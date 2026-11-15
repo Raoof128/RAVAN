@@ -1,9 +1,19 @@
 export type Quality =
   "auto" | "original" | "480p" | "720p" | "1080p" | "1440p" | "2160p";
+/**
+ * What this client says it can decode, in ffprobe's codec names. `hevc10` is
+ * 10-bit HEVC, which also covers HDR10: a capable browser maps it to the screen.
+ */
+export type ClientCapabilities = {
+  video: Array<"h264" | "hevc" | "hevc10" | "av1" | "vp9" | "vp8">;
+  audio: Array<"aac" | "mp3" | "ac3" | "eac3" | "flac" | "opus" | "vorbis">;
+  containers: Array<"mp4" | "webm" | "matroska">;
+};
 export type PlaybackOptions = {
   quality?: Quality;
   audioTrack?: number;
   forceCompatible?: boolean;
+  capabilities?: ClientCapabilities;
 };
 export type SourceRef = {
   fileId: string;
@@ -26,6 +36,8 @@ export type PlaybackPlan = {
   reason?: string;
   progress?: number;
   label?: string;
+  /** The edition is still being prepared and is watched as it grows. */
+  live?: boolean;
 };
 export type PlaybackSession = {
   id: string;
@@ -61,6 +73,8 @@ export interface PlayerAdapter {
   getPositionMs(): number;
   selectAudio(trackId: string): Promise<void>;
   selectSubtitle(trackId: string | null): Promise<void>;
+  /** Replace the caption tracks without reloading the picture. */
+  setSubtitles?(subtitles: NonNullable<PlaybackSession["subtitles"]>): void;
   onState(listener: (state: PlaybackState) => void): () => void;
   destroy(): Promise<void>;
 }
@@ -99,6 +113,7 @@ export type MovieDetail = MovieCard & {
 export type Preferences = {
   audioLanguage: string;
   subtitleLanguage: string;
+  quality: "original" | "720p" | "1080p";
   reducedMotion: boolean;
 };
 export type PlaybackResult =

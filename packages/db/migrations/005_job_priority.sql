@@ -1,0 +1,4 @@
+ALTER TABLE jobs ADD COLUMN priority INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE jobs ADD COLUMN failed_at INTEGER;
+CREATE INDEX jobs_queue ON jobs(state,priority);
+CREATE TABLE settings(key TEXT PRIMARY KEY,value TEXT NOT NULL,updated_at INTEGER NOT NULL);

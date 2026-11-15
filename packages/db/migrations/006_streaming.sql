@@ -1,0 +1,2 @@
+ALTER TABLE prepared_assets ADD COLUMN format TEXT NOT NULL DEFAULT 'mp4';
+ALTER TABLE jobs ADD COLUMN started_at INTEGER;

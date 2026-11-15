@@ -20,10 +20,10 @@ export function registerLibrary(
   let pending: Promise<unknown> | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let failures = 0;
-  function run(folder: string) {
+  function run(folder: string, incremental = false) {
     if (pending) return;
     pending = sync
-      .syncLibrary(folder, controller.signal)
+      .syncLibrary(folder, controller.signal, { incremental })
       .then(
         () => {
           failures = 0;
@@ -40,7 +40,8 @@ export function registerLibrary(
     timer = setTimeout(
       () => {
         const status = sync.status();
-        if (status.folderId) run(status.folderId);
+        // Unattended refreshes ask Drive what changed; owner requests below scan fully.
+        if (status.folderId) run(status.folderId, true);
         schedule();
       },
       60000 * 2 ** failures + Math.random() * 10000,
@@ -59,6 +60,22 @@ export function registerLibrary(
     if (!body.success) return reply.code(400).send({ error: "invalid_folder" });
     if (pending && sync.status().folderId !== body.data.folderId)
       return reply.code(409).send({ error: "scan_in_progress" });
+    // Changing folder: make sure the new one is real before the old one is replaced.
+    if (sync.status().folderId !== body.data.folderId) {
+      let usable: boolean;
+      try {
+        usable = await sync.checkFolder(
+          body.data.folderId,
+          AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]),
+        );
+      } catch {
+        return reply.code(503).send({ error: "drive_unavailable" });
+      }
+      if (!usable) return reply.code(400).send({ error: "invalid_folder" });
+      // A scheduled scan of the old folder may have started while Drive
+      // answered. Do not report a scan that would not run.
+      if (pending) return reply.code(409).send({ error: "scan_in_progress" });
+    }
     run(body.data.folderId);
     return reply.code(202).send({ scanId: "library" });
   });

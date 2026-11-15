@@ -16,6 +16,15 @@ export const progressSchema = z.strictObject({
   positionMs: milliseconds,
   ended: z.boolean(),
 });
+export const capabilitiesSchema = z.strictObject({
+  video: z
+    .array(z.enum(["h264", "hevc", "hevc10", "av1", "vp9", "vp8"]))
+    .max(6),
+  audio: z
+    .array(z.enum(["aac", "mp3", "ac3", "eac3", "flac", "opus", "vorbis"]))
+    .max(7),
+  containers: z.array(z.enum(["mp4", "webm", "matroska"])).max(3),
+});
 export const playbackSchema = z.strictObject({
   movieId: idSchema,
   profileId: idSchema,
@@ -26,8 +35,8 @@ export const playbackSchema = z.strictObject({
     .default("auto"),
   audioTrack: z.number().int().min(0).max(99).optional(),
   forceCompatible: z.boolean().default(false),
+  capabilities: capabilitiesSchema.optional(),
 });
-export const librarySchema = z.strictObject({ folderId: idSchema });
 export const preferencesSchema = z.strictObject({
   audioLanguage: z.string().max(32).default("original"),
   subtitleLanguage: z.string().max(32).default("off"),

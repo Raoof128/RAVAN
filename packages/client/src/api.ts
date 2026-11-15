@@ -43,7 +43,13 @@ export function createApiClient(baseUrl: string) {
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       });
       if (response.status === 204) return undefined as T;
-      const data = (await response.json()) as T & { error?: string };
+      let data: T & { error?: string };
+      try {
+        data = (await response.json()) as T & { error?: string };
+      } catch {
+        // A proxy error page is not JSON. Report the status, not a parse failure.
+        throw new ApiError(response.status, "request_failed");
+      }
       if (!response.ok && !accepted.includes(response.status))
         throw new ApiError(response.status, data.error ?? "request_failed");
       return data;

@@ -1,13 +1,11 @@
 import { afterEach, expect, it } from "vitest";
-import { mkdtemp, rm, writeFile, readFile, access } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openDatabase } from "../../packages/db/src/open.js";
 import { JobQueue } from "../../apps/worker/src/leases.js";
 import { runProcess } from "../../apps/worker/src/process.js";
 import { probeMedia } from "../../apps/worker/src/probe.js";
-import { prepareMedia } from "../../apps/worker/src/prepare.js";
-import { validateOutput } from "../../apps/worker/src/output-validation.js";
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const f of cleanup.splice(0).reverse()) await f();
@@ -32,7 +30,7 @@ it("coalesces jobs and recovers an expired claim", async () => {
   now += 70000;
   expect(jobs.claim()?.id).toBe(id);
 });
-it("probes and prepares an actual synthetic file and publishes only complete VOD", async () => {
+it("probes an actual synthetic file", async () => {
   const d = await directory(),
     input = join(d, "input.mp4");
   await runProcess(
@@ -62,71 +60,25 @@ it("probes and prepares an actual synthetic file and publishes only complete VOD
     10000,
   );
   const probe = await probeMedia(input, new AbortController().signal);
-  expect(probe.video?.codec).toBe("h264");
-  const output = join(d, "prepared");
-  await prepareMedia(
-    {
-      input,
-      output,
-      probe,
-      sourceBytes: 10000n,
-      inputBudget: 20000n,
-      outputBoundaryVerified: true,
-    },
-    new AbortController().signal,
-  );
-  await validateOutput(output);
-  expect(await readFile(join(output, "index.m3u8"), "utf8")).toContain(
-    "#EXT-X-ENDLIST",
-  );
+  expect(probe.video).toMatchObject({
+    codec: "h264",
+    pixelFormat: "yuv420p",
+    width: 160,
+    height: 90,
+  });
+  expect(probe.audio[0]?.codec).toBe("aac");
+  expect(probe.durationMs).toBeGreaterThan(1900);
 });
-it("rejects truncated input, oversized staging, absent output boundary, unsafe manifests and cancelled output", async () => {
+it("rejects truncated input and a cancelled probe", async () => {
   const d = await directory(),
     input = join(d, "broken.mp4");
   await writeFile(input, "broken");
   await expect(
     probeMedia(input, new AbortController().signal),
   ).rejects.toThrow();
-  const options = {
-    input,
-    output: join(d, "out"),
-    probe: {
-      durationMs: 1,
-      container: "mp4",
-      video: {
-        codec: "h264",
-        pixelFormat: "yuv420p",
-        width: 160,
-        height: 90,
-        hdr: false,
-      },
-      audio: [],
-      subtitles: [],
-    },
-    sourceBytes: 100n,
-    inputBudget: 10n,
-    outputBoundaryVerified: true,
-  };
-  await expect(
-    prepareMedia(options, new AbortController().signal),
-  ).rejects.toThrow(/budget/);
-  await expect(
-    prepareMedia(
-      { ...options, inputBudget: 1000n, outputBoundaryVerified: false },
-      new AbortController().signal,
-    ),
-  ).rejects.toThrow(/boundary/);
-  await writeFile(
-    join(d, "index.m3u8"),
-    "#EXTM3U\n#EXTINF:6,\n../secret.ts\n#EXT-X-ENDLIST\n",
-  );
-  await expect(validateOutput(d)).rejects.toThrow();
   const c = new AbortController();
   c.abort();
-  await expect(
-    prepareMedia({ ...options, inputBudget: 1000n }, c.signal),
-  ).rejects.toThrow();
-  await expect(access(options.output)).rejects.toThrow();
+  await expect(probeMedia(input, c.signal)).rejects.toThrow();
 });
 it("classifies resource failures without exposing stderr secrets and persists the safe code", async () => {
   const { mediaFailureCode } = await import("../../apps/worker/src/process.js");

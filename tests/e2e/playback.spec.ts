@@ -210,3 +210,102 @@ test("prepares automatically, loads captions and switches quality with resume", 
     .poll(() => video.evaluate((v) => (v as HTMLVideoElement).readyState))
     .toBeGreaterThanOrEqual(2);
 });
+
+test("plays a streamed edition from its start while it is still being prepared, then to its end", async ({
+  page,
+}) => {
+  const directory = ".local/test-media/hls";
+  const full = await readFile(`${directory}/index.m3u8`, "utf8");
+  const lines = full.trim().split("\n");
+  // The playlist as it stood when two of the four segments existed.
+  const growing =
+    lines
+      .slice(0, lines.indexOf("seg-00001.m4s") + 1)
+      .filter((line) => line !== "#EXT-X-ENDLIST")
+      .join("\n") + "\n";
+  let finished = false;
+  const requested: string[] = [];
+  await page.route("**/api/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    let body: unknown = {};
+    if (path === "/api/session")
+      body = { authenticated: true, configured: true, csrfToken: "test" };
+    else if (path === "/api/movies/fixture")
+      body = {
+        id: "fixture",
+        title: "Streamed fixture",
+        resumeMs: 0,
+        available: true,
+        description: "Test",
+        saved: false,
+        editions: [],
+        tracks: [],
+      };
+    else if (path === "/api/playback")
+      body = {
+        kind: "ready",
+        session: {
+          id: "session",
+          epoch: 1,
+          mediaUrl: "/media/s/test/index.m3u8",
+          expiresAt: new Date(Date.now() + 3600000).toISOString(),
+          startMs: 0,
+          subtitles: [],
+        },
+      };
+    else if (path === "/api/progress") body = { status: "accepted" };
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify(body),
+    });
+  });
+  await page.route("**/media/s/test/**", async (route) => {
+    const file = new URL(route.request().url()).pathname.split("/").pop()!;
+    requested.push(file);
+    if (file === "index.m3u8")
+      return route.fulfill({
+        contentType: "application/vnd.apple.mpegurl",
+        body: finished ? full : growing,
+      });
+    await route.fulfill({
+      contentType: file === "init.mp4" ? "video/mp4" : "video/iso.segment",
+      body: await readFile(`${directory}/${file}`),
+    });
+  });
+  await page.goto("/#/player/fixture");
+  const video = page.locator("video");
+  await expect(video).toBeVisible();
+  await expect
+    .poll(() => video.evaluate((v) => (v as HTMLVideoElement).readyState))
+    .toBeGreaterThanOrEqual(2);
+  // An unfinished playlist starts at the beginning of the film, not its newest segment.
+  expect(
+    await video.evaluate((v) => (v as HTMLVideoElement).currentTime),
+  ).toBeLessThan(3);
+  await video.evaluate(async (v) => {
+    const media = v as HTMLVideoElement;
+    media.muted = true;
+    await media.play();
+  });
+  await expect
+    .poll(() => video.evaluate((v) => (v as HTMLVideoElement).currentTime))
+    .toBeGreaterThan(1);
+  // Only what exists so far has been asked for.
+  expect(requested).not.toContain("seg-00003.m4s");
+  // Preparation finishes: the player picks up the rest and can reach the end.
+  finished = true;
+  await expect
+    .poll(() => video.evaluate((v) => (v as HTMLVideoElement).duration), {
+      timeout: 20000,
+    })
+    .toBeGreaterThan(20);
+  await video.evaluate((v) => {
+    (v as HTMLVideoElement).currentTime = 21;
+  });
+  await expect
+    .poll(() => video.evaluate((v) => (v as HTMLVideoElement).currentTime), {
+      timeout: 15000,
+    })
+    .toBeGreaterThan(21.5);
+  expect(requested).toContain("seg-00003.m4s");
+});

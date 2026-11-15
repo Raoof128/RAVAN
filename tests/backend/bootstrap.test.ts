@@ -3,8 +3,13 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildApp } from "../../apps/api/src/app.js";
-import { parseConfig } from "../../apps/api/src/config.js";
+import { parseConfig, startupReason } from "../../apps/api/src/config.js";
 import { openDatabase } from "../../packages/db/src/open.js";
+import { readdirSync } from "node:fs";
+// One row per migration file, however many there are.
+const migrationCount = readdirSync(
+  new URL("../../packages/db/migrations/", import.meta.url),
+).filter((name) => name.endsWith(".sql")).length;
 
 const cleanups: Array<() => Promise<unknown>> = [];
 afterEach(async () => {
@@ -39,7 +44,7 @@ describe("backend foundation", () => {
     );
     expect(
       db.prepare("SELECT count(*) AS n FROM schema_migrations").get(),
-    ).toEqual({ n: 4 });
+    ).toEqual({ n: migrationCount });
     db.close();
   });
   it("enables_foreign_keys", async () => {
@@ -61,6 +66,69 @@ describe("backend foundation", () => {
     expect(() =>
       parseConfig({ mode: "production", host: "0.0.0.0" }),
     ).toThrow();
+  });
+  it("rejects an origin that could never match a browser Origin header", () => {
+    for (const origin of [
+      "https://ravan.example/",
+      "https://ravan.example/app",
+      "https://ravan.example?x=1",
+    ])
+      expect(() => parseConfig({ origin })).toThrow();
+    expect(parseConfig({ origin: "https://ravan.example:8443" }).origin).toBe(
+      "https://ravan.example:8443",
+    );
+  });
+  it("explains a failed start without printing configuration values", () => {
+    let failure: unknown;
+    try {
+      parseConfig({
+        mode: "production",
+        origin: "https://ravan.example",
+        clientId: "client",
+        clientSecret: "super-secret-value",
+        ownerSubject: "owner",
+        encryptionKey: "not-hex-private-key-material",
+      });
+    } catch (error) {
+      failure = error;
+    }
+    const reason = startupReason(failure);
+    expect(reason).toContain("encryptionKey");
+    expect(reason).not.toMatch(
+      /super-secret-value|not-hex-private-key-material/,
+    );
+    expect(startupReason(new Error("Restored database requires review"))).toBe(
+      "Restored database requires review",
+    );
+    expect(
+      startupReason(Object.assign(new Error("open /x"), { code: "EACCES" })),
+    ).toBe("EACCES");
+  });
+  it("uses one error shape for unknown routes and rate limits", async () => {
+    const app = await buildApp(
+      parseConfig({ dataDir: await folder(), minFreeBytes: 0 }),
+    );
+    cleanups.push(() => app.close());
+    const missing = await app.inject("/no/such/<path>");
+    expect(missing.statusCode).toBe(404);
+    expect(missing.json()).toEqual({ error: "not_found" });
+    let limited = await app.inject("/healthz");
+    for (let i = 0; i < 125 && limited.statusCode !== 429; i++)
+      limited = await app.inject("/healthz");
+    expect(limited.statusCode).toBe(429);
+    expect(limited.json()).toEqual({ error: "rate_limited" });
+    expect(limited.headers["retry-after"]).toBeTruthy();
+  });
+  it("refuses a prepared volume too small to hold an edition beside its neighbours", () => {
+    for (const bytes of [1024 ** 3, 4 * 1024 ** 3, "tiny"])
+      expect(() => parseConfig({ preparedCapacityBytes: bytes })).toThrow();
+    expect(
+      parseConfig({ preparedCapacityBytes: String(60 * 1024 ** 3) })
+        .preparedCapacityBytes,
+    ).toBe(60 * 1024 ** 3);
+    expect(parseConfig({}).preparedCapacityBytes).toBe(20 * 1024 ** 3);
+    expect(parseConfig({}).preparedFormat).toBe("hls");
+    expect(() => parseConfig({ preparedFormat: "dash" })).toThrow();
   });
   it("fails readiness when disk reserve cannot be met", async () => {
     const app = await buildApp(

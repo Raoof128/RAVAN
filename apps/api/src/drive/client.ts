@@ -25,6 +25,11 @@ export interface DriveClient {
     signal?: AbortSignal,
   ): Promise<{
     changed: boolean;
+    /**
+     * What changed, when the client can say. The feed covers the whole Drive, so
+     * without this any edit anywhere counts as a change to the library.
+     */
+    items?: Array<{ fileId: string; parents?: string[] }>;
     nextPageToken?: string;
     newStartPageToken?: string;
   }>;
@@ -132,7 +137,14 @@ export function createDriveClient(
     async changes(tokenValue, signal) {
       const data = z
         .object({
-          changes: z.array(z.unknown()),
+          changes: z.array(
+            z.object({
+              fileId: z.string().optional(),
+              file: z
+                .object({ parents: z.array(z.string()).optional() })
+                .optional(),
+            }),
+          ),
           nextPageToken: z.string().optional(),
           newStartPageToken: z.string().optional(),
         })
@@ -142,7 +154,8 @@ export function createDriveClient(
             {
               pageToken: tokenValue,
               pageSize: "1000",
-              fields: "nextPageToken,newStartPageToken,changes(fileId,removed)",
+              fields:
+                "nextPageToken,newStartPageToken,changes(fileId,removed,file(parents))",
               includeRemoved: "true",
               supportsAllDrives: "true",
               includeItemsFromAllDrives: "true",
@@ -152,6 +165,11 @@ export function createDriveClient(
         );
       return {
         changed: data.changes.length > 0,
+        // A change without a file id cannot be placed; report it as unplaceable.
+        items: data.changes.map((change) => ({
+          fileId: change.fileId ?? "",
+          ...(change.file?.parents ? { parents: change.file.parents } : {}),
+        })),
         nextPageToken: data.nextPageToken,
         newStartPageToken: data.newStartPageToken,
       };

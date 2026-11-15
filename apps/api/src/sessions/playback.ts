@@ -10,6 +10,7 @@ import type {
 } from "../../../../packages/contracts/src/index.js";
 import { hash, secret } from "../auth/sessions.js";
 import { owns, type Principal } from "./devices.js";
+import { HLS_FILE, HLS_PLAYLIST } from "../../../worker/src/hls.js";
 type Row = {
   id: string;
   movie_id: string;
@@ -34,7 +35,7 @@ export class PlaybackService {
     private plan: (
       source: SourceRef,
       profile: string,
-      options?: PlaybackOptions,
+      options?: PlaybackOptions & { startMs?: number },
     ) => Promise<PlaybackPlan>,
     private now = Date.now,
   ) {}
@@ -64,17 +65,23 @@ export class PlaybackService {
     const asset = row.asset_id
       ? (this.db
           .prepare(
-            "SELECT subtitles FROM prepared_assets WHERE id=? AND state='ready'",
+            // The layout is read whatever the state: a withdrawn edition must
+            // not make the address flip to the other layout's file.
+            "SELECT subtitles,format,state FROM prepared_assets WHERE id=?",
           )
-          .get(row.asset_id) as { subtitles: string } | undefined)
+          .get(row.asset_id) as
+          { subtitles: string; format: string; state: string } | undefined)
       : undefined;
-    const captions = asset
-      ? (JSON.parse(asset.subtitles) as Array<{
-          file: string;
-          language: string;
-          label: string;
-        }>)
-      : [];
+    // Captions are complete only once the whole edition is; until then the
+    // player is told on a later heartbeat.
+    const captions =
+      asset?.state === "ready"
+        ? (JSON.parse(asset.subtitles) as Array<{
+            file: string;
+            language: string;
+            label: string;
+          }>)
+        : [];
     return {
       label: row.label,
       subtitles: captions
@@ -86,7 +93,13 @@ export class PlaybackService {
         })),
       id: row.id,
       epoch: row.epoch,
-      mediaUrl: `/media/s/${ticket}/${row.asset_id ? "video.mp4" : "raw"}`,
+      mediaUrl: `/media/s/${ticket}/${
+        !row.asset_id
+          ? "raw"
+          : asset?.format === "hls"
+            ? HLS_PLAYLIST
+            : "video.mp4"
+      }`,
       expiresAt: new Date(row.expires_at).toISOString(),
       startMs,
     };
@@ -112,7 +125,7 @@ export class PlaybackService {
           : "This source is unavailable.",
       };
     const source = await this.verify(sources[0]!.id);
-    const plan = await this.plan(source, profile, options);
+    const plan = await this.plan(source, profile, { ...options, startMs });
     if (plan.mode === "unsupported")
       return {
         kind: "unsupported",
@@ -133,7 +146,7 @@ export class PlaybackService {
         plan.mode === "prepared" &&
         !this.db
           .prepare(
-            "SELECT 1 FROM prepared_assets WHERE id=? AND state='ready' AND source_id=? AND generation=?",
+            "SELECT 1 FROM prepared_assets WHERE id=? AND state IN ('ready','streaming') AND source_id=? AND generation=?",
           )
           .get(plan.assetId, source.fileId, source.generation)
       )
@@ -237,7 +250,9 @@ export class PlaybackService {
   ): Promise<SourceRef & { assetId?: string }> {
     if (
       !/^[A-Za-z0-9_-]{43}$/.test(ticket) ||
-      !/^(raw|video\.mp4|subtitle-\d+\.vtt)$/.test(path)
+      !/^(raw|video\.mp4|subtitle-\d+\.vtt|index\.m3u8|init\.mp4|seg-\d{5}\.m4s)$/.test(
+        path,
+      )
     )
       throw new Error("Media denied");
     const digest = hash(ticket);
@@ -259,7 +274,7 @@ export class PlaybackService {
     if (row.asset_id) {
       const asset = this.db
         .prepare(
-          "SELECT source_id,generation,state,subtitles FROM prepared_assets WHERE id=?",
+          "SELECT source_id,generation,state,subtitles,format FROM prepared_assets WHERE id=?",
         )
         .get(row.asset_id) as
         | {
@@ -267,18 +282,24 @@ export class PlaybackService {
             generation: string;
             state: string;
             subtitles: string;
+            format: string;
           }
         | undefined;
+      // An edition may be watched while it is still being written, but only the
+      // files of its own layout, and its captions only once they are complete.
       if (
         !asset ||
-        asset.state !== "ready" ||
+        (asset.state !== "ready" && asset.state !== "streaming") ||
         asset.source_id !== row.source_id ||
         asset.generation !== row.generation ||
         !(
-          path === "video.mp4" ||
-          (JSON.parse(asset.subtitles) as Array<{ file: string }>).some(
-            (c) => c.file === path,
-          )
+          (asset.format === "hls"
+            ? HLS_FILE.test(path)
+            : path === "video.mp4") ||
+          (asset.state === "ready" &&
+            (JSON.parse(asset.subtitles) as Array<{ file: string }>).some(
+              (c) => c.file === path,
+            ))
         )
       )
         throw new Error("Media denied");

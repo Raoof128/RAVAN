@@ -96,7 +96,7 @@ it("coalesces preparation, separates forced encodes and does not rebuild evicted
     .prepare(
       "INSERT INTO tracks(id,edition_id,kind,codec,metadata) VALUES('probe-f','source-f','probe','metadata',?)",
     )
-    .run(JSON.stringify({ version: 2, generation: "generation", probe }));
+    .run(JSON.stringify({ version: 3, generation: "generation", probe }));
   const planner = new MediaPlanner(h.db, true, "/prepared");
   const a = await planner.planPlayback(source, profile),
     b = await planner.planPlayback(source, profile);

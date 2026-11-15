@@ -21,13 +21,25 @@ RestrictSUIDSGID=true
 CapabilityBoundingSet=
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 NoNewPrivileges=true
+ProtectProc=invisible
+PrivateDevices=true
+ProtectKernelLogs=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/var/lib/ravan /var/lib/ravan-prepared
 MemoryHigh=1536M
 MemoryMax=2G
-CPUQuota=100%
+# Two CPUs: the encoder scales with threads (1.4x measured), and the low weight
+# and niceness below keep it behind everything else on the host.
+CPUQuota=200%
 Nice=10
 CPUWeight=20
 IOWeight=20

@@ -6,8 +6,17 @@ import {
   conversionPlan,
   boundedBitrate,
   inputFormats,
+  textSubtitles,
   type Quality,
 } from "./compatibility.js";
+import {
+  directoryBytes,
+  HLS_PLAYABLE_SEGMENTS,
+  HLS_PLAYLIST,
+  HLS_SEGMENT_SECONDS,
+  readPlaylist,
+  validateEdition,
+} from "./hls.js";
 export type Caption = { file: string; language: string; label: string };
 export async function prepareBrowser(
   input: string,
@@ -20,20 +29,46 @@ export async function prepareBrowser(
     headers?: string;
     maxBytes: number;
     forceEncode?: boolean;
+    /** Encoder and decoder threads; one per CPU the service may use. */
+    threads?: number;
+    preset?: string;
+    /** Video codecs the requesting client decodes; see conversionPlan(). */
+    videoCaps?: readonly string[];
     progress?: (percent: number) => void;
+    /**
+     * "mp4" writes one file that plays only when finished. "hls" writes segments
+     * straight into `output`, so the first of them can be played while the rest
+     * are still being produced.
+     */
+    format?: "mp4" | "hls";
+    /** Called once when enough of an "hls" edition exists to start playing. */
+    playable?: () => void;
     verify: () => Promise<void>;
   },
 ) {
-  const plan = conversionPlan(probe, quality, options.forceEncode);
+  const plan = conversionPlan(
+    probe,
+    quality,
+    options.forceEncode,
+    options.videoCaps,
+  );
   if (audio < 0 || audio >= Math.max(1, probe.audio.length))
     throw Error("Audio track unavailable");
   const bitrate = plan.copyVideo
     ? plan.bitrate
     : boundedBitrate(plan.bitrate, options.maxBytes, probe.durationMs);
-  const partial = output + ".partial";
+  const streaming = options.format === "hls";
+  // A streamed edition is served from its final place while it grows; the
+  // caller decides when it may be offered and removes it if this fails.
+  const partial = streaming ? output : output + ".partial";
   await mkdir(partial, { mode: 0o700 });
+  let finished = false;
   try {
+    const threads = String(Math.max(1, Math.floor(options.threads ?? 1)));
     const filters: string[] = [];
+    // Only frames flagged as interlaced are touched; the rest pass through.
+    if (plan.deinterlace)
+      filters.push("bwdif=mode=send_frame:deint=interlaced");
     if (plan.toneMap)
       filters.push(
         // Resize before float tone mapping to bound memory for 4K sources.
@@ -51,18 +86,9 @@ export async function prepareBrowser(
       );
     const selected = probe.audio[audio];
     const captions: Caption[] = [];
-    const textCodecs = new Set([
-      "subrip",
-      "srt",
-      "ass",
-      "ssa",
-      "webvtt",
-      "mov_text",
-      "text",
-    ]);
     for (const [i, s] of probe.subtitles.entries())
       if (
-        textCodecs.has(s.codec) &&
+        textSubtitles.has(s.codec) &&
         s.index !== undefined &&
         captions.length < 64
       )
@@ -76,9 +102,9 @@ export async function prepareBrowser(
       "-v",
       "error",
       "-threads",
-      "1",
+      threads,
       "-filter_threads",
-      "1",
+      threads,
       "-protocol_whitelist",
       "file,http,tcp",
       "-format_whitelist",
@@ -96,12 +122,16 @@ export async function prepareBrowser(
       "-1",
       "-c:v",
       plan.copyVideo ? "copy" : "libx264",
+      // Apple players only accept HEVC in MP4 under the hvc1 sample entry.
+      ...(plan.copyVideo && probe.video?.codec === "hevc"
+        ? ["-tag:v", "hvc1"]
+        : []),
       ...(!plan.copyVideo
         ? [
             "-threads",
-            "1",
+            threads,
             "-preset",
-            "veryfast",
+            options.preset ?? "superfast",
             "-crf",
             "20",
             "-maxrate",
@@ -127,13 +157,43 @@ export async function prepareBrowser(
               : ["-ac", "2", "-ar", "48000", "-b:a", "192k"]),
           ]
         : []),
-      "-movflags",
-      "+faststart",
-      "-fs",
-      String(options.maxBytes),
-      "-f",
-      "mp4",
-      join(partial, "video.mp4"),
+      ...(streaming
+        ? [
+            // Segments must start on a keyframe. A copied picture is cut at the
+            // keyframes it has; an encoded one is given one per segment.
+            ...(plan.copyVideo
+              ? []
+              : [
+                  "-force_key_frames",
+                  `expr:gte(t,n_forced*${HLS_SEGMENT_SECONDS})`,
+                ]),
+            "-f",
+            "hls",
+            "-hls_time",
+            String(HLS_SEGMENT_SECONDS),
+            // Append-only until finished, then closed with an end marker.
+            "-hls_playlist_type",
+            "event",
+            "-hls_segment_type",
+            "fmp4",
+            "-hls_fmp4_init_filename",
+            "init.mp4",
+            "-hls_segment_filename",
+            join(partial, "seg-%05d.m4s"),
+            // temp_file: a segment and the playlist appear only when complete.
+            "-hls_flags",
+            "independent_segments+temp_file",
+            join(partial, HLS_PLAYLIST),
+          ]
+        : [
+            "-movflags",
+            "+faststart",
+            "-fs",
+            String(options.maxBytes),
+            "-f",
+            "mp4",
+            join(partial, "video.mp4"),
+          ]),
     ];
     for (const c of captions) {
       const index = Number(c.file.match(/\d+/)![0]);
@@ -156,31 +216,102 @@ export async function prepareBrowser(
     args.push("-progress", "pipe:1", "-nostats");
     let buffer = "",
       lastUpdate = 0;
-    await runProcess("ffmpeg", args, signal, 48 * 3600000, (chunk) => {
-      buffer += chunk;
-      if (buffer.length > 16384) throw Error("Invalid progress");
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines)
-        if (line.startsWith("out_time_us=")) {
-          const us = Number(line.slice(12));
-          if (Number.isFinite(us) && Date.now() - lastUpdate > 1000) {
-            lastUpdate = Date.now();
-            options.progress?.(
-              Math.min(99, Math.max(0, (us / (probe.durationMs * 1000)) * 100)),
-            );
-          }
+    // The HLS muxer has no size limit of its own, and its playlist decides when
+    // playback may begin. Both are checked on their own clock, not on FFmpeg's
+    // progress reports, and an overrun stops FFmpeg at once. The volume itself
+    // is the hard limit; this keeps one edition from taking all of it.
+    const limiter = new AbortController();
+    let stopped: Error | undefined,
+      checking = false,
+      announced = false;
+    const inspect = async () => {
+      if (checking || stopped) return;
+      checking = true;
+      try {
+        if ((await directoryBytes(partial)) > options.maxBytes)
+          throw Error("Output budget exceeded");
+        const playlist = await readPlaylist(partial);
+        if (
+          !announced &&
+          playlist &&
+          (playlist.ended || playlist.segments.length >= HLS_PLAYABLE_SEGMENTS)
+        ) {
+          announced = true;
+          options.playable?.();
         }
-    });
-    const file = await stat(join(partial, "video.mp4"));
-    if (file.size <= 0 || file.size > options.maxBytes)
+      } catch (error) {
+        stopped = error instanceof Error ? error : Error("Invalid output");
+        limiter.abort();
+      } finally {
+        checking = false;
+      }
+    };
+    const watch = streaming
+      ? setInterval(() => void inspect(), 1000)
+      : undefined;
+    watch?.unref();
+    const run = runProcess(
+      "ffmpeg",
+      args,
+      AbortSignal.any([signal, limiter.signal]),
+      48 * 3600000,
+      (chunk) => {
+        buffer += chunk;
+        if (buffer.length > 16384) throw Error("Invalid progress");
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines)
+          if (line.startsWith("out_time_us=")) {
+            const us = Number(line.slice(12));
+            if (Number.isFinite(us) && Date.now() - lastUpdate > 1000) {
+              lastUpdate = Date.now();
+              options.progress?.(
+                Math.min(
+                  99,
+                  Math.max(0, (us / (probe.durationMs * 1000)) * 100),
+                ),
+              );
+            }
+          }
+      },
+    );
+    await run
+      .catch((error: unknown) => {
+        throw stopped ?? error;
+      })
+      .finally(() => clearInterval(watch));
+    // One last look: the final segments may have landed since the last tick.
+    if (streaming) {
+      await inspect();
+      if (stopped) throw stopped;
+    }
+    let bytes: number;
+    if (streaming) {
+      const playlist = await validateEdition(partial);
+      if (Math.abs(playlist.seconds * 1000 - probe.durationMs) > 2000)
+        throw Error("Prepared media failed completeness or codec validation");
+      bytes = await directoryBytes(partial);
+    } else bytes = (await stat(join(partial, "video.mp4"))).size;
+    if (bytes <= 0 || bytes > options.maxBytes)
       throw Error("Output budget exceeded");
-    const actual = await probeMedia(join(partial, "video.mp4"), signal);
+    // The playlist was just validated as this server's own, local output.
+    const actual = streaming
+      ? await probeMedia(
+          join(partial, HLS_PLAYLIST),
+          signal,
+          undefined,
+          "hls,mov",
+        )
+      : await probeMedia(join(partial, "video.mp4"), signal);
+    // A copied picture must come out as it went in; an encoded one as H.264 SDR.
+    const expected = plan.copyVideo
+      ? probe.video!
+      : { codec: "h264", pixelFormat: "yuv420p", hdr: false };
     if (
       Math.abs(actual.durationMs - probe.durationMs) > 2000 ||
-      actual.video?.codec !== "h264" ||
-      actual.video.pixelFormat !== "yuv420p" ||
-      actual.video.hdr ||
+      actual.video?.codec !== expected.codec ||
+      actual.video.pixelFormat !== expected.pixelFormat ||
+      actual.video.hdr !== expected.hdr ||
       actual.audio.some((a) => a.codec !== "aac")
     )
       throw Error("Prepared media failed completeness or codec validation");
@@ -192,15 +323,23 @@ export async function prepareBrowser(
     }
     await options.verify();
     signal.throwIfAborted();
-    await rename(partial, output);
+    if (!streaming) await rename(partial, output);
+    // A short film can finish before the first check ran.
+    else if (!announced) options.playable?.();
+    finished = true;
     return {
-      sizeBytes: String(file.size),
+      sizeBytes: String(bytes),
       captions,
+      format: streaming ? ("hls" as const) : ("mp4" as const),
       label: plan.copyVideo
-        ? "Original picture · compatible MP4"
+        ? streaming
+          ? "Original picture · repackaged"
+          : "Original picture · compatible MP4"
         : `${plan.height}p · ${plan.toneMap ? "SDR · " : ""}H.264`,
     };
   } finally {
-    await rm(partial, { recursive: true, force: true });
+    // Nothing incomplete is left behind in either layout.
+    if (!streaming || !finished)
+      await rm(partial, { recursive: true, force: true });
   }
 }

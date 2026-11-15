@@ -14,7 +14,8 @@ import { PairingService } from "./pairing.js";
 import { principal, revokeDevice } from "./devices.js";
 import { MediaPlanner } from "../media/planner.js";
 import { localReader, ASSET_ID } from "../../../worker/src/prepared-store.js";
-import { lstat } from "node:fs/promises";
+import { lstat, readFile } from "node:fs/promises";
+import { HLS_PLAYLIST, parsePlaylist } from "../../../worker/src/hls.js";
 import { join } from "node:path";
 import { sendRaw } from "../media/raw-route.js";
 export function registerSessions(
@@ -28,6 +29,11 @@ export function registerSessions(
     db,
     Boolean(config.workerKey),
     config.preparedDir,
+    Date.now,
+    {
+      format: config.preparedFormat,
+      capacityBytes: config.preparedCapacityBytes,
+    },
   );
   const playback = new PlaybackService(
     db,
@@ -49,16 +55,22 @@ export function registerSessions(
     if (!body.success)
       return reply.code(400).send({ error: "invalid_request" });
     try {
+      const who = principal(db, request);
+      // Only the owner's browser session sets what background work plans for.
+      // The profile name is the client's claim; the session is not.
+      if (who.webHash && body.data.capabilities)
+        planner.rememberCapabilities(body.data.capabilities);
       const r = await playback.create(
         body.data.movieId,
         body.data.profileId,
         body.data.startMs,
-        principal(db, request),
+        who,
         body.data.replaceSessionId,
         {
           quality: body.data.quality,
           audioTrack: body.data.audioTrack,
           forceCompatible: body.data.forceCompatible,
+          capabilities: body.data.capabilities,
         },
       );
       return reply
@@ -118,6 +130,20 @@ export function registerSessions(
           const file = await lstat(join(config.preparedDir, ref.assetId, path));
           if (!file.isFile() || file.isSymbolicLink())
             throw Error("Media denied");
+          if (path === HLS_PLAYLIST) {
+            // The playlist is replaced as the edition grows, so it is read whole,
+            // and only the strict form this server writes is passed on.
+            if (file.size > 2 * 1024 * 1024) throw Error("Media denied");
+            const playlist = parsePlaylist(
+              await readFile(
+                join(config.preparedDir, ref.assetId, path),
+                "utf8",
+              ),
+            );
+            return reply
+              .type("application/vnd.apple.mpegurl")
+              .send(playlist.text);
+          }
           return await sendRaw(
             request,
             reply,
@@ -130,12 +156,31 @@ export function registerSessions(
             async () => {
               await playback.authorizeMedia(ticket, path);
             },
-            path.endsWith(".vtt") ? "text/vtt; charset=utf-8" : "video/mp4",
+            path.endsWith(".vtt")
+              ? "text/vtt; charset=utf-8"
+              : path.endsWith(".m4s")
+                ? "video/iso.segment"
+                : "video/mp4",
           );
         }
-        return await sendRaw(request, reply, ref, cache, async () => {
-          await playback.authorizeMedia(ticket, path);
-        });
+        // Browsers that play WebM or Matroska originals expect them labelled.
+        const stored = (
+          db
+            .prepare("SELECT mime_type FROM source_files WHERE id=?")
+            .get(ref.fileId) as { mime_type: string | null } | undefined
+        )?.mime_type;
+        return await sendRaw(
+          request,
+          reply,
+          ref,
+          cache,
+          async () => {
+            await playback.authorizeMedia(ticket, path);
+          },
+          stored === "video/webm" || stored === "video/x-matroska"
+            ? stored
+            : "video/mp4",
+        );
       } catch {
         return reply.code(403).send({ error: "media_denied" });
       }

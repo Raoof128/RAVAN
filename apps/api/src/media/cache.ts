@@ -12,7 +12,17 @@ import { join } from "node:path";
 import type { Database } from "../../../../packages/db/src/open.js";
 import type { SourceRef } from "../../../../packages/contracts/src/index.js";
 import { StorageBudget } from "./budget.js";
-type Options = { maxBytes: bigint; minFreeBytes: bigint; blockSize?: number };
+type Options = {
+  maxBytes: bigint;
+  minFreeBytes: bigint;
+  blockSize?: number;
+  /**
+   * Blocks to fetch ahead of the one being sent. Each block costs a Drive round
+   * trip plus a verification, so reading strictly one at a time caps throughput
+   * well below what the network allows. Memory per stream is bounded by this.
+   */
+  readAhead?: number;
+};
 type ReadBlock = (
   ref: SourceRef,
   start: bigint,
@@ -113,18 +123,22 @@ export class BlockCache {
       )
       .get(key) as { size_bytes: number } | undefined;
     if (row) {
+      let data: Buffer | undefined;
       try {
-        const data = await readFile(path);
-        if (BigInt(data.length) !== end - start + 1n)
-          throw new Error("Cache size mismatch");
+        data = await readFile(path);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+      if (data && BigInt(data.length) === end - start + 1n) {
         this.db
           .prepare("UPDATE cache_blocks SET last_used=? WHERE key=?")
           .run(Date.now(), key);
         return data;
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-        this.db.prepare("DELETE FROM cache_blocks WHERE key=?").run(key);
       }
+      // A missing or short file (an interrupted write, a damaged disk) is only a
+      // cache miss. Leaving the row made that part of the film fail on every read.
+      this.db.prepare("DELETE FROM cache_blocks WHERE key=?").run(key);
+      if (data) await unlink(path).catch(() => {});
     }
     const reservation = await this.makeRoom(end - start + 1n);
     const partial = join(this.directory, `${key}.${randomUUID()}.partial`);
@@ -171,8 +185,12 @@ export class BlockCache {
         promise: Promise.resolve(new Uint8Array()),
       };
       this.flights.set(key, flight);
+      const started = flight;
       flight.promise = this.load(ref, index, key, controller.signal).finally(
-        () => this.flights.delete(key),
+        () => {
+          // A replacement flight may already own this key; leave it in place.
+          if (this.flights.get(key) === started) this.flights.delete(key);
+        },
       );
     }
     flight.readers++;
@@ -189,7 +207,13 @@ export class BlockCache {
     } finally {
       signal.removeEventListener("abort", listener);
       flight.readers--;
-      if (!flight.readers) flight.controller.abort();
+      if (!flight.readers) {
+        flight.controller.abort();
+        // Retire the cancelled fetch now. It takes time to unwind, and a reader
+        // arriving meanwhile (a seek re-requesting the same block) must start a
+        // fresh fetch rather than inherit this one's cancellation.
+        if (this.flights.get(key) === flight) this.flights.delete(key);
+      }
       const count = this.pins.get(key)! - 1;
       if (count) this.pins.set(key, count);
       else this.pins.delete(key);
@@ -203,18 +227,58 @@ export class BlockCache {
   ): AsyncIterable<Uint8Array> {
     if (start < 0n || end >= BigInt(source.sizeBytes))
       throw new Error("Invalid source range");
-    for (let offset = start; offset <= end;) {
-      signal.throwIfAborted();
-      const index = offset / this.blockSize;
-      const data = await this.block(source, index, signal);
-      const begin = Number(offset % this.blockSize);
-      const length = Number(
-        end - offset + 1n < BigInt(data.length - begin)
-          ? end - offset + 1n
-          : BigInt(data.length - begin),
-      );
-      yield data.subarray(begin, begin + length);
-      offset += BigInt(length);
+    const last = end / this.blockSize;
+    const window = BigInt(Math.max(0, this.options.readAhead ?? 0));
+    // Fetches started early stop as soon as this reader does.
+    const inner = new AbortController();
+    const stop = () => inner.abort(signal.reason);
+    signal.addEventListener("abort", stop, { once: true });
+    if (signal.aborted) stop();
+    const ahead = new Map<bigint, Promise<Uint8Array>>();
+    const fetch = (index: bigint) => {
+      const pending = this.block(source, index, inner.signal);
+      // Early fetches are opportunistic; a failure matters only at its turn.
+      pending.catch(() => {});
+      return pending;
+    };
+    try {
+      for (let offset = start; offset <= end;) {
+        signal.throwIfAborted();
+        const index = offset / this.blockSize;
+        const early = ahead.get(index);
+        ahead.delete(index);
+        const current = early ?? fetch(index);
+        for (
+          let next = index + 1n;
+          next <= index + window && next <= last;
+          next++
+        )
+          if (!ahead.has(next)) ahead.set(next, fetch(next));
+        let data: Uint8Array;
+        try {
+          data = await current;
+        } catch (error) {
+          // An early fetch can fail for want of cache room that the blocks
+          // before it were still holding. Ask again now that it is this
+          // block's turn; a real failure fails again.
+          if (!early || signal.aborted) throw error;
+          // Let the other early fetches finish first, so their room is free.
+          await Promise.allSettled(ahead.values());
+          data = await this.block(source, index, inner.signal);
+        }
+        const begin = Number(offset % this.blockSize);
+        const length = Number(
+          end - offset + 1n < BigInt(data.length - begin)
+            ? end - offset + 1n
+            : BigInt(data.length - begin),
+        );
+        yield data.subarray(begin, begin + length);
+        offset += BigInt(length);
+      }
+    } finally {
+      signal.removeEventListener("abort", stop);
+      inner.abort();
+      await Promise.allSettled(ahead.values());
     }
   }
 }

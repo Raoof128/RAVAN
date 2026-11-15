@@ -1,5 +1,5 @@
 import { buildApp } from "./app.js";
-import { environmentConfig } from "./config.js";
+import { environmentConfig, startupReason } from "./config.js";
 try {
   const config = environmentConfig();
   const app = await buildApp(config);
@@ -11,9 +11,10 @@ try {
     });
   await app.listen({ host: config.host, port: config.port });
   console.info(`Mov API listening on ${config.host}:${config.port}`);
-} catch {
+} catch (error) {
   console.error(
     "Mov startup failed. Check configuration, database permissions and runtime.",
+    startupReason(error),
   );
   process.exitCode = 1;
 }

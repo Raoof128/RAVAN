@@ -164,6 +164,12 @@ export class PlayerController {
         if (this.destroyed) return;
         if (playing) await this.adapter.play();
       }
+      // An edition watched while it was prepared gains its captions when done.
+      else if (
+        JSON.stringify(next.subtitles ?? []) !==
+        JSON.stringify(this.session.subtitles ?? [])
+      )
+        this.adapter.setSubtitles?.(next.subtitles ?? []);
       this.session = next;
       await this.flush(this.completedAt !== undefined);
     } catch {

@@ -207,3 +207,45 @@ it("recognizes generic-MIME video uploads but excludes archives and documents", 
       false,
     );
 });
+
+it("keeps the library available when the root recheck fails for a transient reason", async () => {
+  const { sync, client, db } = await fixture();
+  await sync.syncLibrary("root", new AbortController().signal);
+  db.prepare(
+    "INSERT INTO playback_sessions(id,ticket_hash,movie_id,source_id,generation,epoch,lease_until,access_until,expires_at) SELECT 'live','ticket',movie_id,id,generation,1,9e15,9e15,9e15 FROM source_files WHERE id='one'",
+  ).run();
+  const get = client.get;
+  let rootReads = 0;
+  // A child page is denied, then Google briefly fails the confirming root lookup.
+  client.get = async (id, signal) => {
+    if (id === "root" && ++rootReads > 1) throw new DriveError(503);
+    return get(id, signal);
+  };
+  client.list = async () => {
+    throw new DriveError(404);
+  };
+  await expect(
+    sync.syncLibrary("root", new AbortController().signal),
+  ).rejects.toThrow();
+  expect(sources(db).map((f) => f.available)).toEqual([1, 1]);
+  expect(db.prepare("SELECT revoked_at FROM playback_sessions").get()).toEqual({
+    revoked_at: null,
+  });
+});
+it("still closes the whole library when the root itself is confirmed lost", async () => {
+  const { sync, client, db } = await fixture();
+  await sync.syncLibrary("root", new AbortController().signal);
+  const get = client.get;
+  let rootReads = 0;
+  client.get = async (id, signal) => {
+    if (id === "root" && ++rootReads > 1) throw new DriveError(404);
+    return get(id, signal);
+  };
+  client.list = async () => {
+    throw new DriveError(403);
+  };
+  await expect(
+    sync.syncLibrary("root", new AbortController().signal),
+  ).rejects.toThrow();
+  expect(sources(db).map((f) => f.available)).toEqual([0, 0]);
+});

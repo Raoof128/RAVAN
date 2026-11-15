@@ -10,6 +10,26 @@ import { MfaService } from "./mfa.js";
 import { registerMfaRoutes } from "./mfa-routes.js";
 import { findDevice } from "../sessions/devices.js";
 
+// Reachable without an owner session: session discovery and the TV's own pairing
+// handshake, which is bound to a poll secret and approved separately by the owner.
+const publicApiRoutes = new Set([
+  "/api/session",
+  "/api/pairing",
+  "/api/pairing/poll",
+]);
+const deviceReadRoutes = new Set([
+  "/api/movies",
+  "/api/movies/:id",
+  "/api/preferences",
+]);
+const deviceRoutes = new Set([
+  "/api/playback",
+  "/api/playback/:id/heartbeat",
+  "/api/playback/:id",
+  "/api/progress",
+  "/api/pairing/ack",
+]);
+
 export function registerAuth(
   app: FastifyInstance,
   db: Database,
@@ -51,8 +71,11 @@ export function registerAuth(
         return reply.code(503).send({ error: "google_not_configured" });
       for (const [key, value] of pending)
         if (value.expires < Date.now()) pending.delete(key);
-      if (pending.size >= 100)
-        return reply.code(429).send({ error: "try_later" });
+      // Refusing new attempts at capacity lets anonymous requests lock the owner
+      // out: ten starts a minute from one address fill 100 ten-minute slots. Drop
+      // the oldest abandoned attempt instead; a Map iterates in insertion order.
+      while (pending.size >= 100)
+        pending.delete(pending.keys().next().value as string);
       const state = secret(),
         nonce = secret(),
         verifier = secret(),
@@ -146,33 +169,17 @@ export function registerAuth(
         : {}),
     };
   });
+  // Authorize by the matched route pattern, never the raw request path. The router
+  // percent-decodes before matching, so "/%61pi/movies" reaches the "/api/movies"
+  // handler while its raw URL does not start with "/api/".
   app.addHook("preHandler", async (request, reply) => {
-    if (
-      !request.url.startsWith("/api/") ||
-      request.routeOptions.url === "/api/session"
-    )
-      return;
     const route = request.routeOptions.url ?? "";
-    if (
-      [" /api/pairing", "/api/pairing/poll"]
-        .map((s) => s.trim())
-        .includes(route)
-    )
-      return;
+    if (!route.startsWith("/api/") || publicApiRoutes.has(route)) return;
     const device = findDevice(db, request);
     if (device) {
       const allowed =
-        (request.method === "GET" &&
-          ["/api/movies", "/api/movies/:id", "/api/preferences"].includes(
-            route,
-          )) ||
-        [
-          "/api/playback",
-          "/api/playback/:id/heartbeat",
-          "/api/playback/:id",
-          "/api/progress",
-          "/api/pairing/ack",
-        ].includes(route);
+        (request.method === "GET" && deviceReadRoutes.has(route)) ||
+        deviceRoutes.has(route);
       if (allowed) return;
       return reply.code(403).send({ error: "owner_required" });
     }

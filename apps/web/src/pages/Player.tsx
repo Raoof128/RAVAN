@@ -4,6 +4,13 @@ import { useApi } from "../../../../packages/client/src/api.js";
 import { StatusPanel } from "../../../../packages/ui/src/StatusPanel.js";
 import { BrowserAdapter } from "../player/BrowserAdapter.js";
 import {
+  detectCapabilities,
+  refineCapabilities,
+} from "../player/capabilities.js";
+// Ask the device how well it decodes each codec as soon as the player is
+// loaded; the answer is ready long before a film is started.
+void refineCapabilities().catch(() => {});
+import {
   PlayerController,
   type ControllerState,
 } from "../player/PlayerController.js";
@@ -47,7 +54,7 @@ export function Player({
               .catch(() => {});
         }
       },
-      { quality, audioTrack },
+      { quality, audioTrack, capabilities: detectCapabilities() },
     );
     controller.current = player;
     api

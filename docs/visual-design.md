@@ -10,4 +10,4 @@ Six generated source images become eight WebP derivatives: six 480 px posters an
 
 Controls remain semantic links/buttons with visible focus. Motion is brief and suppressed under reduced motion. Mobile has its own hero crop, stacked collection and compact navigation. The LG C1 build targets Chromium 79 and retains explicit dimensions for its posters. Physical hardware acceptance remains open.
 
-See the [asset prompts and provenance](design-art-manifest.json) and the [project README](../README.md) for current capabilities and verification.
+See [design and current documentation](frontend-redesign-2026-11-15.md), [asset prompts and provenance](design-art-manifest.json), and [verification](testing/ravan-redesign-2026-11-15.md).

@@ -7,6 +7,8 @@ export default tseslint.config(
       ".superpowers/**",
       ".local/**",
       ".wrangler/**",
+      // Local session-tool state; it is not project source.
+      ".remember/**",
     ],
   },
   ...tseslint.configs.recommended,

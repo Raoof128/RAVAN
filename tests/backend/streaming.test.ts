@@ -48,6 +48,7 @@ it("rejects replacement and truncated source bytes", async () => {
         status: 206,
         headers: { "Content-Range": "bytes 2-5/10" },
       }),
+    1,
   );
   await expect(
     short.block(ref, 2n, 5n, new AbortController().signal),
@@ -172,4 +173,126 @@ it("keeps a healthy slow response open beyond the former total-response deadline
     timer.mockRestore();
     await app.close();
   }
+});
+
+const ranged = () =>
+  new Response("2345", {
+    status: 206,
+    headers: { "Content-Range": "bytes 2-5/10" },
+  });
+it.each([
+  ["a 503", async () => new Response("busy", { status: 503 })],
+  ["a 429", async () => new Response("slow down", { status: 429 })],
+  [
+    "a dropped connection",
+    async () => {
+      throw new TypeError("fetch failed");
+    },
+  ],
+  [
+    "a body that closed early",
+    async () =>
+      new Response("23", {
+        status: 206,
+        headers: { "Content-Range": "bytes 2-5/10" },
+      }),
+  ],
+] as const)("recovers a block read from %s", async (_name, failure) => {
+  let calls = 0;
+  const reader = new DriveSourceReader(
+    async () => "token",
+    async () => ref,
+    async () => (++calls === 1 ? failure() : ranged()),
+    1,
+  );
+  expect(
+    Buffer.from(
+      await reader.block(ref, 2n, 5n, new AbortController().signal),
+    ).toString(),
+  ).toBe("2345");
+  expect(calls).toBe(2);
+});
+it("bounds retries and does not retry a refusal or an ignored range", async () => {
+  let calls = 0;
+  const failing = new DriveSourceReader(
+    async () => "token",
+    async () => ref,
+    async () => {
+      calls++;
+      return new Response("busy", { status: 503 });
+    },
+    1,
+  );
+  await expect(
+    failing.block(ref, 2n, 5n, new AbortController().signal),
+  ).rejects.toThrow();
+  expect(calls).toBe(3);
+  for (const status of [200, 401, 403, 404, 416]) {
+    calls = 0;
+    const refused = new DriveSourceReader(
+      async () => "token",
+      async () => ref,
+      async () => {
+        calls++;
+        return new Response("no", { status });
+      },
+      1,
+    );
+    await expect(
+      refused.block(ref, 2n, 5n, new AbortController().signal),
+    ).rejects.toThrow();
+    expect(calls, `status ${status}`).toBe(1);
+  }
+});
+it("stops retrying as soon as the reader goes away", async () => {
+  const controller = new AbortController();
+  let calls = 0;
+  const reader = new DriveSourceReader(
+    async () => "token",
+    async () => ref,
+    async () => {
+      calls++;
+      queueMicrotask(() => controller.abort());
+      return new Response("busy", { status: 503 });
+    },
+    60000,
+  );
+  await expect(reader.block(ref, 2n, 5n, controller.signal)).rejects.toThrow();
+  expect(calls).toBe(1);
+});
+it("asks for a fresh verification after the bytes are read, not before", async () => {
+  const order: string[] = [];
+  const reader = new DriveSourceReader(
+    async () => "token",
+    async (_id, fresh) => {
+      order.push(fresh ? "fresh" : "reusable");
+      return ref;
+    },
+    async () => {
+      order.push("read");
+      return ranged();
+    },
+  );
+  await reader.block(ref, 2n, 5n, new AbortController().signal);
+  expect(order).toEqual(["reusable", "read", "fresh"]);
+});
+it("does not retry when the Drive grant itself is unavailable", async () => {
+  let tokens = 0,
+    fetches = 0;
+  const reader = new DriveSourceReader(
+    async () => {
+      tokens++;
+      throw new Error("invalid_grant");
+    },
+    async () => ref,
+    async () => {
+      fetches++;
+      return ranged();
+    },
+    1,
+  );
+  await expect(
+    reader.block(ref, 2n, 5n, new AbortController().signal),
+  ).rejects.toThrow();
+  expect([tokens, fetches]).toEqual([1, 0]);
 });

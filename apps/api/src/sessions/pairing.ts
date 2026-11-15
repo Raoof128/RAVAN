@@ -32,14 +32,23 @@ export class PairingService {
       .run(now - 60000);
     for (const [id, time] of this.polled)
       if (time < now - 600000) this.polled.delete(id);
-    if (
+    // Anyone can start a pairing, so a full table must not refuse a real TV.
+    // Drop the oldest request nobody has approved; approved ones are kept.
+    const count = () =>
       (
         this.db.prepare("SELECT COUNT(*) n FROM pairing_requests").get() as {
           n: number;
         }
-      ).n >= 100
-    )
-      throw new Error("Pairing capacity");
+      ).n;
+    while (count() >= 100)
+      if (
+        !this.db
+          .prepare(
+            "DELETE FROM pairing_requests WHERE id=(SELECT id FROM pairing_requests WHERE state='pending' ORDER BY expires_at,rowid LIMIT 1)",
+          )
+          .run().changes
+      )
+        throw new Error("Pairing capacity");
     const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     const code = Array.from(
       { length: 8 },
@@ -71,12 +80,7 @@ export class PairingService {
       const row = this.db
         .prepare("SELECT * FROM pairing_requests WHERE code_hash=?")
         .get(hash(code)) as Row | undefined;
-      if (
-        !row ||
-        row.expires_at <= this.now() ||
-        row.state !== "pending" ||
-        row.attempts >= 5
-      )
+      if (!row || row.expires_at <= this.now() || row.state !== "pending")
         throw new Error("Pairing unavailable");
       const credential = secret(),
         device = randomUUID();

@@ -2,6 +2,11 @@ import { expect, it } from "vitest";
 import Sqlite from "better-sqlite3";
 import { readFileSync } from "node:fs";
 import { migrate } from "../../packages/db/src/migrate.js";
+import { readdirSync } from "node:fs";
+// One row per migration file, however many there are.
+const migrationCount = readdirSync(
+  new URL("../../packages/db/migrations/", import.meta.url),
+).filter((name) => name.endsWith(".sql")).length;
 
 it("upgrading a populated pre-MFA database invalidates old browser, TV, pairing and playback credentials", () => {
   const db = new Sqlite(":memory:");
@@ -46,7 +51,7 @@ it("upgrading a populated pre-MFA database invalidates old browser, TV, pairing 
     migrate(db); // Reopening must not revoke future MFA sessions a second time.
     expect(
       db.prepare("SELECT count(*) AS count FROM schema_migrations").get(),
-    ).toEqual({ count: 4 });
+    ).toEqual({ count: migrationCount });
   } finally {
     db.close();
   }

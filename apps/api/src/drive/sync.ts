@@ -17,8 +17,11 @@ export function isVideoFile(file: Pick<DriveFile, "mimeType" | "name">) {
       "application/x-matroska",
       "application/mp4",
       "application/ogg",
+      "application/mxf",
+      "application/vnd.rn-realmedia",
+      "application/vnd.rn-realmedia-vbr",
     ].includes(file.mimeType) &&
-      /\.(mp4|m4v|mkv|webm|mov|avi|wmv|asf|flv|mpg|mpeg|m2v|m2ts|mts|ts|vob|ogv|3gp|3g2|rm|rmvb|nut)$/i.test(
+      /\.(mp4|m4v|mkv|mk3d|webm|mov|qt|avi|divx|xvid|wmv|asf|flv|f4v|mpg|mpeg|mpe|m1v|m2v|m2ts|m2t|mts|ts|tp|trp|vob|vro|mod|tod|ogv|ogm|3gp|3g2|rm|rmvb|nut|mxf|wtv|dv|ivf)$/i.test(
         file.name,
       ))
   );
@@ -38,12 +41,19 @@ type Checkpoint = {
   counts: string;
   token: string | null;
 };
+/** How long one successful Drive verification may answer later non-fresh checks. */
+export const VERIFY_REUSE_MS = 5000;
+/** A scheduled refresh trusts the Drive change feed for at most this long. */
+export const FULL_SCAN_INTERVAL_MS = 3600000;
+type Verification = { at: number; root: string; promise: Promise<SourceRef> };
 export class LibrarySync {
   private running?: Promise<Result>;
   private activeFolder?: string;
+  private verified = new Map<string, Verification>();
   constructor(
     private db: Database,
     private client: DriveClient,
+    private now = Date.now,
   ) {}
   status() {
     const row = this.checkpoint();
@@ -59,6 +69,24 @@ export class LibrarySync {
       counts: data.result ?? {},
       ...(data.error ? { error: data.error } : {}),
     };
+  }
+  /**
+   * Confirm a folder exists and is usable before it replaces the library's
+   * checkpoint. A mistyped id otherwise displaces a working library and every
+   * playback fails until it is corrected.
+   */
+  async checkFolder(folderId: string, signal: AbortSignal): Promise<boolean> {
+    try {
+      const folder = await this.client.get(driveId.parse(folderId), signal);
+      return !folder.trashed && folder.mimeType === folderMime;
+    } catch (error) {
+      if (
+        error instanceof DriveError &&
+        (error.status === 403 || error.status === 404)
+      )
+        return false;
+      throw error;
+    }
   }
   private checkpoint() {
     return this.db
@@ -77,7 +105,16 @@ export class LibrarySync {
       )
       .run(root, state, token, JSON.stringify(data));
   }
-  syncLibrary(folderId: string, signal: AbortSignal): Promise<Result> {
+  /**
+   * `incremental` is for the unattended schedule: when Drive reports no change
+   * since the last complete scan, the published catalogue is already current and
+   * the folder tree is not enumerated again. An owner-requested sync always scans.
+   */
+  syncLibrary(
+    folderId: string,
+    signal: AbortSignal,
+    options: { incremental?: boolean } = {},
+  ): Promise<Result> {
     driveId.parse(folderId);
     if (this.running) {
       if (this.activeFolder !== folderId)
@@ -85,13 +122,36 @@ export class LibrarySync {
       return this.running;
     }
     this.activeFolder = folderId;
-    this.running = this.scan(folderId, signal).finally(() => {
+    this.running = this.scan(
+      folderId,
+      signal,
+      options.incremental ?? false,
+    ).finally(() => {
       this.running = undefined;
       this.activeFolder = undefined;
     });
     return this.running;
   }
-  private async changeCursor(start: string, signal: AbortSignal) {
+  /**
+   * Files and folders whose change could alter the catalogue: every source ever
+   * catalogued, every folder of the library, and anything now placed in one.
+   */
+  private concerns(folders: Iterable<string>, files: Iterable<string> = []) {
+    const known = new Set<string>([...folders, ...files]);
+    for (const row of this.db.prepare("SELECT id FROM source_files").all() as {
+      id: string;
+    }[])
+      known.add(row.id);
+    return (item: { fileId: string; parents?: string[] }) =>
+      !item.fileId ||
+      known.has(item.fileId) ||
+      Boolean(item.parents?.some((parent) => known.has(parent)));
+  }
+  private async changeCursor(
+    start: string,
+    signal: AbortSignal,
+    concerns?: (item: { fileId: string; parents?: string[] }) => boolean,
+  ) {
     let token = start,
       changed = false;
     const seen = new Set<string>();
@@ -100,7 +160,9 @@ export class LibrarySync {
       if (seen.has(token)) throw new Error("Changes pagination loop");
       seen.add(token);
       const page = await this.client.changes(token, signal);
-      changed ||= page.changed;
+      // An edit elsewhere in the owner's Drive is not a change to the library.
+      changed ||=
+        concerns && page.items ? page.items.some(concerns) : page.changed;
       if (!page.nextPageToken) {
         if (!page.newStartPageToken)
           throw new Error("Missing changes checkpoint");
@@ -110,8 +172,16 @@ export class LibrarySync {
     }
     throw new Error("Changes page limit");
   }
-  private async scan(root: string, signal: AbortSignal): Promise<Result> {
+  private async scan(
+    root: string,
+    signal: AbortSignal,
+    incremental: boolean,
+  ): Promise<Result> {
     signal.throwIfAborted();
+    if (incremental) {
+      const current = await this.unchanged(root, signal);
+      if (current) return current;
+    }
     let stage: Stage | undefined;
     try {
       const folder = await this.client.get(root, signal);
@@ -120,7 +190,19 @@ export class LibrarySync {
       const saved = this.checkpoint();
       if (saved?.folder_id === root) {
         stage = (JSON.parse(saved.counts) as { stage?: Stage }).stage;
-        if (stage && (await this.changeCursor(stage.start, signal)).changed)
+        if (
+          stage &&
+          (
+            await this.changeCursor(
+              stage.start,
+              signal,
+              this.concerns(
+                [...stage.seen, ...stage.queue],
+                stage.files.map((f) => f.id),
+              ),
+            )
+          ).changed
+        )
           stage = undefined;
       }
       // Reconcile changes around the snapshot. Concurrent changes restart the scan;
@@ -169,12 +251,19 @@ export class LibrarySync {
           )();
           stage = next;
         }
-        const end = await this.changeCursor(stage.start, signal);
+        const end = await this.changeCursor(
+          stage.start,
+          signal,
+          this.concerns(
+            stage.seen,
+            stage.files.map((f) => f.id),
+          ),
+        );
         if (end.changed) {
           stage = undefined;
           continue;
         }
-        const result = this.publish(root, stage.files, end.token);
+        const result = this.publish(root, stage.files, end.token, stage.seen);
         return result;
       }
       throw new Error("Library changed during scan; retry");
@@ -185,9 +274,17 @@ export class LibrarySync {
       ) {
         // Only a lost root invalidates the entire library; failed child pages remain
         // unpublished. Session creation always rechecks actual membership/access.
+        // Only Google confirming the root is gone or forbidden closes the library.
+        // A timeout, 5xx or shutdown during this lookup proves nothing.
+        let rootLost = false;
         try {
           await this.client.get(root, signal);
-        } catch {
+        } catch (rootError) {
+          rootLost =
+            rootError instanceof DriveError &&
+            (rootError.status === 403 || rootError.status === 404);
+        }
+        if (rootLost)
           this.db.transaction(() => {
             this.db.prepare("UPDATE source_files SET available=0").run();
             this.db
@@ -196,7 +293,6 @@ export class LibrarySync {
               )
               .run(Date.now());
           })();
-        }
       }
       const saved = this.checkpoint();
       this.save(root, "failed", saved?.token ?? null, {
@@ -209,7 +305,65 @@ export class LibrarySync {
       throw error;
     }
   }
-  private publish(root: string, files: DriveFile[], token: string): Result {
+  /**
+   * The published result, when Drive reports nothing changed since it was made.
+   * This runs outside scan()'s failure handling on purpose: a transient error
+   * here rejects and leaves the good checkpoint as it is, rather than recording
+   * a failed scan and forcing the full enumeration this check exists to avoid.
+   */
+  private async unchanged(
+    root: string,
+    signal: AbortSignal,
+  ): Promise<Result | undefined> {
+    const saved = this.checkpoint();
+    if (
+      saved?.folder_id !== root ||
+      saved.state !== "succeeded" ||
+      !saved.token
+    )
+      return;
+    const last = JSON.parse(saved.counts) as {
+      result?: Result;
+      scannedAt?: number;
+      folders?: string[];
+    };
+    if (
+      !last.result ||
+      last.scannedAt === undefined ||
+      this.now() - last.scannedAt >= FULL_SCAN_INTERVAL_MS
+    )
+      return;
+    try {
+      const folder = await this.client.get(root, signal);
+      if (folder.trashed || folder.mimeType !== folderMime) return;
+      const cursor = await this.changeCursor(
+        saved.token,
+        signal,
+        // A checkpoint from before folders were recorded treats any change as relevant.
+        last.folders ? this.concerns([root, ...last.folders]) : undefined,
+      );
+      if (cursor.changed) return;
+      if (cursor.token !== saved.token)
+        this.save(root, "succeeded", cursor.token, last);
+      return last.result;
+    } catch (error) {
+      // A refusal (lost root, expired change token) will not fix itself: let the
+      // full scan establish and record the real state.
+      if (
+        error instanceof DriveError &&
+        error.status < 500 &&
+        error.status !== 429
+      )
+        return;
+      throw error;
+    }
+  }
+  private publish(
+    root: string,
+    files: DriveFile[],
+    token: string,
+    folders: string[],
+  ): Result {
     return this.db.transaction(() => {
       this.db.prepare("UPDATE source_files SET available=0").run();
       for (const file of files) {
@@ -253,37 +407,87 @@ export class LibrarySync {
           .get() as { n: number }
       ).n;
       const result = { upserts: files.length, unavailable };
-      this.save(root, "succeeded", token, { result });
+      this.save(root, "succeeded", token, {
+        result,
+        scannedAt: this.now(),
+        folders,
+      });
       return result;
     })();
   }
-  async verifySource(fileId: string): Promise<SourceRef> {
+  /**
+   * Confirm with Drive that a source is still the catalogued generation inside the
+   * selected folder. Local state is checked on every call. The Drive answer may be
+   * reused for VERIFY_REUSE_MS: streaming asked three times per 4 MiB block, which
+   * made metadata lookups, not bytes, the limit on throughput. Pass `fresh` when
+   * the answer must postdate something just read from Drive.
+   */
+  async verifySource(fileId: string, fresh = false): Promise<SourceRef> {
     const row = this.db
       .prepare("SELECT generation,available FROM source_files WHERE id=?")
       .get(fileId) as { generation: string; available: number } | undefined;
     const root = this.checkpoint()?.folder_id;
     if (!row?.available || !root) throw new Error("Source unavailable");
+    const recent = this.verified.get(fileId);
+    if (
+      !fresh &&
+      recent &&
+      recent.root === root &&
+      this.now() - recent.at < VERIFY_REUSE_MS
+    ) {
+      const ref = await recent.promise;
+      if (ref.generation === row.generation) return ref;
+    }
+    if (this.verified.size > 256)
+      for (const [id, entry] of this.verified)
+        if (this.now() - entry.at >= VERIFY_REUSE_MS) this.verified.delete(id);
+    const entry: Verification = {
+      at: this.now(),
+      root,
+      promise: this.verifyRemote(fileId, row.generation, root),
+    };
+    this.verified.set(fileId, entry);
+    try {
+      return await entry.promise;
+    } catch (error) {
+      // Never let a failed or stale answer satisfy a later caller.
+      if (this.verified.get(fileId) === entry) this.verified.delete(fileId);
+      throw error;
+    }
+  }
+  private async verifyRemote(
+    fileId: string,
+    expected: string,
+    root: string,
+  ): Promise<SourceRef> {
     const signal = AbortSignal.timeout(30000);
-    const file = await this.client.get(fileId, signal);
-    const rootFile = await this.client.get(root, signal);
+    const [file, rootFile] = await Promise.all([
+      this.client.get(fileId, signal),
+      this.client.get(root, signal),
+    ]);
     if (
       rootFile.trashed ||
       file.capabilities?.canDownload === false ||
-      generation(file) !== row.generation ||
+      generation(file) !== expected ||
       !(await belongsTo(this.client, file, root, signal))
     ) {
+      // Only condemn the generation this check was asked about. A scan may have
+      // published a newer one while Drive was answering; closing that row would
+      // hide a good source until the next full scan.
       this.db.transaction(() => {
         this.db
-          .prepare("UPDATE source_files SET available=0 WHERE id=?")
-          .run(fileId);
+          .prepare(
+            "UPDATE source_files SET available=0 WHERE id=? AND generation=?",
+          )
+          .run(fileId, expected);
         this.db
           .prepare(
-            "UPDATE playback_sessions SET revoked_at=? WHERE source_id=? AND revoked_at IS NULL",
+            "UPDATE playback_sessions SET revoked_at=? WHERE source_id=? AND generation=? AND revoked_at IS NULL",
           )
-          .run(Date.now(), fileId);
+          .run(Date.now(), fileId, expected);
       })();
       throw new Error("Source changed or unavailable");
     }
-    return { fileId, generation: row.generation, sizeBytes: file.size! };
+    return { fileId, generation: expected, sizeBytes: file.size! };
   }
 }

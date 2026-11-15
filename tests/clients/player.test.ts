@@ -239,3 +239,38 @@ it("falls back after metadata decoder errors but leaves autoplay denials paused"
   expect(g.api.stop).not.toHaveBeenCalled();
   await d.destroy();
 });
+
+it("adds captions without reloading when an edition watched while preparing is finished", async () => {
+  vi.useFakeTimers();
+  const { api, adapter } = fixture();
+  const setSubtitles = vi.fn();
+  adapter.setSubtitles = setSubtitles;
+  const growing = {
+    id: "s",
+    epoch: 1,
+    mediaUrl: "/media/s/t/index.m3u8",
+    expiresAt: new Date(Date.now() + 3600000).toISOString(),
+    startMs: 0,
+    subtitles: [],
+  };
+  api.playback = vi.fn().mockResolvedValue({ kind: "ready", session: growing });
+  const captions = [
+    { url: "/media/s/t/subtitle-0.vtt", language: "en", label: "English" },
+  ];
+  api.heartbeat = vi
+    .fn()
+    .mockResolvedValueOnce(growing)
+    .mockResolvedValue({ ...growing, subtitles: captions });
+  const controller = new PlayerController(api, adapter, () => {});
+  await controller.start("m", "web", 0);
+  await vi.advanceTimersByTimeAsync(30000);
+  // Still preparing: nothing to change.
+  expect(setSubtitles).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(30000);
+  expect(setSubtitles).toHaveBeenCalledWith(captions);
+  await vi.advanceTimersByTimeAsync(30000);
+  // Told once, and the picture was never reloaded.
+  expect(setSubtitles).toHaveBeenCalledTimes(1);
+  expect(adapter.load).toHaveBeenCalledTimes(1);
+  await controller.destroy();
+});

@@ -64,6 +64,7 @@ export function previewApi() {
   api.preferences = async () => ({
     audioLanguage: "en",
     subtitleLanguage: "en",
+    quality: "original",
     reducedMotion: false,
   });
   api.devices = async () => [];

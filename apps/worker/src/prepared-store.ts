@@ -19,6 +19,8 @@ export function assetId(
   quality: string,
   audio: number,
   forceEncode = false,
+  /** From conversionPlan(); empty keeps the identity older assets were given. */
+  variant = "",
 ) {
   return createHash("sha256")
     .update(
@@ -29,6 +31,7 @@ export function assetId(
         quality,
         audio,
         forceEncode,
+        ...(variant ? [variant] : []),
       ]),
     )
     .digest("hex");
@@ -37,6 +40,7 @@ export async function verifyBoundary(
   directory: string,
   dataDir: string,
   production: boolean,
+  capacity = CAPACITY,
 ) {
   await mkdir(directory, { recursive: true, mode: 0o700 });
   if ((await realpath(directory)) !== resolve(directory))
@@ -49,7 +53,7 @@ export async function verifyBoundary(
   if (
     production &&
     (target.dev === root.dev ||
-      space.blocks * space.bsize > BigInt(CAPACITY) ||
+      space.blocks * space.bsize > BigInt(capacity) ||
       space.blocks * space.bsize < 1024n ** 3n)
   )
     throw Error("Enforced preparation filesystem required");
@@ -63,7 +67,12 @@ export async function makeRoom(
   directory: string,
   needed: number,
 ) {
-  // Incomplete outputs from an interrupted previous lease are never served.
+  // Incomplete outputs from an interrupted previous lease are never served. One
+  // conversion runs at a time and this precedes it, so anything still marked as
+  // in progress is left over from an attempt that died.
+  db.prepare(
+    "UPDATE prepared_assets SET state='queued' WHERE state IN ('preparing','streaming')",
+  ).run();
   for (const name of await readdir(directory))
     if (
       /^[a-f0-9]{64}\.partial$/.test(name) ||
@@ -108,7 +117,9 @@ export function localReader(directory: string, file = "video.mp4") {
       signal: AbortSignal,
     ) {
       if (
-        !/^(video\.mp4|subtitle-\d+\.vtt)$/.test(file) ||
+        !/^(video\.mp4|subtitle-\d+\.vtt|init\.mp4|seg-\d{5}\.m4s)$/.test(
+          file,
+        ) ||
         !ASSET_ID.test(source.fileId)
       )
         throw Error("Invalid prepared asset");
