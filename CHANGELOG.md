@@ -1,5 +1,14 @@
 # Changelog
 
+## Raouf: 2026-11-15 (Australia/Sydney) — panel release
+
+**Scope:** release the Audio & subtitles panel and background all-languages editions, approved by the owner.
+
+- Live: backend `75c9f12bd716-e9092872`, Cloudflare Worker version `7e63af83-7e39-4f88-beb6-5f223c05c86b`. Record: the maintainer's private notes.
+- Found while rehearsing, under the previous release: a 2160p encode of the 4K film made the worker evict every other prepared film, because the room it frees before an encode is the estimate, nearly the whole 20 GB volume for 4K. Activation waited for that encode to finish. The three two-language films are being prepared again, now with every language.
+- Verification: rehearsal on a copy of the live database; 9 of 9 edge checks; 12 release tests; sign-in page in Chromium and WebKit; Sentinel host checks; the first all-languages edition finished after the switch.
+- Follow-ups: check the room that can be freed before evicting; say in the Picture list that a 4K encode replaces other prepared films; signed-in check on production; clear old rollback material.
+
 ## Raouf: 2026-11-15 (Australia/Sydney) — Audio & subtitles panel
 
 **Scope:** the owner asked for the language picker to be audited and made to look like the rest of the site. Same branch.

@@ -168,3 +168,12 @@ Raouf: 2026-11-15 (Australia/Sydney), eleventh entry
 - Files changed: see `CHANGELOG.md`.
 - Verification: 47 files, 304 passed, 1 skipped; `npm run check`; 150 browser tests.
 - Follow-ups: release together with the background all-languages editions.
+
+Raouf: 2026-11-15 (Australia/Sydney), twelfth entry
+
+- Scope: release the panel and background all-languages editions, approved by the owner.
+- Summary: backend `75c9f12bd716-e9092872` and Worker version `7e63af83` are live. Before activating, a live eviction of every prepared film was traced to a 2160p encode of the 4K film under the previous release; activation waited for it to finish. See the maintainer's private notes.
+- Files changed: the maintainer's private notes, the maintainer's private notes, `CHANGELOG.md`, this file.
+- Verification: rehearsal, 9 of 9 edge checks, 12 release tests, sign-in page in two browsers, Sentinel host checks; no rollback needed.
+- Follow-ups: room check before eviction; warn in the Picture list that a 4K encode replaces the other prepared films; signed-in check on production; clear old rollback material.
+- Rule: before activating a release, read the live job queue. A restart throws away a running encode, so wait until no long encode is running and no one is watching.
