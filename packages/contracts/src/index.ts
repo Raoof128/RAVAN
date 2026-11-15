@@ -35,6 +35,8 @@ export type PlaybackPlan = {
   assetId: string;
   reason?: string;
   progress?: number;
+  /** Set with mode "prepare": the step the preparation is at. */
+  phase?: PreparationPhase;
   label?: string;
   /** The edition is still being prepared and is watched as it grows. */
   live?: boolean;
@@ -116,9 +118,29 @@ export type Preferences = {
   quality: "original" | "720p" | "1080p";
   reducedMotion: boolean;
 };
+/**
+ * The step a film is at before it can play. Every value is a state the server
+ * holds: a probe job, a queued or running conversion, or a streamed edition
+ * that has started but has too little written to play without stopping.
+ */
+export type PreparationPhase =
+  | "inspecting"
+  | "queued"
+  | "repackaging"
+  | "converting"
+  | "buffering"
+  | "retrying";
 export type PlaybackResult =
   | { kind: "ready"; session: PlaybackSession }
-  | { kind: "preparing"; jobId: string; progress?: number; reason?: string }
+  | {
+      kind: "preparing";
+      jobId: string;
+      /** Percent of the film converted so far, as reported by the worker. */
+      progress?: number;
+      reason?: string;
+      /** What the server is doing; absent when it cannot say. */
+      phase?: PreparationPhase;
+    }
   | { kind: "conflict"; sessionId: string }
   | { kind: "unsupported"; reason: string };
 export type Device = { id: string; name: string };

@@ -1,5 +1,92 @@
 # Changelog
 
+## Raouf: 2026-11-15 (Australia/Sydney) — UI and UX audit against the rule set
+
+**Scope:** check the interface rule by rule against the UI/UX Pro Max rule set and the frontend-design guidance, measure what can be measured, and fix what is found. Same branch, `audit/frontend-2026-11-15`. Nothing was pushed or deployed. Report: the maintainer's private notes.
+
+### What changed
+
+- **Back returns to where you were.** History entries are numbered and their scroll position is restored once the content is there. The library keeps its last view (films, search, next-page cursor) for five minutes, so returning from a film asks the server for nothing. "Back to the collection" goes back rather than opening a second copy.
+- **Fields no longer zoom the page on iOS.** They are 16 px wherever a finger is the pointer.
+- **The folder field validates.** Its `pattern` had an unescaped hyphen, which browsers reject under the `v` flag, so the pattern was being ignored. Messages now say what is needed.
+- **The TV header's spacing works on Chromium 79.** It used flex `gap`.
+- **Icons are drawn** (`packages/ui/src/Icon.tsx`) instead of typed as characters.
+- **Type follows the reader's text-size setting.** Every size in the web stylesheets is in rem.
+- **Six named text colours** replace 32 raw ones.
+- **One `h1` on every screen**, 44 px touch targets on phones, `/` to search and Escape to clear, a line when the device is offline, a destructive style for removing a TV, a landscape layout for phones.
+- **Copy:** labels that said nothing, arrows appended to links and facts joined with dots are gone.
+
+### Files changed
+
+Source: `apps/web/src/router.tsx`, `libraryCache.ts` (new), `main.tsx`, `cinema.css`, `pages/Library.tsx`, `Detail.tsx`, `Player.tsx`, `Settings.tsx`, `Setup.tsx`, `Mfa.tsx`; `apps/tv/src/main.tsx`, `tv.css`; `packages/ui/src/Icon.tsx` (new), `MovieCard.tsx`, `StatusPanel.tsx`, `tokens.css`, `loading.css`.
+
+Tests added: `tests/e2e/ux.spec.ts`, `tests/clients/design-rules.test.ts`. One assertion added earlier today in `tests/clients/loading.test.tsx` follows the reworded library status. No older test was edited.
+
+Docs: the maintainer's private notes with screens in the maintainer's private notes, `AGENT.md`, this file.
+
+### Verification
+
+- `npm run check`: passed.
+- `npm test`: 43 files, 278 passed, 1 skipped, 0 failed.
+- `npm run build`, `build:web`, `build:tv`, `build:cloudflare`: passed.
+- `npm run test:e2e`: 132 passed across Chromium, Firefox and WebKit on one of two final runs. The other had 1 Chromium timeout in the streamed-playback test under a load average of about 20; that file passed 18 of 18 alone.
+- Release suite: 12 passed.
+
+### Follow-ups
+
+- Check the iOS zoom fix, landscape layout and touch targets on a real iPhone, and the TV header on the LG C1.
+- The TV stylesheet still carries its own raw colours.
+- Preload the two display fonts once the build can write their hashed names into `index.html`.
+
+## Raouf: 2026-11-15 (Australia/Sydney) — frontend audit: loading, preparation states, accessibility
+
+**Scope:** audit every frontend file and fix what was found, on `audit/frontend-2026-11-15` (created from `audit/backend-2026-11-15`). The visual identity is kept. Nothing was pushed or deployed. Report: the maintainer's private notes.
+
+### What changed
+
+- **One loading language.** `packages/ui/src/Loading.tsx` and `loading.css` add the copper line (moving for an unknown wait, filled only to a percentage the server sent), an opening mark, placeholders in the final layout, and buttons that stay focusable while their action runs. `index.html` shows a CSS-only opening screen until the session is known and never holds the page back for it.
+- **Preparation shows what the server is doing.** The API's preparing answer gains an optional `phase` (`inspecting`, `queued`, `retrying`, `repackaging`, `converting`, `buffering`). The web player and the TV show that step and the worker's percentage. No time, speed or estimate is displayed.
+- **The saved "Reduce interface motion" preference is applied.** It was stored and ignored.
+- **The library no longer jumps.** Placeholders hold the hero and grid; later searches keep the current results on screen; every list request is numbered so a late answer is dropped; a failed next page keeps the grid.
+- **Films without artwork** get one typographic poster family, and a real library's hero shows the film's poster beside its title.
+- **Player:** one stage for connecting, preparing, unsupported, in use elsewhere, failed, paused, buffering and ended; the same keyboard shortcuts in every browser. The browser's own controls are kept for the picture.
+- **Settings:** placeholders and retry, a pending state and message per panel, confirmation before removing a TV, paired screens that refresh, the library's real counts, a pasted Drive link accepted.
+- **TV:** placeholders, a pairing wait state, a full-screen player whose transport steps aside while the film plays, the remote's transport keys, position and duration.
+- **Shell:** film page, player and settings are fetched when first opened; each screen names the tab and takes focus; a session that ends mid-visit returns to sign-in; a screen whose code fails to load says so; "Sign out" is a labelled button.
+- **Accessibility:** control outlines raised to at least 3:1; three targets under 24 px fixed; text floor of 11 px; one link per film card; failures announced with `role="alert"`.
+- **Removed:** 98 CSS rules for classes nothing used, the fake sequence markers ("01 / YOUR NEXT SCREENING", "01 02 03"), and the per-card entrance animation.
+
+### Measured
+
+- Library layout shift: 0.6277 to 0.0000 at 1440 px, 0.7203 to 0.0002 at 390 px.
+- Web entry script: 91.40 kB to 74.24 kB gzip. Web stylesheet: 9.19 kB to 10.74 kB gzip. First screen overall: 15.6 kB gzip less.
+- TV entry script: 77.51 kB to 79.53 kB gzip.
+
+### Files changed
+
+Source: `apps/web/index.html`, `apps/web/public/privacy/index.html`, `apps/web/src/main.tsx`, `router.tsx`, `motion.ts` (new), `cinema.css`, `pages/Library.tsx`, `Detail.tsx`, `Player.tsx`, `Settings.tsx`, `Mfa.tsx`, `player/Preparing.tsx` (new); `apps/tv/src/main.tsx`, `tv.css`; `packages/ui/src/Loading.tsx` (new), `loading.css` (new), `MovieCard.tsx`, `StatusPanel.tsx`, `tokens.css`; `packages/contracts/src/index.ts`; `apps/api/src/media/planner.ts`, `apps/api/src/sessions/playback.ts`.
+
+Tests added: `tests/clients/loading.test.tsx`, `tests/e2e/loading.spec.ts`. Extended: `tests/backend/streaming-playback.test.ts`. No existing test was edited.
+
+Docs: the maintainer's private notes with before and after screenshots in the maintainer's private notes, `docs/visual-design.md`, `AGENT.md`, this file. `docs/testing/screenshots/` regenerated by the suites.
+
+### Verification
+
+- `npm run check`: passed.
+- `npm test`: 42 files, 274 passed, 1 skipped, 0 failed. Baseline was 41 files, 263 passed, 1 skipped.
+- `npm run build`, `build:web`, `build:tv`, `build:cloudflare`: passed.
+- `npm run test:e2e`: 114 passed across Chromium, Firefox and WebKit on two of three final runs. The third had 2 Chromium playback timeouts while the machine's load average was near 40; the same tests passed 12 of 12 alone and in the next full run. Baseline was 57.
+- Release suite (`playwright.release.config.ts`): 12 passed against the production build.
+- The one skipped test needs FFmpeg's `zscale` filter, which this machine lacks.
+- An independent reviewer read the diff and reported 14 findings; all were fixed and are listed in section 12 of the report.
+
+### Follow-ups
+
+- Not verified on a physical LG C1 or with a screen reader.
+- The TV's focus move to Play when a film becomes ready is not covered by a test.
+- The API and the web client should ship together: an older API simply sends no `phase`, and the panel then shows the server's sentence and a moving line.
+- Film cards cannot show progress through a film until the catalogue returns each film's length.
+
 ## Raouf: 2026-11-15 (Australia/Sydney) — watch a film while it is prepared
 
 **Scope:** remove the last large wait, finish the remaining improvements, and check current documentation for what the tools support. Same branch, `audit/backend-2026-11-15`. Nothing was pushed or deployed. Report: the maintainer's private notes.

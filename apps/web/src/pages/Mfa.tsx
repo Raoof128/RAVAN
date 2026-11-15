@@ -1,5 +1,4 @@
 import { useEffect, useState, type FormEvent } from "react";
-import QRCode from "qrcode";
 import { ApiError, useApi } from "../../../../packages/client/src/api.js";
 import type { SessionState } from "../../../../packages/contracts/src/index.js";
 
@@ -58,7 +57,9 @@ export function Mfa({ session }: { session: SessionState }) {
         // QR encoding stays in this browser; the secret never reaches a QR service.
         let qr: string | undefined;
         try {
-          qr = await QRCode.toDataURL(data.uri, {
+          // Fetched only for enrolment, so signing in never downloads it.
+          const { toDataURL } = await import("qrcode");
+          qr = await toDataURL(data.uri, {
             width: 200,
             margin: 2,
             errorCorrectionLevel: "M",
@@ -179,7 +180,7 @@ export function Mfa({ session }: { session: SessionState }) {
             location.replace("/");
           }}
         >
-          Enter your cinema <span aria-hidden="true">↗</span>
+          Enter your cinema
         </button>
       </div>
     );
@@ -244,15 +245,20 @@ export function Mfa({ session }: { session: SessionState }) {
             </details>
           </div>
         ) : (
-          <p className="login-availability" role="status">
+          <div className="mfa-enrollment" role="status">
             {error ? (
               <button onClick={() => setRetry((n) => n + 1)}>
                 Try setup again
               </button>
             ) : (
-              "Preparing your authenticator…"
+              <>
+                <span className="sk sk-qr sk-group" aria-hidden="true" />
+                <span className="login-availability">
+                  Preparing your authenticator…
+                </span>
+              </>
             )}
-          </p>
+          </div>
         ))}
       <form onSubmit={submit} aria-busy={busy}>
         <label htmlFor="mfa-code">
@@ -271,7 +277,8 @@ export function Mfa({ session }: { session: SessionState }) {
           value={code}
           onChange={(e) => setCode(e.target.value)}
           required
-          disabled={busy || expired}
+          readOnly={busy}
+          disabled={expired}
           aria-describedby={error ? "mfa-error" : "mfa-code-hint"}
           aria-invalid={error ? true : undefined}
         />

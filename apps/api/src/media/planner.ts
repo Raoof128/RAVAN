@@ -184,6 +184,7 @@ export class MediaPlanner {
             mode: "prepare",
             assetId: jobId,
             reason: "Checking video, audio and captions.",
+            phase: "inspecting",
           };
     }
     const probe = record.probe,
@@ -386,6 +387,7 @@ export class MediaPlanner {
           assetId: jobId,
           progress: 0,
           reason: "Trying this edition again.",
+          phase: "retrying",
         };
       return {
         mode: "unsupported",
@@ -405,6 +407,14 @@ export class MediaPlanner {
               ? "Repackaging your film without changing picture quality."
               : "Creating a browser-compatible edition. This runs in the background; you can return later."
             : "Queued for automatic preparation.",
+      phase:
+        asset?.state === "streaming"
+          ? "buffering"
+          : job.state === "running"
+            ? conversion.copyVideo
+              ? "repackaging"
+              : "converting"
+            : "queued",
     };
   }
 }

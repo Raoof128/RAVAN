@@ -45,9 +45,7 @@ export function Setup({ session }: { session: SessionState }) {
             <p className="login-reassurance">Two steps. One private library.</p>
             {import.meta.env.MODE === "cloudflare" && (
               <div className="login-demo">
-                <a href="/demo/">
-                  Explore the sample library <span aria-hidden="true">↗</span>
-                </a>
+                <a href="/demo/">Explore the sample library</a>
               </div>
             )}
             {!session.configured && (

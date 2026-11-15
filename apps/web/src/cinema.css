@@ -12,8 +12,8 @@ body {
 }
 .preview-banner {
   background: #212a28;
-  color: #c4d4cd;
-  font-size: 9px;
+  color: var(--text-soft);
+  font-size: 0.6rem;
   padding: 7px 16px;
   letter-spacing: 0.18em;
 }
@@ -25,10 +25,10 @@ body {
   z-index: 2;
 }
 .wordmark {
-  font-size: 48px;
+  font-size: 3.2rem;
 }
 .brand-caption {
-  font-size: 8px;
+  font-size: 0.5333rem;
   letter-spacing: 0.2em;
   line-height: 1.6;
   color: var(--muted);
@@ -40,18 +40,11 @@ body {
   gap: 38px;
 }
 .site-header nav a {
-  font-size: 12px;
+  font-size: 0.8rem;
 }
 .site-header nav a[aria-current]:after {
   bottom: 23px;
   height: 1px;
-}
-.profile-button {
-  margin-left: 18px;
-  background: #26332e;
-  border-color: #52625b;
-  min-width: 44px;
-  min-height: 44px;
 }
 .library-page {
   padding-bottom: 0;
@@ -94,55 +87,30 @@ body {
     linear-gradient(90deg, #0d1619de 0%, #0c1519a1 34%, #0b161813 72%),
     linear-gradient(0deg, #101313 0%, #10131320 35%, #10131300 70%);
 }
-.feature-edition {
-  position: absolute;
-  top: 34px;
-  left: 64px;
-  right: 64px;
-  display: flex;
-  justify-content: space-between;
-  font-size: 8px;
-  letter-spacing: 0.26em;
-  color: #e2e8e1;
-}
 .feature-copy {
   max-width: 65%;
   padding: 91px 64px 95px;
-  animation: cinema-enter 0.7s both;
+  animation: cinema-enter var(--dur-slow) var(--ease-out) both;
 }
 .feature-copy .eyebrow {
-  color: #f2c4b4;
-  font-size: 9px;
+  color: var(--danger);
+  font-size: 0.6rem;
   letter-spacing: 0.2em;
 }
 .feature-copy .live-dot {
   background: var(--accent);
 }
-.feature-metadata {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 30px;
-  font-size: 8px;
-  letter-spacing: 0.2em;
-  color: #c5d0cb;
-}
-.metadata-rule {
-  height: 1px;
-  width: 24px;
-  background: #c5d0cb80;
-}
 .feature h1 {
   max-width: 570px;
-  font-size: clamp(68px, 7.5vw, 116px);
+  font-size: clamp(4.5333rem, 7.5vw, 7.7333rem);
   line-height: 0.89;
   letter-spacing: -0.045em;
   margin: 20px 0 26px;
   text-wrap: balance;
 }
 .feature-subtitle {
-  color: #d5dedb;
-  font-size: 14px;
+  color: var(--text-soft);
+  font-size: 0.9333rem;
   line-height: 1.8;
 }
 .feature .button-row {
@@ -153,9 +121,9 @@ body {
   border-radius: 2px;
   background: #efece3;
   border-color: #efece3;
-  color: #15201d;
+  color: var(--bg);
   box-shadow: 0 8px 30px #0002;
-  font-size: 13px;
+  font-size: 0.8667rem;
   min-height: 52px;
   padding: 14px 25px;
 }
@@ -164,7 +132,7 @@ body {
   border-color: var(--accent);
 }
 .feature-detail-link {
-  font-size: 12px;
+  font-size: 0.8rem;
   min-height: 48px;
   display: inline-flex;
   align-items: center;
@@ -173,19 +141,6 @@ body {
 }
 .feature-detail-link:hover {
   color: var(--accent);
-}
-.feature-number {
-  bottom: 47px;
-  right: 64px;
-  font-size: 8px;
-  color: #d9e1db;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.feature-number > span {
-  font: italic 42px var(--serif);
-  color: #f2efe7;
 }
 .resume-ticket {
   position: relative;
@@ -221,7 +176,7 @@ body {
   display: grid;
   place-items: center;
   z-index: 1;
-  font-size: 16px;
+  font-size: 1.0667rem;
 }
 .resume-ticket-copy {
   display: flex;
@@ -229,16 +184,16 @@ body {
   gap: 8px;
 }
 .resume-ticket-copy .eyebrow {
-  font-size: 8px;
+  font-size: 0.5333rem;
   color: var(--muted);
 }
 .resume-ticket-copy strong {
   font-weight: 400;
-  font-size: 17px;
+  font-size: 1.1333rem;
 }
 .resume-ticket-time {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 0.7333rem;
   color: var(--muted);
 }
 .resume-ticket-action {
@@ -247,10 +202,10 @@ body {
   gap: 25px;
   padding-left: 25px;
   border-left: 1px solid var(--line);
-  font-size: 12px;
+  font-size: 0.8rem;
 }
 .resume-ticket-action > span {
-  font-size: 24px;
+  font-size: 1.6rem;
   color: var(--accent);
 }
 .resume-ticket:hover strong,
@@ -261,16 +216,8 @@ body {
   padding-top: 38px;
   padding-bottom: 60px;
 }
-.page-top {
-  min-height: 64px;
-  margin-bottom: 26px;
-}
-.page-top > .eyebrow {
-  font-size: 9px;
-  letter-spacing: 0.22em;
-}
 .search {
-  border: 1px solid #39433f;
+  border: 1px solid var(--control);
   border-radius: 3px;
   width: 260px;
   padding: 0 14px;
@@ -279,35 +226,31 @@ body {
 }
 .search input {
   min-height: 44px;
-  font-size: 12px;
+  font-size: 0.8rem;
 }
 .search > span {
-  font-size: 23px;
+  font-size: 1.5333rem;
 }
 .section-heading {
   margin-bottom: 28px;
 }
 .section-title {
-  font-size: 46px;
+  font-size: 3.0667rem;
 }
 .section-heading .eyebrow {
   color: var(--accent);
-  font-size: 8px;
+  font-size: 0.5333rem;
 }
-.section-title span {
+.section-title > span {
   border: 1px solid #4d5a52;
   border-radius: 50%;
   min-width: 26px;
   height: 26px;
   display: grid;
   place-items: center;
-  color: #d5ddd7;
+  color: var(--text-soft);
   margin-top: 10px;
-  font-size: 9px;
-}
-.collection-note {
-  color: #a7b4ad;
-  font-size: 20px;
+  font-size: 0.6rem;
 }
 .poster-grid {
   gap: 24px;
@@ -328,14 +271,14 @@ body {
   margin-top: 16px;
 }
 .movie-caption h3 {
-  font-size: 13px;
+  font-size: 0.8667rem;
 }
 .movie-caption > span {
-  color: #a9b5af;
+  color: var(--muted);
 }
 .movie-meta {
-  color: #a4afa9;
-  font-size: 10px;
+  color: var(--muted);
+  font-size: 0.6667rem;
 }
 .resume-mark {
   background: var(--accent);
@@ -345,18 +288,19 @@ body {
 .page-footer {
   margin-top: 0;
   min-height: 115px;
-  color: #a9b6ad;
+  color: var(--muted);
 }
 .page-footer > span:first-child {
-  font-size: 32px;
+  font-size: 2.1333rem;
 }
 .page-footer > span:last-child {
-  font-size: 17px;
+  font-size: 1.1333rem;
 }
 .detail-page {
   position: relative;
   isolation: isolate;
   min-height: calc(100vh - 125px);
+  min-height: calc(100dvh - 125px);
   padding-top: 38px;
 }
 .detail-atmosphere {
@@ -388,24 +332,21 @@ body {
   border: 1px solid #ffffff21;
 }
 .detail-copy h1 {
-  font-size: clamp(52px, 6vw, 88px);
+  font-size: clamp(3.4667rem, 6vw, 5.8667rem);
   line-height: 0.98;
 }
 .detail-copy {
   padding-top: 25px;
 }
 .detail-description {
-  color: #c3cec7;
-  font-size: 15px;
+  color: var(--text-soft);
+  font-size: 1rem;
 }
 .detail-section {
   margin-top: 40px;
 }
 .back-link {
-  color: #d4ded8;
-}
-.setup-copy h1 {
-  line-height: 0.95;
+  color: var(--text-soft);
 }
 .setting-panel {
   border-radius: 2px;
@@ -435,13 +376,6 @@ body {
     padding-left: 40px;
     max-width: 75%;
   }
-  .feature-edition {
-    left: 40px;
-    right: 40px;
-  }
-  .feature-number {
-    right: 40px;
-  }
   .brand-caption {
     display: none;
   }
@@ -467,20 +401,14 @@ body {
   }
   .feature h1 {
     max-width: 450px;
-    font-size: 84px;
-  }
-  .feature-number {
-    display: none;
-  }
-  .feature-edition > span:last-child {
-    display: none;
+    font-size: 5.6rem;
   }
   .resume-ticket-action {
     font-size: 0;
     padding-left: 16px;
   }
   .resume-ticket-time {
-    font-size: 10px;
+    font-size: 0.6667rem;
   }
   .resume-ticket {
     gap: 16px;
@@ -490,12 +418,12 @@ body {
     gap: 32px;
   }
   .detail-copy h1 {
-    font-size: 56px;
+    font-size: 3.7333rem;
   }
 }
 @media (max-width: 560px) {
   .preview-banner {
-    font-size: 7px;
+    font-size: 0.4667rem;
     letter-spacing: 0.09em;
     padding: 8px 10px;
   }
@@ -505,13 +433,13 @@ body {
     gap: 22px;
   }
   .wordmark {
-    font-size: 40px;
+    font-size: 2.6667rem;
   }
   .site-header nav {
     gap: 22px;
   }
   .site-header nav a {
-    font-size: 11px;
+    font-size: 0.7333rem;
   }
   .site-header nav a[aria-current]:after {
     bottom: 18px;
@@ -539,39 +467,28 @@ body {
     padding: 220px 26px 45px;
     max-width: 100%;
   }
-  .feature-edition {
-    top: 23px;
-    left: 26px;
-    right: 26px;
-    font-size: 7px;
-  }
   .feature-copy .eyebrow {
-    font-size: 8px;
-  }
-  .feature-metadata {
-    margin-top: 22px;
-    font-size: 7px;
-    gap: 8px;
+    font-size: 0.5333rem;
   }
   .feature h1 {
     max-width: 330px;
-    font-size: 75px;
+    font-size: 5rem;
     margin: 18px 0 20px;
   }
   .feature-subtitle {
-    font-size: 13px;
+    font-size: 0.8667rem;
   }
   .feature .button-row {
     gap: 21px;
     margin-top: 24px;
   }
   .feature .button {
-    font-size: 12px;
+    font-size: 0.8rem;
     min-height: 50px;
     padding: 12px 19px;
   }
   .feature-detail-link {
-    font-size: 11px;
+    font-size: 0.7333rem;
     gap: 12px;
   }
   .resume-ticket {
@@ -589,10 +506,10 @@ body {
     min-width: 0;
   }
   .resume-ticket-copy strong {
-    font-size: 14px;
+    font-size: 0.9333rem;
   }
   .resume-ticket-copy .eyebrow {
-    font-size: 7px;
+    font-size: 0.4667rem;
   }
   .resume-ticket-time {
     display: none;
@@ -602,18 +519,10 @@ body {
     border: 0;
   }
   .resume-ticket-action > span {
-    font-size: 22px;
+    font-size: 1.4667rem;
   }
   .collection {
     padding-top: 20px;
-  }
-  .page-top {
-    padding: 15px 0;
-    gap: 17px;
-    margin-bottom: 13px;
-  }
-  .page-top > .eyebrow {
-    font-size: 8px;
   }
   .search {
     width: 100%;
@@ -622,12 +531,12 @@ body {
     min-height: 44px;
   }
   .section-title {
-    font-size: 38px;
+    font-size: 2.5333rem;
   }
   .section-heading .eyebrow {
-    font-size: 7px;
+    font-size: 0.4667rem;
   }
-  .section-title span {
+  .section-title > span {
     margin-top: 5px;
     min-width: 23px;
     height: 23px;
@@ -640,10 +549,10 @@ body {
     flex-wrap: wrap;
   }
   .movie-caption h3 {
-    font-size: 12px;
+    font-size: 0.8rem;
   }
   .movie-meta {
-    font-size: 9px;
+    font-size: 0.6rem;
   }
   .detail-page {
     padding-top: 24px;
@@ -660,10 +569,10 @@ body {
     padding-top: 15px;
   }
   .detail-copy h1 {
-    font-size: 58px;
+    font-size: 3.8667rem;
   }
   .detail-description {
-    font-size: 14px;
+    font-size: 0.9333rem;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -682,12 +591,12 @@ body {
 
 /* RAVĀN: flowing stories, a restrained typographic signature. */
 .site-header .wordmark {
-  font: 500 32px/1 var(--body);
+  font: 500 2.1333rem/1 var(--body);
   letter-spacing: 0.14em;
   top: 0;
 }
 .page-footer > span:first-child {
-  font: 500 24px/1 var(--body);
+  font: 500 1.6rem/1 var(--body);
   letter-spacing: 0.14em;
 }
 @media (max-width: 560px) {
@@ -697,14 +606,14 @@ body {
     padding-right: 22px;
   }
   .site-header .wordmark {
-    font-size: 22px;
+    font-size: 1.4667rem;
     letter-spacing: 0.1em;
   }
   .site-header nav {
     gap: 17px;
   }
   .site-header nav a {
-    font-size: 10px;
+    font-size: 0.6667rem;
   }
 }
 @media (max-width: 360px) {
@@ -714,38 +623,11 @@ body {
     padding-right: 18px;
   }
   .site-header .wordmark {
-    font-size: 19px;
+    font-size: 1.2667rem;
   }
   .site-header nav {
     gap: 12px;
   }
-}
-
-.setup-art {
-  background: #25271e;
-}
-.setup-photograph {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.setup-art:after {
-  opacity: 1;
-  background: linear-gradient(0deg, #0e1819bf, #0e181914 65%, #0e181970);
-}
-.setup-art .art-title {
-  z-index: 2;
-  color: #fff7e8;
-  margin-top: auto;
-  margin-bottom: 50px;
-  text-shadow: 0 2px 30px #0008;
-}
-.setup-art .art-caption,
-.setup-art .art-bottom {
-  z-index: 2;
-  color: #fff7e8;
 }
 
 /* Owner sign-in extends the cinematic shell; controls stay legible on narrow screens. */
@@ -764,18 +646,18 @@ body {
   width: 100%;
 }
 .login-copy h1 {
-  font: 400 clamp(58px, 6vw, 88px)/1.02 var(--serif);
+  font: 400 clamp(3.8667rem, 6vw, 5.8667rem)/1.02 var(--serif);
   letter-spacing: -0.035em;
   margin: 0 0 30px;
 }
 .login-copy h1 em {
   font-weight: 400;
-  color: #d1cbbd;
+  color: var(--text-soft);
 }
 .login-intro {
-  font-size: 16px;
+  font-size: 1.0667rem;
   line-height: 1.75;
-  color: #c9c7bf;
+  color: var(--text-soft);
   max-width: 440px;
 }
 .login-steps {
@@ -785,7 +667,7 @@ body {
   list-style: none;
   padding: 0;
   margin: 38px 0;
-  font-size: 12px;
+  font-size: 0.8rem;
   color: var(--muted);
 }
 .login-steps li {
@@ -815,9 +697,9 @@ body {
   width: 100%;
   min-height: 58px;
   border: 1px solid var(--text);
-  color: #151513;
+  color: var(--bg);
   background: var(--text);
-  font-size: 15px;
+  font-size: 1rem;
   border-radius: 4px;
   gap: 16px;
 }
@@ -829,8 +711,8 @@ body {
   opacity: 0.65;
 }
 .login-reassurance {
-  color: #b6b3a8;
-  font-size: 13px;
+  color: var(--muted);
+  font-size: 0.8667rem;
   margin: 22px 0 0;
 }
 .login-demo {
@@ -839,20 +721,20 @@ body {
   padding-top: 26px;
 }
 .login-demo a {
-  color: #f18d72;
-  font-size: 14px;
+  color: var(--accent);
+  font-size: 0.9333rem;
   text-decoration: underline;
   text-underline-offset: 6px;
 }
 .login-availability {
-  color: #aaa89e;
-  font-size: 12px;
+  color: var(--muted);
+  font-size: 0.8rem;
   line-height: 1.7;
   margin-top: 18px;
 }
 .login-footer {
-  color: #b7b3a5;
-  font-size: 9px;
+  color: var(--muted);
+  font-size: 0.6rem;
   letter-spacing: 0.15em;
   margin-top: 58px;
 }
@@ -874,9 +756,9 @@ body {
   position: absolute;
   left: 40px;
   bottom: 40px;
-  font: 400 clamp(60px, 6vw, 90px)/0.9 var(--serif);
+  font: 400 clamp(4rem, 6vw, 6rem)/0.9 var(--serif);
   letter-spacing: -0.03em;
-  color: #fff0d8;
+  color: var(--text);
   text-shadow: 0 2px 24px #0008;
 }
 .login-art em {
@@ -886,19 +768,19 @@ body {
   width: 100%;
 }
 .mfa-panel h1 {
-  font-size: clamp(52px, 5vw, 72px);
+  font-size: clamp(3.4667rem, 5vw, 4.8rem);
 }
 .mfa-panel .login-steps {
   margin: 25px 0;
 }
 .mfa-panel form label {
   display: block;
-  font-size: 13px;
+  font-size: 0.8667rem;
   font-weight: 500;
   margin: 24px 0 12px;
 }
 .otp-input {
-  font-size: 28px;
+  font-size: 1.8667rem;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.45em;
   min-height: 64px;
@@ -908,10 +790,10 @@ body {
   margin-top: 24px;
 }
 .login-error {
-  color: #ffb7a2;
+  color: var(--danger);
   border-left: 2px solid var(--accent);
   padding: 4px 0 4px 14px;
-  font-size: 13px;
+  font-size: 0.8667rem;
   line-height: 1.6;
   margin-top: 18px;
 }
@@ -926,7 +808,7 @@ body {
   flex-shrink: 0;
 }
 .mfa-enrollment details {
-  font-size: 12px;
+  font-size: 0.8rem;
   line-height: 1.8;
   min-width: 0;
 }
@@ -943,7 +825,7 @@ body {
   display: block;
   overflow-wrap: anywhere;
   user-select: all;
-  font-size: 12px;
+  font-size: 0.8rem;
   color: var(--text);
 }
 .mfa-actions {
@@ -953,8 +835,8 @@ body {
   margin-top: 16px;
 }
 .mfa-actions button {
-  font-size: 12px;
-  color: #c7c3b7;
+  font-size: 0.8rem;
+  color: var(--text-soft);
   border: 0;
   padding: 12px 0;
   text-decoration: underline;
@@ -971,19 +853,19 @@ body {
   gap: 10px;
 }
 .recovery-codes code {
-  font-size: 13px;
+  font-size: 0.8667rem;
   user-select: all;
   overflow-wrap: anywhere;
 }
 .mfa-secondary {
   width: 100%;
-  font-size: 13px;
+  font-size: 0.8667rem;
 }
 .recovery-saved {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 13px;
+  font-size: 0.8667rem;
   line-height: 1.5;
   margin: 24px 0;
 }
@@ -1000,7 +882,7 @@ body {
   }
   .login-steps {
     gap: 16px;
-    font-size: 11px;
+    font-size: 0.7333rem;
   }
   .login-steps li + li:before {
     display: none;
@@ -1027,13 +909,13 @@ body {
     max-width: 480px;
   }
   .login-copy h1 {
-    font-size: 64px;
+    font-size: 4.2667rem;
   }
   .login-intro {
-    font-size: 14px;
+    font-size: 0.9333rem;
   }
   .login-steps {
-    font-size: 12px;
+    font-size: 0.8rem;
     justify-content: space-between;
     margin: 28px 0;
   }
@@ -1045,7 +927,7 @@ body {
   }
   .login-google,
   .button.login-google {
-    font-size: 14px;
+    font-size: 0.9333rem;
   }
   .mfa-enrollment {
     flex-direction: row;
@@ -1059,23 +941,23 @@ body {
     padding: 16px 12px;
   }
   .recovery-codes code {
-    font-size: 11px;
+    font-size: 0.7333rem;
   }
 }
 @media (max-width: 360px) {
   .login-copy h1 {
-    font-size: 56px;
+    font-size: 3.7333rem;
   }
   .login-steps {
     gap: 8px;
-    font-size: 10px;
+    font-size: 0.6667rem;
   }
   .mfa-enrollment {
     flex-direction: column;
     align-items: start;
   }
   .recovery-codes code {
-    font-size: 10px;
+    font-size: 0.6667rem;
   }
 }
 
@@ -1105,4 +987,864 @@ body {
   width: min(100%, 28rem);
   accent-color: #d6ae76;
   height: 0.5rem;
+}
+
+/* ---- 2026-11-15 audit ---- */
+
+/* Shell */
+.view:focus {
+  outline: none;
+}
+.sign-out {
+  min-height: 44px;
+  margin-left: 6px;
+  padding: 8px 16px;
+  border-color: var(--control);
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+}
+.site-header nav a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+.site-header .wordmark {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.shell-notice {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 12px 64px;
+  color: var(--danger);
+  font-size: 0.8667rem;
+}
+.text-link {
+  display: inline;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.text-link:hover {
+  background: none;
+  color: var(--focus);
+}
+.notice {
+  font-size: 0.8667rem;
+  line-height: 1.6;
+}
+.field-hint {
+  margin-top: -10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+/* Library: the hero holds its place from the first frame. */
+.feature .sk-group {
+  width: 100%;
+}
+.sk-title {
+  height: clamp(54px, 7vw, 96px);
+  margin: 22px 0 26px;
+}
+.sk-button {
+  display: block;
+  width: 190px;
+  height: 50px;
+  margin-top: 30px;
+}
+.sk-heading {
+  height: 22px;
+}
+.sk-field {
+  display: block;
+  height: 48px;
+  margin-top: 28px;
+}
+.sk-qr {
+  display: block;
+  width: 180px;
+  height: 180px;
+}
+.feature h1[data-long] {
+  max-width: 760px;
+  font-size: clamp(2.6667rem, 4.6vw, 4.8rem);
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+}
+.feature-subtitle {
+  max-width: 44ch;
+}
+/* A real library has posters, not wide stills: the poster stands beside the title. */
+.feature-plain .feature-copy {
+  max-width: 58%;
+}
+.feature-poster {
+  position: absolute;
+  top: 50%;
+  right: clamp(64px, 9vw, 150px);
+  width: clamp(190px, 19vw, 290px);
+  transform: translateY(-50%) rotate(2deg);
+  box-shadow: 0 34px 70px #000a;
+  border: 1px solid #ffffff1f;
+}
+.feature-poster .poster-title {
+  font-size: clamp(1.4667rem, 2.2vw, 2.2667rem);
+}
+.feature-poster .poster-title[data-long] {
+  font-size: clamp(1.0667rem, 1.5vw, 1.5333rem);
+}
+
+.in-progress {
+  padding: 26px 0 6px;
+  border-bottom: 1px solid var(--line);
+}
+.in-progress h2 {
+  color: var(--muted);
+  font: 500 0.8rem/1.6 var(--body);
+  letter-spacing: 0.04em;
+}
+.in-progress ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0 32px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.resume-ticket {
+  min-height: 92px;
+  margin: 0;
+  padding: 14px 0;
+  border: 0;
+  gap: 18px;
+}
+.resume-ticket-art {
+  width: 44px;
+  height: 66px;
+  border-radius: 2px;
+}
+.resume-ticket-art:after {
+  display: none;
+}
+.resume-ticket-art .poster {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+}
+.resume-ticket-art .poster-title,
+.resume-ticket-art .poster-year,
+.resume-ticket-art .poster-credit {
+  display: none;
+}
+.resume-ticket-copy {
+  flex: 1;
+  min-width: 0;
+  gap: 4px;
+}
+.resume-ticket-copy strong {
+  overflow: hidden;
+  font-size: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.resume-ticket-time {
+  margin: 0;
+  font-size: 0.8rem;
+}
+.resume-ticket-action {
+  padding: 0 4px 0 18px;
+  border-left: 1px solid var(--line);
+  color: var(--accent);
+  font-size: 0.9333rem;
+}
+
+.section-heading {
+  align-items: flex-end;
+}
+.section-heading .search {
+  flex: 0 0 auto;
+  margin-bottom: 6px;
+}
+.section-title > span {
+  padding: 0 7px;
+  border-radius: 13px;
+  font-size: 0.7333rem;
+  font-variant-numeric: tabular-nums;
+}
+.grid-wait {
+  min-height: 460px;
+}
+.poster-grid {
+  animation: grid-in var(--dur-slow) var(--ease-out);
+}
+@keyframes grid-in {
+  from {
+    opacity: 0;
+  }
+}
+.load-more .notice {
+  margin-top: 14px;
+}
+
+/* Film */
+.detail-wait {
+  min-height: 560px;
+}
+.detail-wait .detail-copy {
+  padding-top: 25px;
+}
+.detail-copy h1[data-long] {
+  font-size: clamp(2.4rem, 4vw, 3.8667rem);
+  line-height: 1.04;
+}
+.detail-description-empty {
+  color: var(--muted);
+}
+.detail-message {
+  min-height: 1.6em;
+}
+.detail-copy > .muted a,
+.fine-print a {
+  text-underline-offset: 3px;
+}
+
+/* Your cinema */
+.setting-panel h2 {
+  margin-top: 0;
+}
+.panel-outcome {
+  min-height: 1.6em;
+  margin-top: 14px;
+}
+.panel-note {
+  margin: 0;
+  color: var(--success);
+  font-size: 0.8667rem;
+  line-height: 1.6;
+}
+.panel-note-failed {
+  color: var(--danger);
+}
+.form-stack .panel-outcome {
+  margin-top: -6px;
+}
+.panel-flow {
+  margin-top: 12px;
+}
+.panel-subtitle {
+  margin: 32px 0 4px;
+  color: var(--muted);
+  font: 500 0.8rem/1.6 var(--body);
+  letter-spacing: 0.04em;
+}
+.device-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.device-list .edition {
+  flex-wrap: wrap;
+  font-size: 0.9333rem;
+}
+.device-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.code-input {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.code-input::placeholder {
+  letter-spacing: 0.18em;
+}
+.settings-wait {
+  min-height: 420px;
+}
+.connection-state {
+  align-items: flex-start;
+  font-size: 0.8667rem;
+  line-height: 1.5;
+}
+.connection-state .live-dot {
+  margin-top: 0.5em;
+}
+.setting-panel .text-button {
+  min-height: 44px;
+  color: var(--text);
+}
+
+.settings-account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 24px;
+  margin-top: 40px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+.settings-account .fine-print {
+  flex: 1 1 260px;
+}
+.settings-account .panel-outcome {
+  flex-basis: 100%;
+  margin-top: 0;
+}
+
+/* Player: one stage for the picture and for every state before it. */
+.player-heading {
+  gap: 20px;
+}
+.player-heading h1 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.player-heading h1[data-long] {
+  font-size: 1.6rem;
+}
+.player-heading .button {
+  flex: 0 0 auto;
+}
+.stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: min(56vw, 62vh);
+  overflow: hidden;
+  background: #060909;
+  border: 1px solid #1d2422;
+  border-radius: 3px;
+  isolation: isolate;
+}
+.stage-live {
+  display: block;
+  min-height: 0;
+  border-color: transparent;
+  background: #000;
+}
+.player-page .stage video {
+  display: block;
+  width: 100%;
+  max-height: 78vh;
+  aspect-ratio: 16 / 9;
+  background: #000;
+}
+.player-page .stage video[hidden] {
+  display: none;
+}
+.stage-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.28;
+}
+.stage-backdrop:after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, #060909, #06090980 60%, #060909c0);
+}
+.stage .opening {
+  min-height: 0;
+  padding: 48px 24px;
+}
+.stage-buffering {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  pointer-events: none;
+}
+.stage-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.stage-play:active {
+  transform: translate(-50%, calc(-50% + 1px));
+}
+.stage-ended {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #060909e0;
+  text-align: center;
+}
+.stage-ended p {
+  font: italic 400 2.2667rem/1.2 var(--serif);
+}
+.stage-ended .button-row {
+  justify-content: center;
+}
+.stage-notice {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  padding: 7px 14px;
+  border-radius: 3px;
+  background: #060909d9;
+  color: var(--text);
+  font-size: 0.8667rem;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.stage-notice:empty {
+  visibility: hidden;
+}
+.stage-message,
+.preparing {
+  width: 100%;
+  max-width: 520px;
+  padding: 48px 24px;
+  text-align: center;
+}
+.stage-message h2,
+.preparing h2 {
+  font: 400 2.2667rem/1.15 var(--serif);
+}
+.stage-message p,
+.preparing-reason {
+  margin-top: 14px;
+  color: var(--text-soft);
+  font-size: 0.9333rem;
+  line-height: 1.7;
+}
+.stage-message .button-row {
+  justify-content: center;
+}
+.preparing-line {
+  min-height: 34px;
+  margin: 28px auto 0;
+  max-width: 360px;
+}
+.preparing-percent {
+  display: block;
+  margin-top: 10px;
+  color: var(--text);
+  font-size: 0.8667rem;
+  font-variant-numeric: tabular-nums;
+}
+.preparing .prep-steps {
+  display: inline-block;
+  margin-top: 26px;
+  font-size: 0.9333rem;
+}
+.preparing .fine-print {
+  margin-top: 28px;
+  font-size: 0.8rem;
+}
+.playback-options {
+  gap: 14px 24px;
+  margin: 18px 0 8px;
+}
+.playback-options label {
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.playback-options select {
+  width: auto;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--control);
+  border-radius: 3px;
+  background: #151a19;
+  color: var(--text);
+  font-size: 0.8667rem;
+}
+/* Safari ignores a minimum height on a native menu button, so the control is
+   drawn here and keeps a full-size target in every engine. */
+.playback-options select {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%23aab3af' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 13px center;
+}
+.playback-edition {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.player-help {
+  margin: 8px 0 18px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.player-help summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+}
+.player-help dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 8px 24px;
+  margin: 4px 0 0;
+}
+.player-help dl > div {
+  display: flex;
+  gap: 12px;
+}
+.player-help dt {
+  flex: 0 0 92px;
+  color: var(--text);
+}
+.player-help dd {
+  margin: 0;
+}
+
+/* Small type stays readable: nothing an owner needs is set below 11px. */
+.eyebrow,
+.feature-copy .eyebrow,
+.section-heading .eyebrow,
+.detail-copy > .eyebrow,
+.settings-page > .eyebrow,
+.brand-caption,
+.header-label,
+.preview-banner,
+.page-footer p {
+  font-size: 0.7333rem;
+  letter-spacing: 0.16em;
+}
+.brand-caption {
+  font-size: 0.6667rem;
+}
+.movie-caption h3 {
+  font-size: 0.9333rem;
+}
+.movie-caption > span,
+.movie-meta {
+  font-size: 0.8rem;
+}
+.site-header nav a,
+.search input,
+.back-link,
+.edition,
+.text-button,
+.form-stack label,
+.setting-panel > p,
+.detail-copy > .muted {
+  font-size: 0.8667rem;
+}
+.fine-print {
+  font-size: 0.8rem;
+}
+
+@media (max-width: 1100px) {
+  .shell-notice {
+    padding: 12px 40px;
+  }
+  .feature-plain .feature-copy {
+    max-width: 62%;
+  }
+  .feature-poster {
+    right: 40px;
+  }
+}
+@media (max-width: 800px) {
+  .sign-out {
+    display: none;
+  }
+  .feature-poster {
+    display: none;
+  }
+  .feature-plain .feature-copy {
+    max-width: 85%;
+  }
+  .feature h1[data-long] {
+    font-size: 3.0667rem;
+  }
+  .playback-edition {
+    margin-left: 0;
+    flex-basis: 100%;
+  }
+}
+@media (max-width: 560px) {
+  .shell-notice {
+    padding: 12px 22px;
+  }
+  .feature h1[data-long] {
+    font-size: 2.5333rem;
+    max-width: none;
+  }
+  .feature-plain .feature-copy {
+    max-width: 100%;
+  }
+  .section-heading {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 18px;
+  }
+  .section-heading .search {
+    margin-bottom: 0;
+  }
+  .detail-copy h1[data-long] {
+    font-size: 2.4rem;
+  }
+  .stage {
+    min-height: 0;
+  }
+  .stage-message,
+  .preparing {
+    padding: 36px 20px;
+  }
+  .stage-message h2,
+  .preparing h2 {
+    font-size: 1.8667rem;
+  }
+  .playback-options label {
+    flex: 1 1 100%;
+    justify-content: space-between;
+  }
+  .playback-options select {
+    max-width: 68%;
+  }
+  .site-header nav a {
+    font-size: 0.8rem;
+  }
+  .eyebrow,
+  .feature-copy .eyebrow,
+  .section-heading .eyebrow {
+    font-size: 0.6667rem;
+    letter-spacing: 0.14em;
+  }
+  .movie-caption h3 {
+    font-size: 0.8667rem;
+  }
+  .movie-meta {
+    font-size: 0.7333rem;
+  }
+}
+@media (max-width: 360px) {
+  .site-header nav a {
+    font-size: 0.7333rem;
+  }
+}
+@media (min-width: 801px) {
+  /* The header already offers it at this width. */
+  .settings-account {
+    display: none;
+  }
+}
+@media (max-width: 560px) {
+  /* Tall enough for a two-line title, so the placeholder and the film agree. */
+  .feature-plain {
+    min-height: 440px;
+  }
+  .feature-plain .feature-copy {
+    padding-top: 84px;
+  }
+  .resume-ticket-time {
+    display: block;
+  }
+  .resume-ticket {
+    flex-wrap: nowrap;
+  }
+}
+/* Wide screens get more columns instead of larger, softer posters. */
+@media (min-width: 2200px) {
+  main,
+  .site-header,
+  .shell-notice {
+    max-width: 2040px;
+  }
+  .poster-grid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+}
+@media (min-width: 3000px) {
+  :root {
+    font-size: 118.75%;
+  }
+  main,
+  .site-header,
+  .shell-notice {
+    max-width: 2880px;
+  }
+  .poster-grid {
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+  }
+}
+
+/* ---- 2026-11-15 UI and UX audit ---- */
+
+/* Icons are drawn, one set and one stroke, and sit on the text's line. */
+.icon {
+  flex: 0 0 auto;
+  vertical-align: -0.15em;
+}
+.back-link .icon,
+.text-button .icon {
+  margin-right: 8px;
+}
+.search .icon {
+  color: var(--muted);
+}
+.search kbd {
+  flex: 0 0 auto;
+  min-width: 22px;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--muted);
+  font: 500 0.7333rem/1.4 var(--body);
+  text-align: center;
+}
+.search:focus-within kbd {
+  visibility: hidden;
+}
+.resume-ticket-action {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* A tap acts at once: no double-tap zoom delay on anything pressable. */
+a,
+button,
+input,
+select,
+textarea,
+summary,
+label {
+  touch-action: manipulation;
+}
+label.checkbox,
+.checkbox input {
+  cursor: pointer;
+}
+
+/* Film page: the year is a fact about the film, set as one. */
+.detail-year {
+  margin: -6px 0 18px;
+  color: var(--muted);
+  font-size: 0.9333rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+.detail-description {
+  max-width: 62ch;
+}
+.setting-panel > p {
+  font-size: 0.9333rem;
+  line-height: 1.7;
+}
+.fine-print,
+.field-hint {
+  font-size: 0.8667rem;
+}
+.player-page > .fine-print {
+  max-width: 75ch;
+}
+.form-stack .checkbox {
+  min-height: 44px;
+}
+.site-header nav a {
+  min-width: 44px;
+  justify-content: center;
+}
+
+/* An action that cannot be undone looks different from one that can. */
+button.danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+button.danger:hover {
+  background: #ffc4b414;
+}
+/* Present but empty until there is something to say, so that it is announced. */
+.shell-notice:empty {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/*
+ * iOS zooms the whole page when a field with type below 16px takes focus,
+ * and does not zoom back. Fields are 16px wherever a finger is the pointer.
+ */
+@media (max-width: 800px), (pointer: coarse) {
+  input:not([type="checkbox"]),
+  select,
+  textarea,
+  .search input,
+  .playback-options select {
+    font-size: max(16px, 1rem);
+  }
+  .search kbd {
+    display: none;
+  }
+}
+/* Reading text is 16px on a phone; captions and labels stay smaller. */
+@media (max-width: 560px) {
+  .detail-description,
+  .feature-subtitle,
+  .preparing-reason,
+  .stage-message p,
+  .status-panel .muted,
+  .settings-lead {
+    font-size: 1.0667rem;
+    line-height: 1.6;
+  }
+  .setting-panel > p,
+  .panel-note,
+  .connection-state,
+  .detail-copy > .muted {
+    font-size: 1rem;
+  }
+  .form-stack label,
+  .edition,
+  .text-button,
+  .back-link {
+    font-size: 0.9333rem;
+  }
+}
+@media (max-width: 560px) {
+  .poster-large .poster-title {
+    font-size: 2.2667rem;
+  }
+  .preparing .fine-print {
+    font-size: 0.8667rem;
+  }
+}
+/* A phone on its side: the hero must not be taller than the screen. */
+@media (max-height: 480px) and (orientation: landscape) {
+  .feature,
+  .feature-plain {
+    min-height: 0;
+  }
+  .feature-copy {
+    padding-top: 36px;
+    padding-bottom: 40px;
+  }
+  .feature h1,
+  .feature h1[data-long] {
+    font-size: 2.9333rem;
+    margin: 12px 0 14px;
+  }
+  .feature-poster {
+    width: 120px;
+  }
+  .player-page .stage video {
+    max-height: 100vh;
+    max-height: 100dvh;
+  }
 }

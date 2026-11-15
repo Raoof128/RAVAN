@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { artworkUrl, sampleArtwork } from "./artwork.js";
+import { Icon } from "./Icon.js";
 import type { MovieCard as Movie } from "../../contracts/src/index.js";
 export function Poster({
   movie,
@@ -31,54 +32,47 @@ export function Poster({
         />
       ) : null}
       <span className="poster-scrim" />
-      <span className="poster-orbit" />
-      <span className="poster-lines" />
       <span className="poster-credit">RAVAN / PRIVATE CINEMA</span>
-      <span className="poster-title">{movie.title}</span>
-      <span className="poster-year">
-        {movie.year ?? "RAVAN / PRIVATE CINEMA"}
+      <span
+        className="poster-title"
+        data-long={movie.title.length > 28 || undefined}
+      >
+        {movie.title}
       </span>
+      {movie.year ? <span className="poster-year">{movie.year}</span> : null}
     </div>
   );
 }
-export function MovieCard({
-  movie,
-  index = 0,
-}: {
-  movie: Movie;
-  index?: number;
-}) {
+/**
+ * One film in a grid. The poster is the card's only link and covers the whole
+ * card, so a keyboard or switch user stops once per film rather than twice.
+ */
+export function MovieCard({ movie }: { movie: Movie }) {
+  const paused = movie.available && movie.resumeMs > 0;
   return (
-    <article
-      className="movie-card"
-      style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
-    >
+    <article className="movie-card">
       <a
         href={`#/movie/${encodeURIComponent(movie.id)}`}
         className="poster-link"
         aria-label={`View ${movie.title}`}
       >
         <Poster movie={movie} />
-        <span className="poster-open" aria-hidden="true">
-          ↗
+        <span className="poster-open">
+          <Icon name="arrow-up-right" />
         </span>
       </a>
       <div className="movie-caption">
-        <h3>
-          <a href={`#/movie/${encodeURIComponent(movie.id)}`}>{movie.title}</a>
-        </h3>
-        <span>{movie.year ?? "Film"}</span>
+        <h3>{movie.title}</h3>
+        {movie.year ? <span>{movie.year}</span> : null}
       </div>
-      <p className="movie-meta">
-        {!movie.available
-          ? "Source unavailable"
-          : movie.resumeMs > 0
-            ? `Paused at ${Math.floor(movie.resumeMs / 60000)} min`
-            : "Ready to discover"}
-      </p>
-      {movie.resumeMs > 0 && movie.available && (
-        <div className="resume-mark" aria-label="Continue watching available" />
-      )}
+      {!movie.available ? (
+        <p className="movie-meta movie-meta-warning">Source unavailable</p>
+      ) : paused ? (
+        <p className="movie-meta">
+          <span className="resume-mark" aria-hidden="true" />
+          Paused at {Math.floor(movie.resumeMs / 60000)} min
+        </p>
+      ) : null}
     </article>
   );
 }

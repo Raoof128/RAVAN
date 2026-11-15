@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#101313" />
+    <meta name="color-scheme" content="dark" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta
       name="description"
@@ -11,9 +12,139 @@
     />
     <meta name="referrer" content="no-referrer" />
     <title>RAVAN — Every Story Flows.</title>
+    <!--
+      Shown while the application script is fetched and the session is checked.
+      It is plain markup and CSS, so it needs nothing that has yet to load, and
+      it stays invisible for the first quarter second: a fast visit never sees it.
+    -->
+    <style>
+      html {
+        background: #101313;
+      }
+      #boot {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 50;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #101313;
+        color: #aab3af;
+        font:
+          12px/1.5 "DM Sans",
+          system-ui,
+          sans-serif;
+        letter-spacing: 0.04em;
+        transition: opacity 0.2s linear;
+      }
+      #boot.leaving {
+        opacity: 0;
+        pointer-events: none;
+      }
+      /* Hidden, not merely transparent, until due: a screen reader does not
+         read the "still opening" line before it applies. */
+      #boot > div,
+      #boot > p {
+        opacity: 0;
+        visibility: hidden;
+        animation: boot-in 0.4s ease-out 0.25s forwards;
+      }
+      #boot > p {
+        margin: 28px 0 0;
+        animation-delay: 1.4s;
+      }
+      #boot > p.late {
+        margin-top: 6px;
+        animation-delay: 15s;
+      }
+      #boot i {
+        position: relative;
+        display: block;
+        width: 30px;
+        height: 2px;
+        margin: 0 0 7px 3px;
+        overflow: hidden;
+        background: #303736;
+        border-radius: 1px;
+      }
+      #boot i:before {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 38%;
+        background: linear-gradient(
+          90deg,
+          #f18c7000,
+          #f18c70 45%,
+          #ffd9c2 62%,
+          #f18c7000
+        );
+        transform: translateX(-100%);
+        animation: boot-flow 1.9s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+      }
+      #boot svg {
+        display: block;
+        width: 44px;
+        height: 46px;
+        fill: #f3f0e8;
+      }
+      @keyframes boot-in {
+        to {
+          opacity: 1;
+          visibility: visible;
+        }
+      }
+      @keyframes boot-flow {
+        to {
+          transform: translateX(265%);
+        }
+      }
+      /* Reduced motion stills the travelling line. The fades stay: they are
+         not movement, and they keep the timing that hides a fast visit. */
+      @media (prefers-reduced-motion: reduce) {
+        #boot {
+          transition: none;
+        }
+        #boot i:before {
+          animation: none;
+          transform: none;
+          width: 100%;
+          opacity: 0.55;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="boot" role="status">
+      <div>
+        <i></i>
+        <svg viewBox="22 19 42 42" aria-hidden="true" focusable="false">
+          <path
+            d="M24 59V21h16c13 0 20 5 20 15 0 7-4 11-11 13l12 10H48L34 46v13Zm10-31v12h6c7 0 10-2 10-6s-3-6-10-6Z"
+          />
+        </svg>
+      </div>
+      <p>Opening your cinema</p>
+      <p class="late">Still opening. Reload the page if this continues.</p>
+    </div>
     <div id="root"></div>
+    <noscript>
+      <style>
+        #boot {
+          display: none;
+        }
+      </style>
+      <p style="padding: 48px 24px; color: #f3f0e8; font-family: sans-serif">
+        RAVAN needs JavaScript to open your cinema. Turn it on for this site and
+        reload the page.
+      </p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

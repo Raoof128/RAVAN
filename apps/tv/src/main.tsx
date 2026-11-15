@@ -10,6 +10,7 @@ import type {
   MovieDetail,
 } from "../../../packages/contracts/src/index.js";
 import { Poster } from "../../../packages/ui/src/MovieCard.js";
+import { Icon } from "../../../packages/ui/src/Icon.js";
 import { installRemote, restoreFocus, saveFocus } from "./focus.js";
 import { pairDevice, credentialStore } from "./pairing.js";
 import { WebOSAdapter } from "./platforms/WebOSAdapter.js";
@@ -18,7 +19,15 @@ import {
   PlayerController,
   type ControllerState,
 } from "../../web/src/player/PlayerController.js";
+import {
+  Flow,
+  FlowProgress,
+  Opening,
+  Placeholder,
+} from "../../../packages/ui/src/Loading.js";
+import { Preparing } from "../../web/src/player/Preparing.js";
 import "../../../packages/ui/src/tokens.css";
+import "../../../packages/ui/src/loading.css";
 import "./tv.css";
 const preview =
   import.meta.env.DEV &&
@@ -33,6 +42,23 @@ async function launch() {
   createRoot(document.getElementById("root")!).render(<TV api={api} />);
 }
 void launch();
+function greeting() {
+  const hour = new Date().getHours();
+  return hour < 5
+    ? "GOOD EVENING"
+    : hour < 12
+      ? "GOOD MORNING"
+      : hour < 18
+        ? "GOOD AFTERNOON"
+        : "GOOD EVENING";
+}
+function clock(seconds: number) {
+  const s = Math.max(0, Math.floor(seconds)),
+    h = Math.floor(s / 3600),
+    m = Math.floor((s % 3600) / 60);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return h ? `${h}:${pad(m)}:${pad(s % 60)}` : `${m}:${pad(s % 60)}`;
+}
 function TV({ api }: { api: ApiClient }) {
   const [page, setPage] = useState<
       "loading" | "pair" | "library" | "detail" | "player" | "settings"
@@ -42,7 +68,10 @@ function TV({ api }: { api: ApiClient }) {
     [message, setMessage] = useState(""),
     [code, setCode] = useState(""),
     [retry, setRetry] = useState(0),
-    [cursor, setCursor] = useState<string | null>(null);
+    [cursor, setCursor] = useState<string | null>(null),
+    [loaded, setLoaded] = useState(false),
+    [opening, setOpening] = useState<string>(),
+    [moreBusy, setMoreBusy] = useState(false);
   const pageRef = useRef(page);
   const loadedRevision = useRef<number | null>(null);
   const resumePositions = useRef(new Map<string, number>());
@@ -86,6 +115,7 @@ function TV({ api }: { api: ApiClient }) {
     if (page !== "pair" || preview) return;
     const controller = new AbortController();
     setCode("");
+    setMessage("");
     if (!/^https:\/\//.test(origin)) {
       setMessage(
         "This TV app needs your cinema’s secure address. Install the configured package.",
@@ -112,21 +142,27 @@ function TV({ api }: { api: ApiClient }) {
       .then((data) => {
         if (active) {
           loadedRevision.current = retry;
+          setLoaded(true);
+          setMessage("");
           setItems(data.items);
           setCursor(data.nextCursor);
         }
       })
       .catch(() => {
-        if (active)
+        if (active) {
+          setLoaded(true);
           setMessage(
             "We couldn’t load your films. Check the connection or reconnect this TV.",
           );
+        }
       });
     return () => {
       active = false;
     };
   }, [page, retry, api]);
   async function open(id: string) {
+    if (opening) return;
+    setOpening(id);
     try {
       const value = await api.detail(id);
       resumePositions.current.delete(id);
@@ -137,10 +173,12 @@ function TV({ api }: { api: ApiClient }) {
       saveFocus("library", `movie-${id}`);
     } catch {
       setMessage("This film is unavailable. Try refreshing your collection.");
+    } finally {
+      setOpening(undefined);
     }
   }
   return (
-    <div className="tv-shell">
+    <div className="tv-shell" data-page={page}>
       <header className="tv-header">
         <span className="wordmark">RAVĀN</span>
         <span className="tv-label">
@@ -154,7 +192,6 @@ function TV({ api }: { api: ApiClient }) {
       </header>
       {page === "pair" ? (
         <main className="tv-pair">
-          <p className="eyebrow">BRING THE BIG SCREEN</p>
           <h1>Your seat is ready.</h1>
           <p>
             Open RAVAN on your phone, choose Your cinema,
@@ -162,8 +199,29 @@ function TV({ api }: { api: ApiClient }) {
             then approve this TV with the code below.
           </p>
           <div className="pair-code" aria-live="polite">
-            {code || "— — — —"}
+            {code ? (
+              <>
+                <span aria-hidden="true">{code.slice(0, 4)}</span>
+                <span aria-hidden="true">{code.slice(4)}</span>
+                <span className="sr-only">
+                  Pairing code {code.split("").join(" ")}
+                </span>
+              </>
+            ) : message ? (
+              <span className="pair-code-empty">— — — —</span>
+            ) : (
+              <span className="pair-code-wait">
+                <Flow />
+                <span className="sr-only">Requesting a pairing code</span>
+              </span>
+            )}
           </div>
+          {code && !message && (
+            <p className="pair-waiting">
+              Waiting for approval on your phone
+              <Flow />
+            </p>
+          )}
           <p className="tv-address">{origin}</p>
           <p role="status">{message}</p>
           {message && (
@@ -180,11 +238,11 @@ function TV({ api }: { api: ApiClient }) {
           <div className="tv-library-atmosphere">
             <FilmStill url={items[0]?.posterUrl} priority />
           </div>
-          <p className="eyebrow">GOOD EVENING. MAKE YOURSELF AT HOME.</p>
+          <p className="eyebrow">{greeting()}. MAKE YOURSELF AT HOME.</p>
           <h1>Something worth watching.</h1>
           {message && (
-            <div role="status">
-              <p>{message}</p>
+            <div>
+              <p role="status">{message}</p>
               <button
                 data-focus-id="retry"
                 onClick={() => setRetry((n) => n + 1)}
@@ -193,7 +251,18 @@ function TV({ api }: { api: ApiClient }) {
               </button>
             </div>
           )}
-          {!items.length && !message ? (
+          {!loaded ? (
+            <Placeholder label="Loading your films" className="tv-grid-wait">
+              <div className="tv-grid">
+                {[0, 1, 2, 3, 4, 5].map((n) => (
+                  <div className="tv-movie" key={n}>
+                    <span className="sk tv-sk-poster" />
+                    <span className="sk sk-line tv-sk-line" />
+                  </div>
+                ))}
+              </div>
+            </Placeholder>
+          ) : !items.length && !message ? (
             <p>
               Your collection will appear here after you choose a folder on your
               phone.
@@ -202,7 +271,8 @@ function TV({ api }: { api: ApiClient }) {
             <div className="tv-grid">
               {items.map((m) => (
                 <button
-                  className="tv-movie"
+                  className={`tv-movie${opening === m.id ? " is-opening" : ""}`}
+                  aria-busy={opening === m.id || undefined}
                   data-focus-id={`movie-${m.id}`}
                   key={m.id}
                   onClick={() => void open(m.id)}
@@ -223,7 +293,11 @@ function TV({ api }: { api: ApiClient }) {
           {cursor && (
             <button
               data-focus-id="more"
+              className={moreBusy ? "is-pending" : undefined}
+              aria-busy={moreBusy || undefined}
               onClick={() => {
+                if (moreBusy) return;
+                setMoreBusy(true);
                 api
                   .listMovies(cursor)
                   .then((data) => {
@@ -235,7 +309,8 @@ function TV({ api }: { api: ApiClient }) {
                     ]);
                     setCursor(data.nextCursor);
                   })
-                  .catch(() => setMessage("More films could not be loaded."));
+                  .catch(() => setMessage("More films could not be loaded."))
+                  .finally(() => setMoreBusy(false));
               }}
             >
               More films
@@ -249,10 +324,8 @@ function TV({ api }: { api: ApiClient }) {
           </div>
           <Poster movie={movie} large />
           <section>
-            <p className="eyebrow">
-              FROM YOUR COLLECTION / {movie.year ?? "RAVAN"}
-            </p>
             <h1>{movie.title}</h1>
+            {movie.year ? <p className="tv-year">{movie.year}</p> : null}
             <p>
               {movie.description || "A film from your personal collection."}
             </p>
@@ -263,7 +336,7 @@ function TV({ api }: { api: ApiClient }) {
                 disabled={!movie.available}
                 onClick={() => go("player")}
               >
-                ▶{" "}
+                <Icon name="play" size={24} />
                 {(resumePositions.current.get(movie.id) ?? movie.resumeMs)
                   ? "Continue watching"
                   : "Watch film"}
@@ -289,7 +362,6 @@ function TV({ api }: { api: ApiClient }) {
         />
       ) : page === "settings" ? (
         <main className="tv-settings">
-          <p className="eyebrow">YOUR SCREEN, YOUR SPACE</p>
           <h1>Welcome to your cinema.</h1>
           <p>
             Manage your movie folder and languages on your phone.
@@ -317,11 +389,11 @@ function TV({ api }: { api: ApiClient }) {
           </div>
         </main>
       ) : (
-        <main className="tv-pair" role="status">
-          <h1>Opening your cinema…</h1>
+        <main className="tv-pair tv-opening">
+          <Opening words="Opening your cinema" />
         </main>
       )}
-      <footer className="tv-footer">
+      <footer className="tv-footer" hidden={page === "player"}>
         <span>EVERY STORY FLOWS.</span>
         <span>↑ ↓ ← → to explore · OK to choose · Back to return</span>
       </footer>
@@ -345,7 +417,20 @@ function TVPlayer({
     controller = useRef<PlayerController | null>(null);
   const position = useRef(resumeMs);
   const [state, setState] = useState<ControllerState>({ kind: "loading" }),
-    [retry, setRetry] = useState(0);
+    [retry, setRetry] = useState(0),
+    [time, setTime] = useState({ at: 0, of: 0 }),
+    [playing, setPlaying] = useState(false),
+    [stalled, setStalled] = useState(false),
+    [shown, setShown] = useState(true);
+  const shownRef = useRef(true);
+  const hide = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const live = state.kind === "ready" || state.kind === "paused";
+  // When the film is ready the transport arrives beside Close, which had the
+  // focus while there was nothing else. OK should now mean Play or Pause.
+  useEffect(() => {
+    if (live)
+      document.querySelector<HTMLElement>('[data-focus-id="play"]')?.focus();
+  }, [live]);
   useEffect(() => {
     if (!preview && detectPlatform() !== "webos") {
       setState({
@@ -360,7 +445,12 @@ function TVPlayer({
     const element = video.current!;
     const adapter = new WebOSAdapter(element, origin || location.origin);
     const player = new PlayerController(api, adapter, (s) => {
-      if (active) setState(s);
+      // The controller says "loading" before each of its checks on a film
+      // being prepared. The panel stays up between them.
+      if (active)
+        setState((previous) =>
+          s.kind === "loading" && previous.kind === "preparing" ? previous : s,
+        );
     });
     controller.current = player;
     const capturePosition = () => {
@@ -388,27 +478,169 @@ function TVPlayer({
       void player.destroy();
     };
   }, [api, movie.id, retry]);
+  // What the element reports, at most once a second: the C1 need not repaint
+  // the transport for every frame of the film.
+  useEffect(() => {
+    const element = video.current;
+    if (!element) return;
+    let last = -1;
+    const tick = () => {
+      const at = Math.floor(element.currentTime);
+      if (at === last) return;
+      last = at;
+      setTime({
+        at,
+        of: Number.isFinite(element.duration) ? element.duration : 0,
+      });
+    };
+    const play = () => setPlaying(true);
+    const pause = () => setPlaying(false);
+    const stall = () => setStalled(true);
+    const flowing = () => setStalled(false);
+    const events: Array<[string, () => void]> = [
+      ["timeupdate", tick],
+      ["durationchange", tick],
+      ["play", play],
+      ["pause", pause],
+      ["ended", pause],
+      ["waiting", stall],
+      ["playing", flowing],
+      ["canplay", flowing],
+      ["seeked", flowing],
+    ];
+    for (const [name, handler] of events)
+      element.addEventListener(name, handler);
+    return () => {
+      for (const [name, handler] of events)
+        element.removeEventListener(name, handler);
+    };
+  }, []);
+  // The transport steps aside while the film plays and returns on any key.
+  // The key that brings it back does nothing else, so a press on a control the
+  // viewer could not see never acts.
+  useEffect(() => {
+    const reveal = () => {
+      shownRef.current = true;
+      setShown(true);
+      clearTimeout(hide.current);
+      if (playing && live)
+        hide.current = setTimeout(() => {
+          shownRef.current = false;
+          setShown(false);
+        }, 4500);
+    };
+    reveal();
+    const key = (event: KeyboardEvent) => {
+      const element = video.current;
+      const back =
+        event.key === "Escape" ||
+        event.key === "Backspace" ||
+        event.keyCode === 461;
+      const hidden = !shownRef.current;
+      reveal();
+      if (!element || !live) return;
+      // Transport keys on the remote act whether or not the bar is showing.
+      const code = event.keyCode;
+      if (code === 415 || code === 19 || code === 179 || code === 413) {
+        event.preventDefault();
+        if (code === 415 || (code === 179 && element.paused))
+          void element.play().catch(() => {});
+        else element.pause();
+        return;
+      }
+      if (code === 412 || code === 417) {
+        event.preventDefault();
+        element.currentTime = Math.max(
+          0,
+          element.currentTime + (code === 412 ? -30 : 30),
+        );
+        return;
+      }
+      if (hidden && !back) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    };
+    window.addEventListener("keydown", key, true);
+    window.addEventListener("pointermove", reveal);
+    return () => {
+      clearTimeout(hide.current);
+      window.removeEventListener("keydown", key, true);
+      window.removeEventListener("pointermove", reveal);
+    };
+  }, [playing, live]);
+  const seek = (delta: number) => {
+    const element = video.current;
+    if (!element) return;
+    element.currentTime = Math.max(
+      0,
+      Math.min(element.duration || 0, element.currentTime + delta),
+    );
+  };
   return (
-    <main className="tv-player">
+    <main
+      className={`tv-player${live && playing && !shown ? " tv-player-idle" : ""}`}
+    >
       <video
         ref={video}
         playsInline
         preload="metadata"
         aria-label={movie.title}
       />
+      {live && stalled && (
+        <div className="tv-player-buffering" role="status">
+          <Flow />
+          <span className="sr-only">Buffering</span>
+        </div>
+      )}
+      {!live && (
+        <div className="tv-player-wait">
+          {state.kind === "loading" ? (
+            <Opening words="Opening your film" />
+          ) : state.kind === "preparing" ? (
+            <Preparing
+              phase={state.phase}
+              progress={state.progress}
+              reason={state.reason}
+            />
+          ) : (
+            <section className="tv-player-message">
+              <h2>
+                {state.kind === "conflict"
+                  ? "A film is already playing."
+                  : state.kind === "unsupported"
+                    ? "This film can’t play on this TV yet."
+                    : "Playback has stopped."}
+              </h2>
+              <p role="status">
+                {state.kind === "conflict"
+                  ? "A film is already playing on another screen."
+                  : state.kind === "error" || state.kind === "unsupported"
+                    ? state.reason
+                    : ""}
+              </p>
+            </section>
+          )}
+        </div>
+      )}
       <div className="tv-player-controls">
         <h1>{movie.title}</h1>
-        <p role="status">
-          {state.kind === "error" || state.kind === "unsupported"
-            ? state.reason
-            : state.kind === "preparing"
-              ? "Checking the source format…"
-              : state.kind === "loading"
-                ? "Opening your film…"
-                : state.kind === "conflict"
-                  ? "A film is already playing on another screen."
-                  : ""}
-        </p>
+        {live && (
+          <div className="tv-transport">
+            <span>{clock(time.at)}</span>
+            {time.of > 0 ? (
+              <>
+                <FlowProgress
+                  value={(time.at / time.of) * 100}
+                  label="Position in the film"
+                />
+                <span>{clock(time.of)}</span>
+              </>
+            ) : (
+              <span className="tv-transport-open" />
+            )}
+          </div>
+        )}
         <div className="button-row">
           {state.kind === "conflict" ? (
             <button
@@ -431,17 +663,9 @@ function TVPlayer({
             >
               Reconnect playback
             </button>
-          ) : state.kind === "ready" || state.kind === "paused" ? (
+          ) : live ? (
             <>
-              <button
-                data-focus-id="rewind"
-                onClick={() => {
-                  video.current!.currentTime = Math.max(
-                    0,
-                    video.current!.currentTime - 10,
-                  );
-                }}
-              >
+              <button data-focus-id="rewind" onClick={() => seek(-10)}>
                 −10 sec
               </button>
               <button
@@ -458,17 +682,9 @@ function TVPlayer({
                   else video.current!.pause();
                 }}
               >
-                Play / Pause
+                {playing ? "Pause" : "Play"}
               </button>
-              <button
-                data-focus-id="forward"
-                onClick={() => {
-                  video.current!.currentTime = Math.min(
-                    video.current!.duration || 0,
-                    video.current!.currentTime + 10,
-                  );
-                }}
-              >
+              <button data-focus-id="forward" onClick={() => seek(10)}>
                 +10 sec
               </button>
             </>

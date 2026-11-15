@@ -1,0 +1,286 @@
+/*
+ * Loading language shared by the web and TV clients.
+ *
+ * One motif carries every wait: the copper line that sits over the A in the
+ * wordmark. Left to itself it carries a slow current; given a real percentage
+ * from the server it fills. Nothing here animates layout, and every rule is
+ * written for Chromium 79 (no inset, no flex gap, no aspect-ratio).
+ */
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-quick: 140ms;
+  --dur-base: 240ms;
+  --dur-slow: 480ms;
+  --skeleton: #ffffff0b;
+  --skeleton-strong: #ffffff14;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The current: an indeterminate wait. */
+.flow {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 2px;
+  overflow: hidden;
+  background: var(--line);
+  border-radius: 1px;
+}
+.flow:before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 38%;
+  background: linear-gradient(
+    90deg,
+    #f18c7000,
+    var(--accent) 45%,
+    #ffd9c2 62%,
+    #f18c7000
+  );
+  transform: translateX(-100%);
+  animation: flow 1.9s var(--ease-in-out) infinite;
+  will-change: transform;
+}
+@keyframes flow {
+  to {
+    transform: translateX(265%);
+  }
+}
+
+/* The same line with a measured value behind it. */
+progress.flow-progress {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 3px;
+  border: 0;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--line);
+  color: var(--accent);
+}
+progress.flow-progress::-webkit-progress-bar {
+  background: var(--line);
+}
+progress.flow-progress::-webkit-progress-value {
+  background: var(--accent);
+  transition: width var(--dur-slow) var(--ease-out);
+}
+progress.flow-progress::-moz-progress-bar {
+  background: var(--accent);
+}
+
+/* App opening: the mark, its line, and words only if the wait is long. */
+.opening {
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  text-align: center;
+}
+.opening-mark {
+  width: 44px;
+}
+.opening-mark .flow {
+  width: 30px;
+  margin: 0 auto 7px 3px;
+}
+.opening-mark svg {
+  display: block;
+  width: 44px;
+  height: 46px;
+  fill: var(--text);
+}
+.opening-words {
+  margin-top: 28px;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  opacity: 0;
+  animation: appear var(--dur-slow) var(--ease-out) 0.9s forwards;
+}
+@keyframes appear {
+  to {
+    opacity: 1;
+  }
+}
+
+/* Placeholders stand exactly where the content will. */
+.sk {
+  display: block;
+  background: var(--skeleton);
+  border-radius: 3px;
+}
+.sk-strong {
+  background: var(--skeleton-strong);
+}
+.sk-line {
+  height: 0.8em;
+  margin: 0.45em 0;
+}
+.sk-poster {
+  position: relative;
+  width: 100%;
+  border-radius: 4px;
+}
+.sk-poster:before {
+  content: "";
+  display: block;
+  padding-top: 150%;
+}
+/* One breath for the whole group, on the compositor. */
+.sk-group {
+  animation: breathe 1.8s var(--ease-in-out) infinite alternate;
+}
+@keyframes breathe {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.55;
+  }
+}
+/* Results being replaced stay on screen, quietened, rather than vanishing. */
+.is-refreshing {
+  opacity: 0.45;
+  transition: opacity var(--dur-base) linear;
+  pointer-events: none;
+}
+
+/* A control whose action is under way keeps its size, label and focus. */
+.is-pending {
+  position: relative;
+  cursor: progress;
+}
+.is-pending:after {
+  content: "";
+  position: absolute;
+  right: 12px;
+  bottom: 6px;
+  left: 12px;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.75;
+  transform-origin: left center;
+  animation: pending 1.1s var(--ease-in-out) infinite alternate;
+}
+@keyframes pending {
+  from {
+    transform: scaleX(0.12);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Preparation: what the server is doing, in the order it does it. */
+.prep-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+.prep-steps li {
+  position: relative;
+  padding: 0 0 18px 30px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.prep-steps li:last-child {
+  padding-bottom: 0;
+}
+.prep-steps li:before {
+  content: "";
+  position: absolute;
+  top: 0.45em;
+  left: 3px;
+  width: 9px;
+  height: 9px;
+  border: 1px solid #6c7672;
+  border-radius: 50%;
+}
+.prep-steps li:after {
+  content: "";
+  position: absolute;
+  top: calc(0.45em + 13px);
+  bottom: -0.2em;
+  left: 8px;
+  width: 1px;
+  background: var(--line);
+}
+.prep-steps li:last-child:after {
+  display: none;
+}
+.prep-steps li[data-state="done"] {
+  color: var(--text);
+}
+.prep-steps li[data-state="done"]:before {
+  background: var(--muted);
+  border-color: var(--muted);
+}
+.prep-steps li[data-state="current"] {
+  color: var(--text);
+}
+.prep-steps li[data-state="current"]:before {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px #f18c7026;
+}
+.prep-steps small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.86em;
+}
+
+/* Reduced motion, from the system setting or the owner's saved preference. */
+@media (prefers-reduced-motion: reduce) {
+  .flow:before {
+    animation: none;
+    transform: none;
+    width: 100%;
+    opacity: 0.55;
+  }
+  .opening-words {
+    animation: none;
+    opacity: 1;
+  }
+  .is-pending:after {
+    animation: none;
+    transform: none;
+  }
+}
+:root[data-motion="reduce"] *,
+:root[data-motion="reduce"] *:before,
+:root[data-motion="reduce"] *:after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+:root[data-motion="reduce"] .flow:before {
+  transform: none;
+  width: 100%;
+  opacity: 0.55;
+}
+:root[data-motion="reduce"] .opening-words {
+  opacity: 1;
+}

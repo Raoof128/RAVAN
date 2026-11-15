@@ -514,3 +514,66 @@ it("does not rebuild in the background an edition that was reclaimed in the othe
   expect((await planner.planPlayback(source, web)).mode).toBe("prepare");
   expect(h.db.prepare("SELECT COUNT(*) n FROM jobs").get()).toEqual({ n: 1 });
 });
+
+it("names the step a preparation is at, and only steps the server is in", async () => {
+  // No probe yet: the file is being read.
+  const bare = await sessionFixture();
+  const reading = await new MediaPlanner(
+    bare.db,
+    true,
+    "/prepared",
+    () => 1_000_000,
+  ).planPlayback(source, web);
+  expect(reading).toMatchObject({ mode: "prepare", phase: "inspecting" });
+  expect(reading.progress).toBeUndefined();
+
+  // Probed, conversion not started: waiting, with nothing measured.
+  const h = await fixture();
+  const planner = new MediaPlanner(h.db, true, "/prepared", () => 1_000_000, {
+    format: "hls",
+  });
+  expect(await planner.planPlayback(source, web)).toMatchObject({
+    mode: "prepare",
+    phase: "queued",
+    progress: 0,
+  });
+
+  // A worker has it: MPEG-4 Part 2 cannot be copied for a browser, so it is converted.
+  h.db
+    .prepare(
+      "UPDATE jobs SET state='running',progress=12,started_at=?,lease_until=?",
+    )
+    .run(1_000_000, 2_000_000);
+  expect(await planner.planPlayback(source, web)).toMatchObject({
+    mode: "prepare",
+    phase: "converting",
+    progress: 12,
+  });
+
+  // The same job on a picture a browser already decodes is a repackage.
+  const copy = await fixture({
+    ...probe,
+    video: { ...probe.video!, codec: "h264" },
+  });
+  const copier = new MediaPlanner(copy.db, true, "/prepared", () => 1_000_000, {
+    format: "hls",
+  });
+  await copier.planPlayback(source, web);
+  copy.db
+    .prepare(
+      "UPDATE jobs SET state='running',progress=40,started_at=?,lease_until=?",
+    )
+    .run(1_000_000, 2_000_000);
+  expect(await copier.planPlayback(source, web)).toMatchObject({
+    phase: "repackaging",
+    progress: 40,
+  });
+
+  // Segments exist, but too few to play without stopping.
+  const slow = await streaming(25, hour);
+  expect(await slow.planner.planPlayback(source, web)).toMatchObject({
+    mode: "prepare",
+    phase: "buffering",
+    progress: 25,
+  });
+});

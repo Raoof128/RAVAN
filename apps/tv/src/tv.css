@@ -10,7 +10,10 @@
   border-bottom: 1px solid #383833;
   display: flex;
   align-items: center;
-  gap: 64px;
+}
+/* Chromium 79 has no gap in a flex row; the space is a margin. */
+.tv-header > * + * {
+  margin-left: 64px;
 }
 .tv-header .wordmark {
   font-size: 68px;
@@ -78,7 +81,7 @@
 }
 .tv-movie .poster-credit,
 .tv-movie .poster-year {
-  font-size: 10px;
+  font-size: 14px;
 }
 .tv-movie strong {
   font-size: 23px;
@@ -230,4 +233,270 @@
   font: 500 46px/1 var(--body);
   letter-spacing: 7px;
   top: 0;
+}
+
+/* ---- 2026-11-15 audit ----
+   Written for Chromium 79: no flex gap, no aspect-ratio, no :focus-visible. */
+
+/* Keep everything inside the title-safe area of a 1080p panel. */
+.tv-shell {
+  min-height: 1080px;
+}
+.tv-label,
+.tv-shell .eyebrow {
+  font-size: 18px;
+}
+.tv-footer {
+  font-size: 18px;
+}
+.tv-shell button {
+  transition:
+    background-color 0.14s linear,
+    transform 0.14s ease-out;
+}
+/* One focus treatment everywhere: a wide warm ring that survives any backdrop. */
+.tv-shell button:focus {
+  outline: 5px solid #ffd8ab;
+  outline-offset: 8px;
+}
+.tv-shell .tv-movie {
+  transition: transform 0.16s ease-out;
+}
+.tv-shell .tv-movie:focus {
+  transform: scale(1.035);
+}
+.tv-shell .tv-movie.is-opening {
+  opacity: 0.6;
+}
+.tv-shell button.is-pending:after {
+  right: 24px;
+  bottom: 10px;
+  left: 24px;
+  height: 3px;
+}
+.tv-shell [role="status"] p,
+.tv-shell p[role="status"] {
+  min-height: 1.6em;
+}
+
+.tv-footer[hidden] {
+  display: none;
+}
+
+/* Opening and waiting */
+.tv-opening .opening {
+  min-height: 700px;
+}
+.tv-shell .opening-mark {
+  width: 88px;
+}
+.tv-shell .opening-mark .flow {
+  width: 60px;
+  height: 4px;
+  margin: 0 auto 14px 6px;
+}
+.tv-shell .opening-mark svg {
+  width: 88px;
+  height: 92px;
+}
+.tv-shell .opening-words {
+  margin-top: 48px;
+  font-size: 24px;
+}
+.tv-sk-poster {
+  display: block;
+  width: 100%;
+  height: 360px;
+}
+.tv-sk-line {
+  display: block;
+  width: 70%;
+  height: 22px;
+  margin-top: 26px;
+}
+
+/* Pairing */
+.pair-code {
+  min-height: 108px;
+}
+.pair-code > span {
+  display: inline-block;
+}
+.pair-code > span + span {
+  margin-left: 36px;
+}
+.pair-code-empty {
+  color: #6c7672;
+}
+.pair-code-wait {
+  width: 380px;
+  padding-top: 52px;
+}
+.pair-code-wait .flow,
+.pair-waiting .flow {
+  height: 3px;
+}
+.tv-shell .pair-waiting {
+  width: 520px;
+  margin: 0 auto 28px;
+  color: #a6a69c;
+  font-size: 22px;
+}
+.pair-waiting .flow {
+  margin-top: 16px;
+}
+
+/* Player: the picture owns the screen; the transport steps aside. */
+.tv-shell[data-page="player"] .tv-header {
+  display: none;
+}
+.tv-shell .tv-player {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  min-height: 0;
+  padding: 0;
+  background: #000;
+}
+.tv-player video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.tv-player-controls {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 150px 96px 64px;
+  background: linear-gradient(0deg, #000000f2 0%, #000000b8 55%, #00000000);
+  transition: opacity 0.25s linear;
+}
+.tv-player-idle .tv-player-controls {
+  opacity: 0;
+  pointer-events: none;
+}
+.tv-shell .tv-player-controls h1 {
+  margin: 0 0 22px;
+  font-size: 44px;
+}
+.tv-transport {
+  display: flex;
+  align-items: center;
+  margin-bottom: 30px;
+  color: #f1eee5;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+.tv-transport progress.flow-progress {
+  flex: 1;
+  height: 6px;
+  margin: 0 24px;
+  border-radius: 3px;
+  background: #ffffff33;
+}
+.tv-transport progress.flow-progress::-webkit-progress-bar {
+  background: #ffffff33;
+}
+.tv-transport progress.flow-progress::-webkit-progress-value {
+  transition: none;
+}
+.tv-transport-open {
+  flex: 1;
+}
+.tv-player-controls .button-row {
+  margin-top: 0;
+}
+.tv-player-buffering {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+}
+.tv-player-buffering .flow {
+  height: 5px;
+}
+.tv-player-wait {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 220px;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.tv-player-wait .opening {
+  min-height: 0;
+}
+.tv-player-message,
+.tv-player-wait .preparing {
+  width: 1000px;
+}
+.tv-shell .tv-player-wait h2 {
+  font:
+    400 58px/1.1 "Cormorant Garamond",
+    Georgia,
+    serif;
+  margin: 0;
+}
+.tv-shell .tv-player-wait p {
+  margin-top: 22px;
+}
+.tv-player-wait .preparing-line {
+  width: 640px;
+  min-height: 70px;
+  margin: 44px auto 0;
+}
+.tv-player-wait .flow {
+  height: 4px;
+}
+.tv-player-wait progress.flow-progress {
+  height: 6px;
+}
+.tv-player-wait .preparing-percent {
+  display: block;
+  margin-top: 18px;
+  color: #f1eee5;
+  font-size: 24px;
+}
+.tv-player-wait .prep-steps {
+  display: inline-block;
+  margin-top: 30px;
+  font-size: 24px;
+}
+.tv-player-wait .prep-steps li {
+  padding: 0 0 22px 46px;
+}
+.tv-player-wait .prep-steps li:before {
+  top: 0.4em;
+  left: 4px;
+  width: 15px;
+  height: 15px;
+}
+.tv-player-wait .prep-steps li:after {
+  top: calc(0.4em + 22px);
+  left: 12px;
+}
+.tv-shell .tv-player-wait .fine-print {
+  margin-top: 30px;
+  color: #a6a69c;
+  font-size: 20px;
+}
+
+.tv-shell .tv-year {
+  margin: -8px 0 24px;
+  color: #a6a69c;
+  font-size: 24px;
+  letter-spacing: 1px;
+}
+.tv-shell button .icon {
+  margin-right: 14px;
+  vertical-align: -4px;
 }

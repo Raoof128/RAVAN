@@ -1,20 +1,44 @@
 import { FilmStill } from "../../../../packages/ui/src/FilmStill.js";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useApi } from "../../../../packages/client/src/api.js";
 import type { MovieDetail } from "../../../../packages/contracts/src/index.js";
 import { Poster } from "../../../../packages/ui/src/MovieCard.js";
 import { StatusPanel } from "../../../../packages/ui/src/StatusPanel.js";
+import {
+  ActionButton,
+  Line,
+  Placeholder,
+  useDelayed,
+  usePending,
+} from "../../../../packages/ui/src/Loading.js";
+import { Icon } from "../../../../packages/ui/src/Icon.js";
+import { forgetLibrary } from "../libraryCache.js";
+import { returnTo, useTitle } from "../router.js";
+const editionState: Record<string, string> = {
+  source: "Original file",
+  ready: "Prepared",
+  preparing: "Being prepared",
+  queued: "Waiting to be prepared",
+};
 export function Detail({ id }: { id: string }) {
   const api = useApi();
   const [movie, setMovie] = useState<MovieDetail>(),
     [failed, setFailed] = useState(false),
+    [retry, setRetry] = useState(0),
     [message, setMessage] = useState(""),
-    [busy, setBusy] = useState(false),
+    [formError, setFormError] = useState(""),
     [editing, setEditing] = useState(false);
+  const [saving, runSave] = usePending();
+  const [storing, runStore] = usePending();
+  const firstField = useRef<HTMLInputElement>(null);
+  const editToggle = useRef<HTMLButtonElement>(null);
+  useTitle(movie?.title);
   useEffect(() => {
     let active = true;
     setMovie(undefined);
     setFailed(false);
+    setMessage("");
+    setEditing(false);
     api
       .detail(id)
       .then((m) => {
@@ -26,16 +50,38 @@ export function Detail({ id }: { id: string }) {
     return () => {
       active = false;
     };
-  }, [api, id]);
+  }, [api, id, retry]);
+  useEffect(() => {
+    if (editing) firstField.current?.focus();
+  }, [editing]);
+  const waiting = useDelayed(!movie && !failed);
+  // Back to the list the reader came from, where they left it; otherwise the library.
+  const back = (
+    <a
+      className="back-link"
+      href="#/library"
+      onClick={(event) => {
+        if (returnTo(/^\/(library|watchlist)$/)) event.preventDefault();
+      }}
+    >
+      <Icon name="arrow-left" />
+      Back to the collection
+    </a>
+  );
   if (failed)
     return (
       <main id="main">
         <StatusPanel
+          tone="error"
+          level={1}
           title="This film couldn’t be loaded."
           action={
-            <a className="button" href="#/library">
-              Back to your library
-            </a>
+            <div className="button-row">
+              <button onClick={() => setRetry((n) => n + 1)}>Try again</button>
+              <a className="button" href="#/library">
+                Back to your library
+              </a>
+            </div>
           }
         >
           The connection may have changed. Your watch history is still saved.
@@ -44,126 +90,181 @@ export function Detail({ id }: { id: string }) {
     );
   if (!movie)
     return (
-      <main id="main" className="loading-screen" role="status">
-        Opening the film…
+      <main id="main" className="detail-page">
+        {back}
+        {waiting ? (
+          <Placeholder label="Opening the film" className="detail-wait">
+            <div className="detail-grid">
+              <span className="sk sk-poster" />
+              <div className="detail-copy">
+                <Line width="200px" />
+                <Line width="min(560px, 85%)" strong className="sk-title" />
+                <Line width="min(620px, 95%)" />
+                <Line width="min(480px, 70%)" />
+                <span className="sk sk-button" />
+              </div>
+            </div>
+          </Placeholder>
+        ) : (
+          <div className="detail-wait" aria-busy="true" />
+        )}
       </main>
     );
-  async function save() {
-    if (!movie) return;
-    setBusy(true);
-    try {
-      await api.saveMovie(id, !movie.saved);
-      setMovie({ ...movie, saved: !movie.saved });
-      setMessage(
-        movie.saved
-          ? "Removed from your watchlist."
-          : "Saved for another night.",
-      );
-    } catch {
-      setMessage("Couldn’t update your watchlist. Please try again.");
-    } finally {
-      setBusy(false);
-    }
+  const film = movie;
+  function save() {
+    void runSave(async () => {
+      try {
+        await api.saveMovie(id, !film.saved);
+        forgetLibrary(api);
+        setMovie({ ...film, saved: !film.saved });
+        setMessage(
+          film.saved
+            ? "Removed from your watchlist."
+            : "Saved for another night.",
+        );
+      } catch {
+        setMessage("Couldn’t update your watchlist. Please try again.");
+      }
+    });
   }
+  const audio = film.audioTracks ?? [];
+  const playable = film.editions.filter((e) => e.available).length;
   return (
     <main id="main" className="detail-page">
       <div className="detail-atmosphere">
-        <FilmStill url={movie.posterUrl} priority />
+        <FilmStill url={film.posterUrl} priority />
       </div>
-      <a className="back-link" href="#/library">
-        ← Back to the collection
-      </a>
+      {back}
       <div className="detail-grid">
-        <Poster movie={movie} large />
+        <Poster movie={film} large />
         <div className="detail-copy">
-          <p className="eyebrow">
-            FROM YOUR COLLECTION {movie.year ? `/ ${movie.year}` : ""}
-          </p>
-          <h1>{movie.title}</h1>
-          <p className="detail-description">
-            {movie.description ||
-              "A film from your personal collection. Add a description to make it easier to find next time."}
-          </p>
+          <h1 data-long={film.title.length > 28 || undefined}>{film.title}</h1>
+          {film.year ? <p className="detail-year">{film.year}</p> : null}
+          {film.description ? (
+            <p className="detail-description">{film.description}</p>
+          ) : (
+            <p className="detail-description detail-description-empty">
+              No description yet.{" "}
+              <button className="text-link" onClick={() => setEditing(true)}>
+                Add one
+              </button>{" "}
+              to make this film easier to find.
+            </p>
+          )}
           <div className="button-row">
-            {movie.available ? (
+            {film.available ? (
               <a
                 className="button primary"
                 href={`#/player/${encodeURIComponent(id)}`}
               >
-                ▶ {movie.resumeMs ? "Resume film" : "Watch film"}
+                <Icon name="play" />
+                {film.resumeMs ? "Resume film" : "Watch film"}
               </a>
             ) : (
               <span className="unavailable">Source unavailable</span>
             )}
-            <button disabled={busy} onClick={() => void save()}>
-              {movie.saved ? "✓ In watchlist" : "+ Watchlist"}
-            </button>
+            <ActionButton
+              pending={saving}
+              pendingLabel="Updating your watchlist"
+              onClick={save}
+            >
+              {film.saved ? "✓ In watchlist" : "+ Watchlist"}
+            </ActionButton>
           </div>
-          {movie.resumeMs > 0 && (
+          {!film.available && (
             <p className="muted">
-              Paused at {Math.floor(movie.resumeMs / 60000)} minutes.{" "}
+              The file is no longer in your Drive folder, or Google needs to be
+              reconnected. <a href="#/settings">Open Your cinema</a> to check.
+            </p>
+          )}
+          {film.available && film.resumeMs > 0 && (
+            <p className="muted">
+              Paused at {Math.floor(film.resumeMs / 60000)} minutes.{" "}
               <a href={`#/player/${encodeURIComponent(id)}?start=0`}>
                 Start from the beginning
               </a>
             </p>
           )}
-          <p role="status">{message}</p>
+          <p className="detail-message" role="status">
+            {message}
+          </p>
           <section className="detail-section">
             <h2>Available editions</h2>
-            {movie.editions.map((edition) => (
+            {film.editions.map((edition) => (
               <div className="edition" key={edition.id}>
                 <span>{edition.label}</span>
                 <span className="muted">
                   {edition.available
-                    ? edition.state === "source"
-                      ? "Original file"
-                      : edition.state
+                    ? (editionState[edition.state] ?? edition.state)
                     : "Unavailable"}
                 </span>
               </div>
             ))}
-            {movie.editions.filter((e) => e.available).length > 1 && (
+            {audio.length > 1 && (
+              <div className="edition">
+                <span>Audio</span>
+                <span className="muted">
+                  {audio.map((a) => a.label).join(", ")}
+                </span>
+              </div>
+            )}
+            {playable > 1 && (
               <p className="muted">
                 Multiple editions need a selection before playback. Manage
                 source associations in the catalogue.
               </p>
             )}
           </section>
-          <button className="text-button" onClick={() => setEditing(!editing)}>
+          <button
+            ref={editToggle}
+            className="text-button"
+            aria-expanded={editing}
+            aria-controls="edit-film"
+            onClick={() => {
+              setFormError("");
+              setEditing(!editing);
+            }}
+          >
             {editing ? "Cancel editing" : "Edit film details"}
           </button>
           {editing && (
             <form
+              id="edit-film"
               className="form-stack"
-              onSubmit={async (event) => {
+              aria-label="Film details"
+              onSubmit={(event) => {
                 event.preventDefault();
                 const form = new FormData(event.currentTarget);
-                setBusy(true);
-                try {
-                  const updated = await api.editMovie(id, {
-                    title: String(form.get("title")),
-                    description: String(form.get("description")),
-                    ...(form.get("year")
-                      ? { year: Number(form.get("year")) }
-                      : {}),
-                  });
-                  setMovie(updated);
-                  setEditing(false);
-                  setMessage("Film details saved.");
-                } catch {
-                  setMessage(
-                    "Couldn’t save the details. Your existing information is unchanged.",
-                  );
-                } finally {
-                  setBusy(false);
-                }
+                void runStore(async () => {
+                  setFormError("");
+                  try {
+                    const updated = await api.editMovie(id, {
+                      title: String(form.get("title")),
+                      description: String(form.get("description")),
+                      ...(form.get("year")
+                        ? { year: Number(form.get("year")) }
+                        : {}),
+                    });
+                    forgetLibrary(api);
+                    setMovie(updated);
+                    setEditing(false);
+                    setMessage("Film details saved.");
+                    // The form and its button are gone; return to what opened it.
+                    editToggle.current?.focus();
+                  } catch {
+                    setFormError(
+                      "Couldn’t save the details. Your existing information is unchanged.",
+                    );
+                  }
+                });
               }}
             >
               <label>
                 Title
                 <input
+                  ref={firstField}
                   name="title"
-                  defaultValue={movie.title}
+                  defaultValue={film.title}
                   required
                   maxLength={300}
                 />
@@ -173,22 +274,32 @@ export function Detail({ id }: { id: string }) {
                 <input
                   name="year"
                   type="number"
+                  inputMode="numeric"
                   min="1888"
                   max="2100"
-                  defaultValue={movie.year}
+                  defaultValue={film.year}
                 />
               </label>
               <label>
                 Description
                 <textarea
                   name="description"
-                  defaultValue={movie.description}
+                  defaultValue={film.description}
                   maxLength={4000}
                 />
               </label>
-              <button className="primary" disabled={busy}>
+              {formError && (
+                <p className="notice" role="alert">
+                  {formError}
+                </p>
+              )}
+              <ActionButton
+                className="primary"
+                pending={storing}
+                pendingLabel="Saving film details"
+              >
                 Save details
-              </button>
+              </ActionButton>
             </form>
           )}
         </div>

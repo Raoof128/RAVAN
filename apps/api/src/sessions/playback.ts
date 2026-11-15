@@ -137,6 +137,7 @@ export class PlaybackService {
         jobId: plan.assetId,
         progress: plan.progress,
         reason: plan.reason,
+        phase: plan.phase,
       };
     return this.db.transaction(() => {
       const now = this.now();
@@ -154,6 +155,7 @@ export class PlaybackService {
           kind: "preparing" as const,
           jobId: plan.assetId,
           reason: "Preparing this edition again.",
+          phase: "retrying" as const,
         };
       const previous = this.db
         .prepare(

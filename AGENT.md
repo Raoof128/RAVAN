@@ -4,7 +4,7 @@ RAVAN is a private, single-owner cinema: a Fastify API, a media worker, a Cloudf
 
 ## Before changing code
 
-- Read `README.md`, `docs/backend-usage.md`, the maintainer's private notes and the maintainer's private notes.
+- Read `README.md`, `docs/backend-usage.md`, the maintainer's private notes and the maintainer's private notes. For the web or TV client, also read `docs/visual-design.md`, the maintainer's private notes and the maintainer's private notes.
 - Run `npm run check` and `npm test` first and note anything already failing.
 - Work on a branch. Do not push to `main`, deploy, or touch the server without the owner's say-so.
 
@@ -27,6 +27,28 @@ RAVAN is a private, single-owner cinema: a Fastify API, a media worker, a Cloudf
 - **A playlist is served only in the exact form this server writes.** `parsePlaylist` in `apps/worker/src/hls.ts` is the gate; a player fetches every address a playlist names. Never serve a playlist, or add a tag, without going through it.
 - **An edition being written is offered only in state `streaming`, and withdrawn on any failure.** Its files appear only when complete (`temp_file`); do not write into an edition's directory any other way.
 - **The API and worker ship together.** They share the database schema and the `/_worker` protocol.
+
+## Rules the interface depends on
+
+- **Show only what the server sent.** A preparation step comes from `phase`, a bar from `progress`, a sentence from `reason`. No time remaining, speed, queue position or percentage may be computed or guessed in the client. `apps/web/src/player/Preparing.tsx` is the one place this is drawn, for web and TV.
+- **Never hold a screen back for an animation.** The opening screen in `apps/web/index.html` goes when the session answers. Placeholders appear only after `useDelayed`.
+- **Loading uses the primitives in `packages/ui/src/Loading.tsx`.** Do not add another spinner, shimmer or skeleton. Animate `opacity` and `transform` only.
+- **Every animation needs a still form.** Both `prefers-reduced-motion` and `:root[data-motion="reduce"]` set `animation: none`; an element whose base style is invisible until its animation runs will stay invisible. Write keyframes from the hidden state, not to the visible one, or add an explicit reset.
+- **`index.html` may carry inline CSS but no inline script.** The content security policy is `script-src 'self'`.
+- **Browser storage holds the motion flag (`ravan:motion`) and the TV's device credential, nothing else.** Never an MFA secret, a session token or library data.
+- **A control whose action is running stays focusable.** Use `ActionButton` and `usePending`; do not set `disabled` on it. When an action removes the focused control, move focus somewhere deliberate.
+- **Anything the TV loads must run on Chromium 79.** The build lowers script syntax and `inset`; it does not lower flex `gap`, `aspect-ratio`, `:focus-visible`, `:is()` or `:where()`. `tv.css` and `loading.css` avoid them; shared rules in `tokens.css` that use them are overridden in `tv.css`.
+- **TV focus ids are a contract.** `data-focus-id` values are what remote navigation and its tests use. While the transport is hidden, the key that reveals it must do nothing else.
+- **One link per film card.** The poster link covers the card; the title is a heading, not a second link.
+- **Text an owner needs is at least 11 px, targets at least 24 by 24 px, control outlines `var(--control)`.** `tests/e2e/loading.spec.ts` measures all three on every screen from 320 to 3840 px.
+- **`PlayerController.ts` and `BrowserAdapter.ts` own tickets, sessions and recovery.** Interface work goes around them, in the pages.
+- **Type sizes are in rem; colours for text come from tokens.** `--text`, `--text-soft`, `--muted`, `--accent`, `--success`, `--danger`. `tests/clients/design-rules.test.ts` fails on a px type size or a new raw text colour. The TV stylesheet is exempt: it is a fixed 1080p layout.
+- **Icons come from `packages/ui/src/Icon.tsx`.** Do not type ▶, ↗ or similar characters as icons; devices draw them differently, some as emoji.
+- **Fields are 16 px where a finger is the pointer, and non-inline targets 44 px on a phone.** `tests/e2e/ux.spec.ts` measures both.
+- **Navigation goes through `apps/web/src/router.tsx`.** It numbers history entries and restores scroll on Back. Do not call `window.scrollTo` on route change elsewhere. A "back to…" link uses `returnTo` so it does not push a second copy of the screen.
+- **Anything that changes what the library lists must call `forgetLibrary(api)`** (`apps/web/src/libraryCache.ts`): playing, saving, editing.
+- **Escape a hyphen in an HTML `pattern`.** Browsers compile it with the `v` flag and silently ignore a pattern that is invalid there.
+- **One `h1` per screen.** `StatusPanel` takes `level={1}` when it is the only heading.
 
 ## Testing
 
@@ -76,3 +98,19 @@ Raouf: 2026-11-15 (Australia/Sydney), third entry
 - Files changed: see `CHANGELOG.md`.
 - Verification: 41 files, 263 passed, 1 skipped, 0 failed; `npm run check`, all three builds and `npm run test:e2e` (57 passed across Chromium, Firefox and WebKit, on two consecutive runs) pass.
 - Follow-ups: real Safari and LG television checks; captions during growth; enlarging the volume on the server.
+
+Raouf: 2026-11-15 (Australia/Sydney), fourth entry
+
+- Scope: full frontend audit and remediation on `audit/frontend-2026-11-15`.
+- Summary: one loading language, preparation screens driven by a new `phase` field from the API, the saved motion preference applied, layout shift on the library removed (0.63 to 0.00), accessibility gaps closed, a full-screen TV player. See the maintainer's private notes.
+- Files changed: see `CHANGELOG.md`.
+- Verification: 42 files, 274 passed, 1 skipped, 0 failed; `npm run check` and all four builds pass; `npm run test:e2e` 114 passed (one of three final runs had 2 Chromium playback timeouts under a load average near 40); release suite 12 passed.
+- Follow-ups: verify on a physical LG C1 and with a screen reader; test the TV's focus move to Play; return film length in the catalogue.
+
+Raouf: 2026-11-15 (Australia/Sydney), fifth entry
+
+- Scope: UI and UX audit against the UI/UX Pro Max rule set and the frontend-design guidance, on `audit/frontend-2026-11-15`.
+- Summary: 19 findings fixed. Back keeps scroll, search and results; fields no longer zoom on iOS; the folder pattern validates; the TV header no longer depends on flex gap; drawn icons, rem type, six text colours, one `h1` per screen. See the maintainer's private notes.
+- Files changed: see `CHANGELOG.md`.
+- Verification: 43 files, 278 passed, 1 skipped, 0 failed; `npm run check` and all four builds pass; `npm run test:e2e` 132 passed (one of two final runs had 1 Chromium playback timeout under load); release suite 12 passed.
+- Follow-ups: real iPhone and LG C1 checks; TV colour tokens; font preloading.
