@@ -50,6 +50,7 @@ RAVAN is a private, single-owner cinema: a Fastify API, a media worker, a Cloudf
 - **Navigation goes through `apps/web/src/router.tsx`.** It numbers history entries and restores scroll on Back. Do not call `window.scrollTo` on route change elsewhere. A "back to…" link uses `returnTo` so it does not push a second copy of the screen.
 - **Anything that changes what the library lists must call `forgetLibrary(api)`** (`apps/web/src/libraryCache.ts`): playing, saving, editing.
 - **Escape a hyphen in an HTML `pattern`.** Browsers compile it with the `v` flag and silently ignore a pattern that is invalid there.
+- **Track choices go through `TrackPanel` (`apps/web/src/player/TrackPanel.tsx`).** Radio groups, not native selects; labels pass through `readableChoices` so codes become language names. A choice must show at once and then follow what the player reports.
 - **One `h1` per screen.** `StatusPanel` takes `level={1}` when it is the only heading.
 - **Every playlist and picture is served only in the form this server writes.** `servePlaylist` (`apps/worker/src/hls.ts`) is the gate for media and top-level playlists; track names from a film are reduced to safe characters before they are written. Pictures are served by random id from `<data directory>/artwork` only (`ARTWORK_FILE`). Never serve a URL or path a client or a film supplies.
 - **No title leaves the server unless `MOV_TMDB_TOKEN` is set.** TMDB is reached only from the API (the worker cannot reach the internet), only at its fixed hosts, with redirects refused and every answer size-limited. A match needs the title and, when several films share it, the year.
@@ -150,4 +151,20 @@ Raouf: 2026-11-15 (Australia/Sydney), ninth entry
 - Summary: generations now follow content (Drive's `version` changed several times an hour and caused films to be prepared again and playback to end); stale editions are pruned; the audio menu shows for every film and stays with the picture in full screen.
 - Files changed: see `CHANGELOG.md`.
 - Verification: 46 files, 302 passed, 1 skipped; `npm run check`; 150 browser tests passed.
+- Follow-ups: released as `e58d8f59578d`; see the maintainer's private notes.
+
+Raouf: 2026-11-15 (Australia/Sydney), tenth entry
+
+- Scope: the owner found the audio option locked.
+- Summary: background planning builds all-languages editions for films that only have one-language copies; a one-language film states its language instead of showing a disabled menu.
+- Files changed: `apps/api/src/media/planner.ts`, `apps/web/src/pages/Player.tsx`, `apps/web/src/cinema.css`, tests, logs.
+- Verification: `npm run check`; 301 of 302 unit tests (one load-timing failure in the untouched cache test, 5 of 5 on repeat); 150 browser tests.
 - Follow-ups: release.
+
+Raouf: 2026-11-15 (Australia/Sydney), eleventh entry
+
+- Scope: audit and restyle the language picker at the owner's request.
+- Summary: one Audio & subtitles button and panel (Audio, Subtitles, Picture) in the site's style, replacing three browser menus; readable names; keyboard, full screen and phone sheet.
+- Files changed: see `CHANGELOG.md`.
+- Verification: 47 files, 304 passed, 1 skipped; `npm run check`; 150 browser tests.
+- Follow-ups: release together with the background all-languages editions.

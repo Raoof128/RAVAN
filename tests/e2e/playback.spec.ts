@@ -194,17 +194,25 @@ test("prepares automatically, loads captions and switches quality with resume", 
   await expect
     .poll(() => video.evaluate((v) => (v as HTMLVideoElement).currentTime))
     .toBeGreaterThanOrEqual(2.9);
+  await page.getByRole("button", { name: /Audio & subtitles/ }).click();
   await page
-    .getByRole("combobox", { name: "Playback quality" })
-    .selectOption("720p");
+    .getByRole("group", { name: "Picture" })
+    .getByRole("radio", { name: "720p HD", exact: true })
+    .check();
   await expect.poll(() => requests.at(-1)?.quality).toBe("720p");
   expect(requests.at(-1)?.startMs).toBeGreaterThanOrEqual(2900);
   await expect
     .poll(() => video.evaluate((v) => (v as HTMLVideoElement).readyState))
     .toBeGreaterThanOrEqual(2);
+  const panel = page.getByRole("dialog", {
+    name: "Audio, subtitles and picture",
+  });
+  if (!(await panel.isVisible()))
+    await page.getByRole("button", { name: /Audio & subtitles/ }).click();
   await page
-    .getByRole("combobox", { name: "Audio track", exact: true })
-    .selectOption("1");
+    .getByRole("group", { name: "Audio" })
+    .getByRole("radio", { name: "Persian", exact: true })
+    .check();
   await expect.poll(() => requests.at(-1)?.audioTrack).toBe(1);
   await expect
     .poll(() => video.evaluate((v) => (v as HTMLVideoElement).readyState))

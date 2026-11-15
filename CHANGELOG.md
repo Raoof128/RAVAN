@@ -1,5 +1,50 @@
 # Changelog
 
+## Raouf: 2026-11-15 (Australia/Sydney) — Audio & subtitles panel
+
+**Scope:** the owner asked for the language picker to be audited and made to look like the rest of the site. Same branch.
+
+### Audit of the picker it replaces
+
+- Three browser-drawn menus (Quality, Audio, Subtitles), each drawn differently by Chrome, Firefox and Safari, and unlike anything else on the site.
+- The 4K film's subtitles were one menu of about forty entries, many shown as bare codes ("bul", "cze") and four as the same word ("English").
+- A one-language film showed a disabled menu, which read as locked.
+- Choosing a picture quality prepares the film again; nothing said so.
+- The menus did not come along into the browser's full screen.
+
+### What replaces it
+
+- One **Audio & subtitles** button showing what is playing ("English · English 1 subtitles"), which opens a panel of three short lists: Audio, Subtitles and Picture. The current choice in each carries the copper line used for a paused film. Notes under a list say what applies: the only language in this film; subtitles available after preparation; picture subtitles from a Blu-ray or DVD cannot be shown; a different picture is prepared again and never larger than the original.
+- Language codes become names (Czech, Bulgarian); repeated names are numbered; channel layouts sit beside the name in quieter type.
+- Lists are radio groups: arrow keys within a list, Tab between lists, a choice applies at once and shows at once, Escape or a click outside closes and returns focus to the button. Each row is a full-width 44 px target.
+- In full screen the panel opens downward from the menus at the top; on a phone it is a sheet from the bottom of the screen with the page dimmed behind it.
+
+### Files changed
+
+`apps/web/src/player/TrackPanel.tsx` (new), `apps/web/src/player/languages.ts`, `apps/web/src/pages/Player.tsx`, `apps/web/src/cinema.css`. Tests: `tests/clients/track-panel.test.tsx` (new); `tests/e2e/tracks.spec.ts`, `playback.spec.ts` and `loading.spec.ts` now drive the panel, with the same checks and two added (Escape returns focus; a one-language copy says that choosing another language prepares the film again).
+
+### Verification
+
+- `npm run check`: passed. `npm test`: 47 files, 304 passed, 1 skipped. `npm run test:e2e`: 150 passed in Chromium, Firefox and WebKit, under a load average between 35 and 50. In an earlier run under a load average of 108, two tests timed out; both passed 18 of 18 when repeated.
+
+## Raouf: 2026-11-15 (Australia/Sydney) — every language ready before it is needed
+
+**Scope:** the owner reported the audio option was locked. Same branch.
+
+### What was wrong
+
+- Two of the films opened have one language, and the menu showed it disabled, which read as locked.
+- The film with English and Japanese had been prepared before all-languages editions existed, so it carried English only. Choosing Japanese prepared the film again before it could play.
+
+### What changed
+
+- Background planning now builds the all-languages edition of any film with several languages that has only one-language copies, so switching is instant by the time someone tries. A viewer is still given a finished one-language copy at once while it is built.
+- A film with one language states it ("Audio English · 5.1, the only language in this film") instead of showing a disabled menu.
+
+### Verification
+
+- `npm run check`: passed. `npm test`: 301 of 302 passed, 1 skipped; the failure was `tests/backend/cache.test.ts` under a load average near 16, which passed 5 of 5 when repeated and is untouched by this change. `npm run test:e2e`: 150 passed.
+
 ## Raouf: 2026-11-15 (Australia/Sydney) — prepared films kept; audio menu always shown
 
 **Scope:** two problems the owner reported on the live site: the audio choice was missing, and films the server had already prepared were prepared again. Same branch. Not yet released.
@@ -27,7 +72,7 @@
 
 ### Follow-ups
 
-- Release to the server. The first scan after it records the content of each film; generations do not change for films whose checksum is unchanged.
+- Released the same evening as `e58d8f59578d` (record: the maintainer's private notes). Six editions of content that had since changed were removed on start; every remaining edition matches its film.
 
 ## Raouf: 2026-11-15 (Australia/Sydney) — languages and pictures released
 

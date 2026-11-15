@@ -10,7 +10,12 @@ import { backdropUrl } from "../../../../packages/ui/src/artwork.js";
 import { Flow, Opening } from "../../../../packages/ui/src/Loading.js";
 import { BrowserAdapter } from "../player/BrowserAdapter.js";
 import { Preparing } from "../player/Preparing.js";
-import { preferredTrack } from "../player/languages.js";
+import { preferredTrack, sameLanguage } from "../player/languages.js";
+import {
+  readableChoices,
+  TrackPanel,
+  type TrackList,
+} from "../player/TrackPanel.js";
 import {
   detectCapabilities,
   refineCapabilities,
@@ -26,7 +31,7 @@ import { Icon } from "../../../../packages/ui/src/Icon.js";
 import { forgetLibrary } from "../libraryCache.js";
 import { useTitle } from "../router.js";
 const qualities: Array<[Quality, string]> = [
-  ["auto", "Auto (recommended)"],
+  ["auto", "Auto, recommended"],
   ["original", "Original resolution"],
   ["480p", "480p, saves data"],
   ["720p", "720p HD"],
@@ -57,7 +62,7 @@ export function Player({
   const [quality, setQuality] = useState<Quality>("auto");
   const [audioTrack, setAudioTrack] = useState<number | undefined>();
   const [audioTracks, setAudioTracks] = useState<
-    Array<{ index: number; label: string }>
+    NonNullable<MovieDetail["audioTracks"]>
   >([]);
   const [subtitleTracks, setSubtitleTracks] = useState<
     NonNullable<MovieDetail["subtitleTracks"]>
@@ -287,6 +292,105 @@ export function Player({
   }
   const textSubtitles = subtitleTracks.filter((t) => t.text);
   const pictureSubtitles = subtitleTracks.filter((t) => !t.text);
+  // The lists for the audio and subtitles panel, in words people read.
+  const audioChoices = readableChoices(
+    inStream
+      ? streamAudio.map((o) => ({
+          id: o.id,
+          label: audioTracks[Number(o.id)]?.label ?? o.label,
+          language: o.language,
+        }))
+      : audioTracks.map((a) => ({
+          id: String(a.index),
+          label: a.label,
+          language: a.language,
+        })),
+  );
+  const playingAudio = inStream
+    ? streamAudio.find((o) => o.active)?.id
+    : String(
+        audioTrack ??
+          Math.max(
+            0,
+            audioTracks.findIndex((t) =>
+              sameLanguage(t.language, preferredAudio.current),
+            ),
+          ),
+      );
+  const audioList: TrackList | undefined = audioChoices.length
+    ? {
+        options: audioChoices,
+        selected: playingAudio,
+        onSelect: (choice) => {
+          if (inStream)
+            void adapterRef.current?.selectAudio(choice).catch(() => {});
+          else setAudioTrack(Number(choice));
+        },
+        note:
+          audioChoices.length === 1
+            ? "The only language in this film."
+            : !inStream && visible
+              ? "The edition with every language is still being made. Choosing another language now prepares the film again; once it is ready, languages switch at once."
+              : undefined,
+      }
+    : undefined;
+  const subtitleChoices = readableChoices([
+    ...streamSubtitles.map((o) => ({
+      id: o.id,
+      label: o.label,
+      language: o.language,
+    })),
+    // Text subtitles not yet available, and picture subtitles, are listed but
+    // cannot be chosen, so the viewer knows what the film carries.
+    ...(streamSubtitles.length === 0
+      ? textSubtitles.map((t, i) => ({
+          id: `waiting-${i}`,
+          label: t.label,
+          language: t.language,
+          detail: "after preparation",
+          disabled: true,
+        }))
+      : []),
+    ...pictureSubtitles.map((t, i) => ({
+      id: `picture-${i}`,
+      label: t.label,
+      language: t.language,
+      detail: "picture, can’t be shown",
+      disabled: true,
+    })),
+  ]);
+  const subtitleList: TrackList | undefined =
+    subtitleChoices.length || subtitleTracks.length
+      ? {
+          options: [{ id: "", label: "Off" }, ...subtitleChoices],
+          selected: streamSubtitles.find((o) => o.active)?.id ?? "",
+          onSelect: chooseSubtitle,
+          note:
+            streamSubtitles.length === 0 && textSubtitles.length > 0
+              ? "Subtitles can be chosen once this film’s preparation has finished."
+              : pictureSubtitles.length > 0
+                ? "Picture subtitles from a Blu-ray or DVD cannot be shown by a browser."
+                : undefined,
+        }
+      : undefined;
+  const pictureList: TrackList = {
+    options: qualities.map(([id, label]) => {
+      const [name, ...rest] = label.split(", ");
+      return { id, label: name!, detail: rest.join(", ") || undefined };
+    }),
+    selected: quality,
+    onSelect: (choice) => setQuality(choice as Quality),
+    note: "A different picture is prepared again, and never larger than the original.",
+  };
+  const activeSubtitle = streamSubtitles.find((o) => o.active);
+  const trackSummary = [
+    audioChoices.find((o) => o.id === playingAudio)?.label,
+    activeSubtitle
+      ? `${subtitleChoices.find((o) => o.id === activeSubtitle.id)?.label ?? activeSubtitle.label} subtitles`
+      : "Subtitles off",
+  ]
+    .filter(Boolean)
+    .join(" · ");
   // What the element itself reports: stalled for data, playing, finished.
   useEffect(() => {
     const element = video.current;
@@ -530,101 +634,12 @@ export function Player({
           ) : null}
         </div>
         <div className="playback-options">
-          <label>
-            <span>Quality</span>
-            <select
-              aria-label="Playback quality"
-              value={quality}
-              onChange={(e) => setQuality(e.target.value as Quality)}
-            >
-              {qualities.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {inStream ? (
-            <label>
-              <span>Audio</span>
-              <select
-                aria-label="Audio track"
-                value={streamAudio.find((o) => o.active)?.id ?? ""}
-                onChange={(e) =>
-                  void adapterRef.current
-                    ?.selectAudio(e.target.value)
-                    .catch(() => {})
-                }
-              >
-                {streamAudio.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {audioTracks[Number(o.id)]?.label ?? o.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : audioTracks.length === 1 ? (
-            <label>
-              <span>Audio</span>
-              <select
-                aria-label="Audio track"
-                aria-describedby="audio-note"
-                value="0"
-                disabled
-              >
-                <option value="0">{audioTracks[0]!.label}</option>
-              </select>
-            </label>
-          ) : (
-            audioTracks.length > 1 && (
-              <label>
-                <span>Audio</span>
-                <select
-                  aria-label="Audio track"
-                  aria-describedby="audio-note"
-                  value={audioTrack ?? ""}
-                  onChange={(e) =>
-                    setAudioTrack(
-                      e.target.value === ""
-                        ? undefined
-                        : Number(e.target.value),
-                    )
-                  }
-                >
-                  <option value="">Preferred / original</option>
-                  {audioTracks.map((a) => (
-                    <option key={a.index} value={a.index}>
-                      {a.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )
-          )}
-          {(streamSubtitles.length > 0 || subtitleTracks.length > 0) && (
-            <label>
-              <span>Subtitles</span>
-              <select
-                aria-label="Subtitles"
-                aria-describedby="subtitle-note"
-                value={streamSubtitles.find((o) => o.active)?.id ?? ""}
-                disabled={streamSubtitles.length === 0}
-                onChange={(e) => chooseSubtitle(e.target.value)}
-              >
-                <option value="">Off</option>
-                {streamSubtitles.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.label}
-                  </option>
-                ))}
-                {pictureSubtitles.map((t, i) => (
-                  <option key={`picture-${i}`} value={`picture-${i}`} disabled>
-                    {t.label} (picture subtitles, can’t be shown)
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
+          <TrackPanel
+            summary={trackSummary}
+            audio={audioList}
+            subtitles={subtitleList}
+            picture={pictureList}
+          />
           <button
             type="button"
             className="fullscreen-button"
@@ -640,31 +655,6 @@ export function Player({
           )}
         </div>
       </div>
-      {!inStream && audioTracks.length > 1 && visible && (
-        <p className="playback-note" id="audio-note">
-          This edition carries one language. Choosing another prepares the film
-          again with it; films prepared from now on carry every language and
-          switch at once.
-        </p>
-      )}
-      {audioTracks.length === 1 && (
-        <p className="playback-note" id="audio-note">
-          This film has one language. Films with several show each of them here.
-        </p>
-      )}
-      {streamSubtitles.length === 0 && textSubtitles.length > 0 && (
-        <p className="playback-note" id="subtitle-note">
-          Subtitles appear here once this film’s preparation has finished.
-        </p>
-      )}
-      {streamSubtitles.length === 0 &&
-        textSubtitles.length === 0 &&
-        pictureSubtitles.length > 0 && (
-          <p className="playback-note" id="subtitle-note">
-            This film’s subtitles are pictures (from a Blu-ray or DVD), which
-            browsers cannot show.
-          </p>
-        )}
       <details className="player-help">
         <summary>Keyboard shortcuts</summary>
         <dl>

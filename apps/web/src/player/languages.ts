@@ -32,3 +32,17 @@ export function preferredTrack(options: TrackOption[], language: unknown) {
     matching.find((o) => !/forced|sdh|commentary/i.test(o.label)) ?? matching[0]
   );
 }
+/** "cze" → "Czech"; undefined for "und" or anything not a language. */
+export function languageName(code: unknown) {
+  if (typeof code !== "string") return undefined;
+  const plain = code.trim();
+  if (!plain || /^(und|zxx|mis|mul)$/i.test(plain)) return undefined;
+  try {
+    const name = names?.of(plain);
+    return name && name.toLowerCase() !== plain.toLowerCase()
+      ? name
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}

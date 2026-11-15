@@ -1927,3 +1927,251 @@ button.danger:hover {
   opacity: 0;
   pointer-events: none;
 }
+
+/* A setting with one possible value is stated, not offered. */
+.playback-fact {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.8667rem;
+}
+.playback-fact > span {
+  color: var(--muted);
+}
+
+/* ---- Audio & subtitles panel ----
+   One button; a panel of three short lists. The chosen row carries the
+   copper line from the wordmark, as a paused film's card does. */
+.track-picker {
+  position: relative;
+}
+.track-trigger {
+  justify-content: flex-start;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 18px 8px 14px;
+  border-color: var(--control);
+  text-align: left;
+}
+.track-trigger[aria-expanded="true"] {
+  border-color: var(--text-soft);
+  background: #ffffff0d;
+}
+.track-trigger-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.9333rem;
+  line-height: 1.25;
+}
+.track-summary {
+  max-width: 34ch;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.track-panel {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 0;
+  z-index: 30;
+  width: min(780px, calc(100vw - 48px));
+  padding: 22px 24px 24px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #121817;
+  box-shadow: 0 30px 80px #000000b3;
+  animation: track-open var(--dur-base) var(--ease-out);
+}
+@keyframes track-open {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.track-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.track-head h2 {
+  font: 400 1.7333rem/1.1 var(--serif);
+}
+.track-close {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-color: transparent;
+  color: var(--muted);
+}
+.track-close:hover {
+  color: var(--text);
+}
+.track-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px 28px;
+}
+.track-list {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.track-list legend {
+  margin-bottom: 8px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.8667rem;
+  letter-spacing: 0.02em;
+}
+.track-rows {
+  max-height: 300px;
+  margin: 0 -6px;
+  padding: 2px 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: var(--line) transparent;
+}
+.track-option {
+  position: relative;
+  display: block;
+  cursor: pointer;
+}
+/* The radio itself covers its row, unseen: the whole row is its target. */
+.track-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+.track-row {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  min-height: 44px;
+  padding: 11px 10px 11px 30px;
+  border-radius: 3px;
+  color: var(--text-soft);
+  font-size: 0.9333rem;
+  line-height: 1.4;
+  transition: background-color var(--dur-quick) linear;
+}
+.track-row:before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 8px;
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+  background: transparent;
+}
+.track-option:hover .track-row {
+  background: #ffffff0a;
+}
+.track-option input:checked + .track-row {
+  color: var(--text);
+}
+.track-option input:checked + .track-row:before {
+  background: var(--accent);
+}
+.track-option input:focus-visible + .track-row {
+  outline: 3px solid var(--focus);
+  outline-offset: 1px;
+}
+.track-option.is-disabled {
+  cursor: not-allowed;
+}
+.track-option.is-disabled .track-row {
+  color: var(--muted);
+  opacity: 0.75;
+}
+.track-option.is-disabled:hover .track-row {
+  background: none;
+}
+.track-detail {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.track-note {
+  max-width: 40ch;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+/* In full screen the menus sit at the top, so the panel opens downward. */
+.player-frame:fullscreen .track-panel,
+.player-frame:-webkit-full-screen .track-panel {
+  top: calc(100% + 12px);
+  bottom: auto;
+}
+/* On a phone the panel is a sheet from the bottom of the screen. */
+@media (max-width: 560px) {
+  .track-picker {
+    flex: 1 1 100%;
+  }
+  .track-trigger {
+    width: 100%;
+  }
+  .track-summary {
+    max-width: none;
+  }
+  .track-panel {
+    position: fixed;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    max-height: 82vh;
+    max-height: 82dvh;
+    padding: 18px 20px calc(24px + env(safe-area-inset-bottom));
+    overflow-y: auto;
+    border-radius: 12px 12px 0 0;
+    border-width: 1px 0 0;
+  }
+  .track-columns {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .track-rows {
+    max-height: none;
+  }
+}
+/* The menus row styles its labels as inline pairs; the panel's rows are not. */
+.track-panel .track-option {
+  display: block;
+  color: inherit;
+  font-size: inherit;
+}
+.track-scrim {
+  display: none;
+}
+@media (max-width: 560px) {
+  .track-scrim {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 29;
+    display: block;
+    background: #000000a6;
+  }
+}

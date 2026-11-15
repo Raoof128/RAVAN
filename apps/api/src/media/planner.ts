@@ -310,10 +310,14 @@ export class MediaPlanner {
     const id = allAudio ? everyTrack : streamed ? oneTrack : single;
     // Editions finished earlier play as well as a new one: the all-tracks one,
     // then one with the asked-for track, streamed or as a single file.
+    // A viewer is given what is already finished: the all-languages edition,
+    // or one in the language asked for. Background planning instead builds
+    // the all-languages edition of a film that has only one-language copies,
+    // so that switching language is instant by the time someone tries.
     const finished =
       ready(id) ??
-      (allAudio ? ready(oneTrack) : undefined) ??
-      (streamed ? ready(single) : undefined);
+      (allAudio && !background ? ready(oneTrack) : undefined) ??
+      (streamed && !(allAudio && background) ? ready(single) : undefined);
     if (finished) return finished;
     const asset = this.db
       .prepare("SELECT state,label FROM prepared_assets WHERE id=?")

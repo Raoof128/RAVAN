@@ -629,6 +629,10 @@ it("prepares one edition for every audio track of a film that has several", asyn
     mode: "prepared",
     assetId: oneTrack,
   });
+  // In the background, the all-languages edition is still built, so switching
+  // is instant by the time someone tries.
+  const background = await planner.planPlayback(source, web, {}, true);
+  expect(background).toMatchObject({ mode: "prepare", assetId: first.assetId });
 });
 
 it("removes finished editions of content that has since changed, but not one in use", async () => {

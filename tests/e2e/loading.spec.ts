@@ -420,7 +420,11 @@ test("the player answers the same keys in every browser", async ({ page }) => {
   await page.locator("body").press("ArrowLeft");
   await expect.poll(async () => (await state()).time).toBeLessThan(1);
   // Typing in a control is never taken for a shortcut.
-  await page.getByRole("combobox", { name: "Playback quality" }).focus();
+  await page.getByRole("button", { name: /Audio & subtitles/ }).click();
+  await page
+    .getByRole("group", { name: "Picture" })
+    .getByRole("radio", { name: "720p HD", exact: true })
+    .focus();
   await page.keyboard.press("m");
   expect((await state()).muted).toBe(true);
   await page.getByText("Keyboard shortcuts").click();

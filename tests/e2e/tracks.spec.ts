@@ -55,6 +55,26 @@ async function cinema(
     await route.fulfill({ json: body });
   });
 }
+/** The audio and subtitles panel, opened. */
+async function openTracks(page: Page) {
+  const panel = page.getByRole("dialog", {
+    name: "Audio, subtitles and picture",
+  });
+  if (!(await panel.isVisible()))
+    await page.getByRole("button", { name: /Audio & subtitles/ }).click();
+  await expect(panel).toBeVisible();
+  return panel;
+}
+const choice = (page: Page, group: string, name: string) =>
+  page
+    .getByRole("dialog", { name: "Audio, subtitles and picture" })
+    .getByRole("group", { name: group })
+    .getByRole("radio", { name, exact: true });
+const choices = (page: Page, group: string) =>
+  page
+    .getByRole("dialog", { name: "Audio, subtitles and picture" })
+    .getByRole("group", { name: group })
+    .locator(".track-name");
 const ready = (page: Page) =>
   expect
     .poll(() =>
@@ -85,17 +105,19 @@ test("changes language at once in an edition that carries every track", async ({
   });
   await page.goto("/#/player/fixture");
   await ready(page);
-  const audio = page.getByRole("combobox", { name: "Audio track" });
-  // The names are the film's page's own, with the channel layout.
-  await expect(audio.locator("option")).toHaveText([
-    "English",
-    "Persian · 5.1",
-  ]);
-  await expect(audio).toHaveValue("0");
+  const panel = await openTracks(page);
+  // The names are the film's page's own; the channel layout is shown beside.
+  await expect(choices(page, "Audio")).toHaveText(["English", "Persian"]);
+  await expect(choice(page, "Audio", "Persian 5.1")).toBeVisible();
+  await expect(choice(page, "Audio", "English")).toBeChecked();
   // No note about preparing again: this edition switches in place.
-  await expect(page.locator("#audio-note")).toHaveCount(0);
-  await audio.selectOption("1");
-  await expect(audio).toHaveValue("1");
+  await expect(panel.getByText("prepares the film again")).toHaveCount(0);
+  await choice(page, "Audio", "Persian 5.1").check();
+  await expect(choice(page, "Audio", "Persian 5.1")).toBeChecked();
+  // The button says what is playing.
+  await expect(
+    page.getByRole("button", { name: /Audio & subtitles/ }),
+  ).toContainText("Persian");
   // The second language's own stream is fetched; the film is not asked for again.
   await expect.poll(() => requests.some((f) => f.startsWith("a1-"))).toBe(true);
   expect(playbackRequests).toBe(1);
@@ -152,12 +174,11 @@ test("shows subtitles in the saved language, lets the viewer turn them off, and 
   );
   await page.goto("/#/player/fixture");
   await ready(page);
-  const menu = page.getByRole("combobox", { name: "Subtitles" });
+  await openTracks(page);
   // The saved preference is "fa"; the track says "fas". Both are Persian.
-  await expect(menu).toHaveValue("1");
-  await expect(menu.locator("option:checked")).toHaveText("Persian");
+  await expect(choice(page, "Subtitles", "Persian")).toBeChecked();
   await expect(
-    menu.locator("option", { hasText: "French (picture subtitles" }),
+    choice(page, "Subtitles", "French picture, can’t be shown"),
   ).toBeDisabled();
   const showing = () =>
     page.locator("video").evaluate((v) =>
@@ -166,11 +187,21 @@ test("shows subtitles in the saved language, lets the viewer turn them off, and 
         .map((t) => t.label),
     );
   expect(await showing()).toEqual(["Persian"]);
-  await menu.selectOption("");
+  await choice(page, "Subtitles", "Off").check();
   await expect.poll(showing).toEqual([]);
-  await menu.selectOption("0");
+  await choice(page, "Subtitles", "English").check();
   await expect.poll(showing).toEqual(["English"]);
-  // C goes on to the next track, then off.
+  // Escape closes the panel and hands focus back to its button.
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("dialog", { name: "Audio, subtitles and picture" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /Audio & subtitles/ }),
+  ).toBeFocused();
+  // C goes on to the next track, then off. Shortcuts wait while a button
+  // has focus, so the viewer first returns to the picture.
+  await page.evaluate(() => (document.activeElement as HTMLElement).blur());
   await page.locator("body").press("c");
   await expect.poll(showing).toEqual(["Persian"]);
   await page.locator("body").press("c");
@@ -217,18 +248,25 @@ test("keeps the language the viewer picks, after a one-language edition led to a
   });
   await page.goto("/#/player/fixture");
   await ready(page);
-  const audio = page.getByRole("combobox", { name: "Audio track" });
-  await audio.selectOption("1");
+  await openTracks(page);
+  // This copy has one language: the panel says choosing another prepares it.
+  await expect(
+    page
+      .getByRole("dialog", { name: "Audio, subtitles and picture" })
+      .getByText("prepares the film again"),
+  ).toBeVisible();
+  await choice(page, "Audio", "Persian 5.1").check();
   await expect.poll(() => calls).toBe(2);
   await ready(page);
   // The stream now offers both; the one asked for is playing.
-  await expect(audio.locator("option")).toHaveCount(2);
-  await expect(audio).toHaveValue("1");
+  await openTracks(page);
+  await expect(choices(page, "Audio")).toHaveCount(2);
+  await expect(choice(page, "Audio", "Persian 5.1")).toBeChecked();
   // The viewer goes back to English, and it stays English.
-  await audio.selectOption("0");
-  await expect(audio).toHaveValue("0");
+  await choice(page, "Audio", "English").check();
+  await expect(choice(page, "Audio", "English")).toBeChecked();
   await page.waitForTimeout(1500);
-  await expect(audio).toHaveValue("0");
+  await expect(choice(page, "Audio", "English")).toBeChecked();
   expect(calls).toBe(2);
 });
 
@@ -248,11 +286,14 @@ test("shows the audio menu for a film with one language, and keeps the menus in 
   );
   await page.goto("/#/player/fixture");
   await ready(page);
-  const audio = page.getByRole("combobox", { name: "Audio track" });
-  await expect(audio).toBeVisible();
-  await expect(audio).toBeDisabled();
-  await expect(audio.locator("option")).toHaveText(["English · 5.1"]);
-  await expect(page.locator("#audio-note")).toContainText("one language");
+  // Nothing to choose: the one language is shown as chosen, and said to be the only one.
+  const panel = await openTracks(page);
+  await expect(choices(page, "Audio")).toHaveText(["English"]);
+  await expect(choice(page, "Audio", "English 5.1")).toBeChecked();
+  await expect(
+    panel.getByText("The only language in this film."),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
   // The browser's own full-screen button is hidden; ours takes the menus along.
   await expect(page.locator("video")).toHaveAttribute(
     "controlslist",
@@ -265,7 +306,9 @@ test("shows the audio menu for a film with one language, and keeps the menus in 
       page.evaluate(() => document.fullscreenElement?.className ?? ""),
     )
     .toContain("player-frame");
-  await expect(audio).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Audio & subtitles/ }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Exit full screen" }).click();
   await expect
     .poll(() => page.evaluate(() => document.fullscreenElement === null))
