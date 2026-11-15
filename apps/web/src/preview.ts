@@ -11,6 +11,7 @@ const titles = [
 ];
 export function previewApi() {
   const api = createApiClient("");
+  const real = { ...api };
   const movies: MovieDetail[] = titles.map((title, i) => ({
     id: `sample-${i}`,
     title,
@@ -79,5 +80,17 @@ export function previewApi() {
   api.sync = previewOnly;
   api.approvePairing = previewOnly;
   api.savePreferences = previewOnly;
+  api.pictures = async () => ({ items: [] });
+  api.artworkCredits = async () => ({});
+  api.progress = async () => ({ status: "accepted" });
+  api.stop = async () => undefined;
+  // The demo is served from the cinema's own address, so a request it made
+  // would carry the owner's cookie. Whatever is not stubbed above is refused
+  // here: nothing in the demo reaches the network, now or when a method is
+  // added to the client later.
+  const methods = api as unknown as Record<string, unknown>;
+  for (const [name, method] of Object.entries(real))
+    if (typeof method === "function" && methods[name] === method)
+      methods[name] = previewOnly;
   return api;
 }

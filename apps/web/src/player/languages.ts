@@ -1,4 +1,5 @@
 import type { TrackOption } from "../../../../packages/contracts/src/index.js";
+import { sameLanguage } from "../../../../packages/contracts/src/languages.js";
 const names = (() => {
   try {
     return new Intl.DisplayNames(["en"], { type: "language" });
@@ -6,22 +7,8 @@ const names = (() => {
     return undefined;
   }
 })();
-/** "fa", "fas" and "per" are all Persian: compare languages by name. */
-function key(code: unknown) {
-  if (typeof code !== "string") return "";
-  const plain = code.trim().toLowerCase();
-  if (!plain || plain === "und" || plain === "off" || plain === "original")
-    return "";
-  try {
-    return (names?.of(plain) ?? plain).toLowerCase();
-  } catch {
-    return plain;
-  }
-}
-export function sameLanguage(a: unknown, b: unknown) {
-  const left = key(a);
-  return left !== "" && left === key(b);
-}
+// "fa", "fas" and "per" are all Persian. The server plans by the same rule.
+export { sameLanguage };
 /**
  * The track to show for a saved preference: one in that language, preferring a
  * full track over one marked "forced" or "SDH" only when both exist.

@@ -10,7 +10,8 @@ import { openDatabase } from "../../../packages/db/src/open.js";
 import { registerAuth } from "./auth/routes.js";
 import type { OAuthProvider } from "./auth/oauth.js";
 import { registerLibrary } from "./library/import.js";
-import { DriveError, type DriveClient } from "./drive/client.js";
+import type { DriveClient } from "./drive/client.js";
+import { sourceGone } from "./drive/sync.js";
 import { BlockCache } from "./media/cache.js";
 import { DriveSourceReader } from "./media/source-stream.js";
 import { sendRaw } from "./media/raw-route.js";
@@ -41,10 +42,18 @@ export async function buildApp(
   const app = Fastify({
     logger: false,
     bodyLimit: 64 * 1024,
+    // A film being watched is a response with no end in sight. Waiting for it
+    // made every stop last until the service manager killed the process, with
+    // the database never closed. Players reconnect and resume on their own.
+    forceCloseConnections: true,
     // Production accepts only the local Nginx hop, which overwrites forwarded identity.
     trustProxy: config.mode === "production" ? ["127.0.0.1"] : false,
   });
   app.decorate("database", db);
+  let stopping = false;
+  app.addHook("preClose", async () => {
+    stopping = true;
+  });
   app.addHook("onClose", async () => {
     db.close();
   });
@@ -104,12 +113,29 @@ export async function buildApp(
     });
     app.decorate("lookupArtwork", lookup);
   }
+  await app.register(cookie);
+  await app.register(rateLimit, { max: 120, timeWindow: "1 minute" });
+  // Only a plainly written path is answered. The proxy in front chooses its
+  // rule (and whether to demand the origin key) from the path with "..", "//"
+  // and "%2F" resolved, then passes the path on as it was written, and this
+  // router resolves none of those. Each such difference is a way round a
+  // layer: "/api/movies/..%2f..%2fmedia%2fx/pictures" entered by the proxy's
+  // open media rule and arrived here as an API route.
+  app.addHook("onRequest", async (request, reply) => {
+    const path = request.url.split("?", 1)[0]!;
+    if (
+      /%(2f|5c|2e|25)/i.test(path) ||
+      path.includes("\\") ||
+      path.includes("//") ||
+      /(^|\/)\.{1,2}(\/|$)/.test(path)
+    )
+      return reply.code(404).send({ error: "not_found" });
+  });
+  // Routes are declared after the limiter: it only counts those it sees added.
   // The credit TMDB asks for, shown wherever its pictures may appear.
   app.get("/api/artwork-credits", async () =>
     config.tmdbToken ? { tmdb: TMDB_NOTICE } : {},
   );
-  await app.register(cookie);
-  await app.register(rateLimit, { max: 120, timeWindow: "1 minute" });
   app.addHook("onRequest", async (request, reply) => {
     // Packaged TVs use an opaque file origin. CORS never permits browser cookies;
     // device requests still require bearer authorization on every private route.
@@ -137,8 +163,26 @@ export async function buildApp(
     if (!reply.getHeader("Cache-Control"))
       reply.header("Cache-Control", "no-store");
   });
-  app.setErrorHandler((error, _request, reply) => {
+  app.setErrorHandler((error, request, reply) => {
     const status = (error as { statusCode?: number }).statusCode ?? 500;
+    // A fault of the server's own must leave a trace, or it cannot be found.
+    // Only the matched route pattern and the error's class and code are
+    // written: never the address (tickets and OAuth codes travel in it), a
+    // header, or a message, which can quote the data that failed to parse.
+    // Not while stopping: requests cut off by the stop fail by design.
+    if (!(status >= 400 && status < 500) && !stopping) {
+      const word = (value: unknown) =>
+        typeof value === "string" && /^[A-Za-z0-9_]{1,64}$/.test(value)
+          ? value
+          : "";
+      console.error(
+        "Request failed.",
+        request.method,
+        request.routeOptions.url ?? "unmatched",
+        word(error instanceof Error ? error.name : "") || "unknown",
+        word((error as { code?: unknown }).code),
+      );
+    }
     reply.code(status >= 400 && status < 600 ? status : 500).send({
       error:
         status === 429
@@ -216,14 +260,7 @@ export async function buildApp(
       try {
         return await library.verifySource(id, fresh);
       } catch (error) {
-        const gone =
-          (error instanceof DriveError &&
-            (error.status === 403 || error.status === 404)) ||
-          (error instanceof Error &&
-            /^Source (unavailable|changed or unavailable|metadata incomplete)$/.test(
-              error.message,
-            )) ||
-          error instanceof z.ZodError;
+        const gone = sourceGone(error);
         reply
           .code(gone ? 410 : 503)
           .send({ error: gone ? "source_unavailable" : "try_later" });

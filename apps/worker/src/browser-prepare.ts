@@ -1,7 +1,7 @@
 import { mkdir, rm, rename, stat, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { runProcess } from "./process.js";
-import { probeMedia, type Probe } from "./probe.js";
+import { pictureMs, probeMedia, type Probe } from "./probe.js";
 import {
   conversionPlan,
   boundedBitrate,
@@ -22,6 +22,36 @@ import {
   type AudioRendition,
 } from "./hls.js";
 export type Caption = { file: string; language: string; label: string };
+/** More cues than any film's captions have. */
+const CAPTION_CUES = 20000;
+/** Cues on screen together: speakers talking over each other, not a pile. */
+const CAPTION_TOGETHER = 16;
+/**
+ * Whether a WebVTT file asks a player to lay out more than captions ever do.
+ * The file is the film's own data: a few thousand cues timed to overlap fit
+ * in a few hundred kilobytes and held a browser's main thread for seconds to
+ * minutes. Such a track is left out; the film and its other captions are not.
+ */
+export function captionsTooDense(text: string): boolean {
+  const clock = String.raw`(?:(\d{1,4}):)?(\d{2}):(\d{2})\.(\d{3})`;
+  const timing = new RegExp(`^${clock} --> ${clock}`, "gm");
+  const ms = (h: string | undefined, m: string, s: string, f: string) =>
+    ((Number(h ?? 0) * 60 + Number(m)) * 60 + Number(s)) * 1000 + Number(f);
+  const edges: Array<[number, number]> = [];
+  for (const cue of text.matchAll(timing)) {
+    edges.push([ms(cue[1], cue[2]!, cue[3]!, cue[4]!), 1]);
+    edges.push([ms(cue[5], cue[6]!, cue[7]!, cue[8]!), -1]);
+    if (edges.length > CAPTION_CUES * 2) return true;
+  }
+  // Ends before starts at the same instant: back-to-back cues do not overlap.
+  edges.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  let together = 0;
+  for (const [, step] of edges) {
+    together += step;
+    if (together > CAPTION_TOGETHER) return true;
+  }
+  return false;
+}
 export async function prepareBrowser(
   source: string,
   output: string,
@@ -167,8 +197,9 @@ export async function prepareBrowser(
     }
     // Every language is made exactly as long as the picture: a commentary that
     // ends early is padded with silence, one that runs on is cut. Streams of
-    // different lengths would stall a player switching between them.
-    const filmSeconds = (probe.durationMs / 1000).toFixed(3);
+    // different lengths would stall a player switching between them. The
+    // picture's own length, not the file's: sound can outlast the last frame.
+    const filmSeconds = (pictureMs(probe) / 1000).toFixed(3);
     const captions: Caption[] = [];
     for (const [i, s] of probe.subtitles.entries())
       if (
@@ -362,10 +393,17 @@ export async function prepareBrowser(
       await inspect();
       if (stopped) throw stopped;
     }
+    // An edition is complete when it is as long as the film: the whole file,
+    // or its picture when sound runs on after the last frame. Measuring only
+    // against the file failed such a film after every full conversion.
+    const complete = (ms: number) =>
+      [probe.durationMs, pictureMs(probe)].some(
+        (expected) => Math.abs(ms - expected) <= 2000,
+      );
     let bytes: number;
     if (streaming) {
       const playlist = await validateEdition(partial);
-      if (Math.abs(playlist.seconds * 1000 - probe.durationMs) > 2000)
+      if (!complete(playlist.seconds * 1000))
         throw Error("Prepared media failed completeness or codec validation");
       bytes = await directoryBytes(partial);
     } else bytes = (await stat(join(partial, "video.mp4"))).size;
@@ -385,7 +423,7 @@ export async function prepareBrowser(
       ? probe.video!
       : { codec: "h264", pixelFormat: "yuv420p", hdr: false };
     if (
-      Math.abs(actual.durationMs - probe.durationMs) > 2000 ||
+      !complete(actual.durationMs) ||
       actual.video?.codec !== expected.codec ||
       actual.video.pixelFormat !== expected.pixelFormat ||
       actual.video.hdr !== expected.hdr ||
@@ -393,11 +431,15 @@ export async function prepareBrowser(
       (multi && actual.audio.length !== probe.audio.length)
     )
       throw Error("Prepared media failed completeness or codec validation");
+    const kept: Caption[] = [];
     for (const c of captions) {
       const s = await stat(join(partial, c.file));
       if (s.size > 8388608) throw Error("Caption too large");
       const text = await readFile(join(partial, c.file), "utf8");
       if (!text.startsWith("WEBVTT")) throw Error("Invalid caption");
+      if (captionsTooDense(text))
+        await rm(join(partial, c.file), { force: true });
+      else kept.push(c);
     }
     await options.verify();
     signal.throwIfAborted();
@@ -407,7 +449,7 @@ export async function prepareBrowser(
     finished = true;
     return {
       sizeBytes: String(bytes),
-      captions,
+      captions: kept,
       format: streaming ? ("hls" as const) : ("mp4" as const),
       label: plan.copyVideo
         ? streaming

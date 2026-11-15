@@ -7,7 +7,7 @@ import { openDatabase } from "../../packages/db/src/open.js";
 import { JobQueue } from "../../apps/worker/src/leases.js";
 import { MediaWorker } from "../../apps/worker/src/main.js";
 import { runProcess } from "../../apps/worker/src/process.js";
-import { probeMedia } from "../../apps/worker/src/probe.js";
+import { PROBE_VERSION, probeMedia } from "../../apps/worker/src/probe.js";
 import { MediaPlanner } from "../../apps/api/src/media/planner.js";
 import { RETRY_COOLDOWN_MS } from "../../apps/worker/src/leases.js";
 
@@ -99,7 +99,7 @@ it("a running background conversion makes way for the film a viewer asks for", a
   );
   db.prepare(
     "INSERT INTO tracks(id,edition_id,kind,codec,metadata) VALUES('probe-file','source-file','probe','metadata',?)",
-  ).run(JSON.stringify({ generation, probe, version: 3 }));
+  ).run(JSON.stringify({ generation, probe, version: PROBE_VERSION }));
   const prepared = join(dir, "prepared");
   const queue = new JobQueue(db);
   const background = queue.enqueue("browser-prepare", "background", {
@@ -152,7 +152,7 @@ it("an owner's new request retries a failed preparation, background work does no
   ).run(
     JSON.stringify({
       generation: "g",
-      version: 3,
+      version: PROBE_VERSION,
       probe: {
         durationMs: 60000,
         container: "matroska,webm",

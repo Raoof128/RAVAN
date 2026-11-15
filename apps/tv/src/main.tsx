@@ -439,9 +439,17 @@ function TV({ api }: { api: ApiClient }) {
             <button
               data-focus-id="signout"
               onClick={() => {
-                credentialStore.clear();
-                api.setDeviceCredential(undefined);
-                setPage("pair");
+                // Give the credential up on the server first, while this
+                // screen can still prove it holds it; then forget it here
+                // whether or not the server could be reached.
+                void api
+                  .forgetDevice()
+                  .catch(() => {})
+                  .then(() => {
+                    credentialStore.clear();
+                    api.setDeviceCredential(undefined);
+                    setPage("pair");
+                  });
               }}
             >
               Disconnect this TV

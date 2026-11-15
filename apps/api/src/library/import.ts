@@ -8,22 +8,31 @@ import {
 } from "../drive/client.js";
 import { LibrarySync } from "../drive/sync.js";
 import { z } from "zod";
-export function registerLibrary(
-  app: FastifyInstance,
-  db: Database,
-  config: AppConfig,
-  injected?: DriveClient,
+/**
+ * Runs one library scan at a time and counts consecutive failures, which the
+ * schedule uses to back off.
+ *
+ * The schedule's own scans only ask Drive what changed. A full scan asked for
+ * while one of those is out is owed, and runs as soon as it returns: the
+ * request was answered "accepted", so it must not be dropped. A full scan
+ * already running or owed answers any number of further requests.
+ */
+export function scanRunner(
+  sync: Pick<LibrarySync, "syncLibrary">,
+  signal: AbortSignal,
 ) {
-  const token = app.getDecorator<() => Promise<string>>("getDriveAccessToken");
-  const sync = new LibrarySync(db, injected ?? createDriveClient(token));
-  const controller = new AbortController();
   let pending: Promise<unknown> | undefined;
-  let timer: ReturnType<typeof setTimeout> | undefined;
+  let checking = false;
+  let owed: string | undefined;
   let failures = 0;
   function run(folder: string, incremental = false) {
-    if (pending) return;
+    if (pending) {
+      if (checking && !incremental) owed = folder;
+      return;
+    }
+    checking = incremental;
     pending = sync
-      .syncLibrary(folder, controller.signal, { incremental })
+      .syncLibrary(folder, signal, { incremental })
       .then(
         () => {
           failures = 0;
@@ -34,8 +43,33 @@ export function registerLibrary(
       )
       .finally(() => {
         pending = undefined;
+        const next = owed;
+        owed = undefined;
+        if (next && !signal.aborted) run(next);
       });
   }
+  return {
+    run,
+    busy: () => pending !== undefined,
+    failures: () => failures,
+    /** Resolves once no scan is running or owed. */
+    async idle() {
+      while (pending) await pending;
+    },
+  };
+}
+export function registerLibrary(
+  app: FastifyInstance,
+  db: Database,
+  config: AppConfig,
+  injected?: DriveClient,
+) {
+  const token = app.getDecorator<() => Promise<string>>("getDriveAccessToken");
+  const sync = new LibrarySync(db, injected ?? createDriveClient(token));
+  const controller = new AbortController();
+  const runner = scanRunner(sync, controller.signal);
+  const run = runner.run;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   function schedule() {
     timer = setTimeout(
       () => {
@@ -44,7 +78,7 @@ export function registerLibrary(
         if (status.folderId) run(status.folderId, true);
         schedule();
       },
-      60000 * 2 ** failures + Math.random() * 10000,
+      60000 * 2 ** runner.failures() + Math.random() * 10000,
     );
     timer.unref();
   }
@@ -52,13 +86,13 @@ export function registerLibrary(
   app.addHook("onClose", async () => {
     clearTimeout(timer);
     controller.abort();
-    await pending;
+    await runner.idle();
   });
   app.get("/api/library", async () => sync.status());
   app.post("/api/library", async (request, reply) => {
     const body = z.strictObject({ folderId: driveId }).safeParse(request.body);
     if (!body.success) return reply.code(400).send({ error: "invalid_folder" });
-    if (pending && sync.status().folderId !== body.data.folderId)
+    if (runner.busy() && sync.status().folderId !== body.data.folderId)
       return reply.code(409).send({ error: "scan_in_progress" });
     // Changing folder: make sure the new one is real before the old one is replaced.
     if (sync.status().folderId !== body.data.folderId) {
@@ -74,7 +108,8 @@ export function registerLibrary(
       if (!usable) return reply.code(400).send({ error: "invalid_folder" });
       // A scheduled scan of the old folder may have started while Drive
       // answered. Do not report a scan that would not run.
-      if (pending) return reply.code(409).send({ error: "scan_in_progress" });
+      if (runner.busy())
+        return reply.code(409).send({ error: "scan_in_progress" });
     }
     run(body.data.folderId);
     return reply.code(202).send({ scanId: "library" });

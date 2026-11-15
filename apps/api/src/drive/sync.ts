@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { z } from "zod";
 import type { Database } from "../../../../packages/db/src/open.js";
 import type { SourceRef } from "../../../../packages/contracts/src/index.js";
 import {
@@ -46,6 +47,22 @@ type Checkpoint = {
   counts: string;
   token: string | null;
 };
+/**
+ * Whether a failed verification is a verdict on the source (gone, forbidden,
+ * changed) rather than Drive being slow or unreachable. Only a verdict may end
+ * what depends on the source; anything else is worth asking again.
+ */
+export function sourceGone(error: unknown): boolean {
+  return (
+    (error instanceof DriveError &&
+      (error.status === 403 || error.status === 404)) ||
+    (error instanceof Error &&
+      /^Source (unavailable|changed or unavailable|metadata incomplete)$/.test(
+        error.message,
+      )) ||
+    error instanceof z.ZodError
+  );
+}
 /** How long one successful Drive verification may answer later non-fresh checks. */
 export const VERIFY_REUSE_MS = 5000;
 /** A scheduled refresh trusts the Drive change feed for at most this long. */

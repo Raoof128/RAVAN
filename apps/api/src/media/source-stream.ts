@@ -1,6 +1,6 @@
 import { setTimeout as delay } from "node:timers/promises";
 import type { SourceRef } from "../../../../packages/contracts/src/index.js";
-import { driveId } from "../drive/client.js";
+import { driveId, usageLimited } from "../drive/client.js";
 /** A Drive read that failed for a reason another attempt cannot change. */
 class PermanentSourceError extends Error {}
 export class DriveSourceReader {
@@ -94,9 +94,11 @@ export class DriveSourceReader {
       response.headers.get("content-range") !==
         `bytes ${start}-${end}/${source.sizeBytes}`
     ) {
-      await response.body?.cancel();
+      // A usage limit arrives as 403 too; it passes, so it is worth asking again.
+      const limited = await usageLimited(response);
+      if (response.status !== 403) await response.body?.cancel();
       const message = "Upstream range mismatch";
-      throw response.status === 429 || response.status >= 500
+      throw limited || response.status === 429 || response.status >= 500
         ? new Error(message)
         : new PermanentSourceError(message);
     }

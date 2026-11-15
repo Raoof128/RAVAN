@@ -10,7 +10,11 @@ import {
 } from "../../apps/api/src/media/planner.js";
 import { assetId } from "../../apps/worker/src/prepared-store.js";
 import { prepareBrowser } from "../../apps/worker/src/browser-prepare.js";
-import { probeMedia, type Probe } from "../../apps/worker/src/probe.js";
+import {
+  PROBE_VERSION,
+  probeMedia,
+  type Probe,
+} from "../../apps/worker/src/probe.js";
 import { runProcess } from "../../apps/worker/src/process.js";
 import { MediaWorker } from "../../apps/worker/src/main.js";
 import { JobQueue } from "../../apps/worker/src/leases.js";
@@ -271,7 +275,13 @@ async function plannerFixture(probe: Probe, name = "Film.mkv") {
     .prepare(
       "INSERT INTO tracks(id,edition_id,kind,codec,metadata) VALUES('probe-f','source-f','probe','metadata',?)",
     )
-    .run(JSON.stringify({ version: 3, generation: "generation", probe }));
+    .run(
+      JSON.stringify({
+        version: PROBE_VERSION,
+        generation: "generation",
+        probe,
+      }),
+    );
   return h;
 }
 const source = { fileId: "f", generation: "generation", sizeBytes: "10" };

@@ -108,6 +108,10 @@ test("edge reports its deployment and fails closed for private routes", async ({
   expect(index.headers()["content-security-policy"]).toContain(
     "frame-ancestors 'none'",
   );
+  // Markup that should never get in could not post a form to another host.
+  expect(index.headers()["content-security-policy"]).toContain(
+    "form-action 'self'",
+  );
   expect(index.headers()["x-content-type-options"]).toBe("nosniff");
   const session = await request.get("/api/session?preview=1");
   expect(await session.json()).toEqual({

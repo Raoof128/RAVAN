@@ -17,7 +17,7 @@ npm run dev:web
 
 The player reports what the browser can decode, and the server does the least work that will play: the original directly, a repackaged copy with the picture untouched, or a full H.264 conversion. Choosing an explicit size in the player always converts to that size. A browser that reports nothing gets the universal conversion.
 
-Only one playback session is active by default. Replacing it requires an explicit button press. Progress is saved periodically and on pause/end. The TV receives its own revocable credential; Google tokens remain on the server.
+Only one playback session is active by default. Replacing it requires an explicit button press. Progress is saved periodically and on pause/end. The TV receives its own revocable credential; Google tokens remain on the server. A credential the owner approved but the screen did not collect within a minute is revoked, since nobody holds it.
 
 The worker's private routes are `/_worker/*`. They require a separate key and must also be excluded by the public proxy. Source bytes are served only against a per-file grant the worker obtains with that key, so the key itself never appears on an FFmpeg command line. Media operations use fixed executable argument arrays, bounded output and timeouts. Source downloads use immutable generation-keyed blocks; the input file is never changed.
 
@@ -25,7 +25,7 @@ Every `/api` route is authorized by the route the request matched, not by the te
 
 The API runs on loopback port 4310. `/healthz` checks liveness; `/readyz` checks the open database and disk reserve. Missing Google configuration leaves the setup screen available and private API routes protected. Normal development commands do not auto-load `.env`; use the explicit commands above when connecting Google.
 
-The current implementation disables application request logging. The proxy template disables ticket-bearing media access logs and error logs. Add telemetry only with explicit redaction of paths, credentials and private filenames.
+The current implementation disables application request logging. The one exception is a request that fails inside the server: it writes its method, matched route pattern and error class, never the address, a header or data. The proxy template disables ticket-bearing media access logs and error logs. Add telemetry only with explicit redaction of paths, credentials and private filenames.
 
 Source edition reassignment is available to the owner via `PATCH /api/movies/:targetId` with `{ "associateSourceId": "source-id" }` and the normal session/CSRF headers. It retains the original movie's history and revokes playback of the moved source. Multiple available sources currently require disambiguation before playback. Optional TMDB enrichment is not connected; locally edited titles/descriptions and generated fallback posters work independently.
 

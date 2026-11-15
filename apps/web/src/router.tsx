@@ -40,6 +40,21 @@ function settle(y: number) {
   };
   step();
 }
+/**
+ * The id that follows `prefix` in a route, or undefined when there is none or
+ * it is not validly written. Never throws: a link ending in a stray "%" used
+ * to blank the whole app, because decoding it failed while rendering.
+ */
+export function routeParam(route: string, prefix: string): string | undefined {
+  if (!route.startsWith(prefix)) return;
+  try {
+    return (
+      decodeURIComponent(route.slice(prefix.length).split("?")[0]!) || undefined
+    );
+  } catch {
+    return;
+  }
+}
 export function useRoute() {
   const [route, setRoute] = useState(current);
   useEffect(() => {

@@ -1,5 +1,92 @@
 # Changelog
 
+## Raouf: 2026-11-16 (Australia/Sydney) — red-team release
+
+**Scope:** release `b0dab6b8d873`, approved by the owner.
+
+- Live: backend `b0dab6b8d873-c4619299`, Cloudflare Worker version `53ad7734-be82-476c-ba81-7483f5cf00f3`, and one rule added to the origin's Nginx. Record: the maintainer's private notes.
+- The crafted addresses that reached the API past the origin key now give `404` on the live origin, and the API refuses them itself when they come through the public site.
+- Verification: rehearsal on a copy of the live database; 9 of 9 edge checks; 12 release tests; sign-in page in Chromium and WebKit; Sentinel host checks; no rollback.
+- Follow-ups: sign in on production (the sign-in path changed); rebuild the television package; clear old rollback material.
+
+## Raouf: 2026-11-16 (Australia/Sydney) — red-team exercise
+
+**Scope:** the owner asked for the whole project to be attacked. Branch `audit/backend-2026-11-16`, from the released `905086c`. Report: the maintainer's private notes.
+
+### Result
+
+Nobody without the owner's sign-in reached a film, a title or any private data, and no attack ran script in the owner's browser. Eleven attacks worked in lesser ways; ten are fixed here, each with a test that failed first. Nothing is released.
+
+### What worked, and the fix
+
+- **Origin key walked round (confirmed on the live origin).** `/api/movies/..%2f..%2fmedia%2fx/pictures` entered the proxy's open media rule and reached the API and the worker's private routes. The API's own checks held. The API now answers only plainly written paths, and the proxy template passes on only `/media/s/<ticket>/<file>` as written.
+- **Sign-in knocked out by strangers.** A hundred anonymous requests from ten networks pushed any sign-in in progress out of a table of one hundred. An attempt is now sealed into its own browser's cookie; there is no table.
+- **A paired screen could queue 65 conversions a minute**, each at viewer priority. A screen may now have three waiting.
+- **A 750 KB cover image cost FFmpeg about 1 GB**, enough to get the worker killed mid-conversion. Covers are held to 40 megapixels, and frames are scaled down before the filter that holds 24 of them.
+- **FFmpeg ran with the service's secrets in its environment.** It now gets a path, a temporary directory and a locale.
+- **"Disconnect this TV" left the credential valid on the server.** A screen can now revoke itself (`POST /api/pairing/forget`), and the television does.
+- **A caption track of thousands of overlapping cues froze the player.** Such a track is left out of the edition.
+- **A link ending in a stray `%` blanked the web app.** The id in the address is read without throwing.
+- **The public demo called the real API** for methods its stand-in did not cover. It now refuses them without touching the network.
+- `.gitignore` covers backups, key stores and stray media; the site's policy gains `form-action 'self'`.
+
+### Open
+
+- One finding, about how paired screens are approved and kept, needs a product decision, a migration and changes to both clients. Several lower ones are left open with their reasons. All are in section 5 of the report.
+
+### Files changed
+
+`apps/api/src/app.ts`, `auth/routes.ts`, `media/planner.ts`, `sessions/playback.ts`, `sessions/routes.ts`; `apps/worker/src/artwork.ts`, `browser-prepare.ts`, `process.ts`; `apps/web/src/main.tsx`, `router.tsx`, `preview.ts`; `apps/tv/src/main.tsx`; `packages/client/src/api.ts`; `deploy/nginx/ravan-origin.conf.template`; `scripts/build-cloudflare.mjs`; `.gitignore`. Tests: `tests/backend/red-team.test.ts`, `tests/clients/route-params.test.ts`, `tests/clients/preview-api.test.ts` (new); `tests/backend/oauth-capacity.test.ts` (its second test asserted the eviction that was the sign-in attack, and now asserts that an attempt cannot be pushed out); `tests/release/frontend.spec.ts`. Documentation: the maintainer's private notes (new), the maintainer's private notes, `README.md`, `AGENT.md`.
+
+### Verification
+
+- `npm run check`: passed. `npm test`: 53 files, 337 passed, 1 skipped (was 50 files, 326). `npm run build`, `build:web`, `build:tv`, `build:cloudflare`: passed. `npm run test:e2e`: 153 passed (an earlier run, made while the reviewers were also driving browsers, had one Firefox playback timeout). Release tests: 12 passed.
+- Each attack was run against the code as it was and worked; each test failed before its fix.
+- On the live site: about sixty harmless unauthenticated requests, which is how the origin-key finding was confirmed. No sign-in or pairing attempt, and nothing that could lock out or load the server.
+
+## Raouf: 2026-11-16 (Australia/Sydney) — second-audit release
+
+**Scope:** release `89ed78bc12ad`, approved by the owner.
+
+- Live: backend `89ed78bc12ad-7de5ef21`, Cloudflare Worker version `2ccce3c7-df8e-402c-93ce-29840d957315`. Record: the maintainer's private notes.
+- The rehearsal on a copy of the live database showed the defect had been hit that morning: a failed start on a two-language film led to a forced re-encode, and making room for it removed the 4K film's copy. With the staged code, all three two-language films gave a session and every playlist and segment checked was served.
+- Verification: 9 of 9 edge checks; 12 release tests; sign-in page in Chromium and WebKit; Sentinel host checks; all five films inspected again under probe version 4; no rollback.
+- Follow-ups: play a two-language film signed in; the 4K film is prepared again when next played; clear old rollback material; the public repository has not received this revision.
+
+## Raouf: 2026-11-16 (Australia/Sydney) — second backend audit
+
+**Scope:** the owner asked for a full audit of the backend, with fixes and improvements. Branch `audit/backend-2026-11-16`, from `b6067e7`. Report: the maintainer's private notes.
+
+### The main finding
+
+- **Films with more than one audio track could not be played in the web player.** The worker wrote all-languages editions and the planner offered them, but the media route admitted only the one-language layout's file names: `index.m3u8` was served, then `video.m3u8` answered `403`. In every release since `712c59b`. Each side's tests passed alone. Both gates now use the one list, `HLS_FILE`.
+
+### Also fixed
+
+- One failed or slow Drive lookup when a session's access was renewed stopped the film. Renewal now starts at half-time and is tried again on later heartbeats; a heartbeat waits eight seconds for Drive, not thirty; a verdict that the film is gone still ends the session at once.
+- A Drive usage limit, which arrives as `403`, was read as "gone": it could end playback, charge a conversion an attempt and close the library until the next scan. It is now retried and reported as a rate limit.
+- The saved audio language was matched by exact code on the server and by language in the players. With `en` saved, a film tagged `eng` was planned in its first language. One shared rule, `sameLanguage`.
+- A film whose sound runs on after its picture was converted in full, refused at the final check and tried twice more. The probe records the picture's own length (`PROBE_VERSION` 4) and editions are measured against it.
+- Stopping the API waited on anyone watching until systemd killed it. It now closes connections and then the database, in order.
+- A fault inside the server left no trace. A 5xx answer writes its method, route pattern and error class; never the address, a header, a message or data.
+- A screen's credential that was approved but never collected is revoked after its one-minute window.
+- Smaller: tickets of lapsed sessions are forgotten; `/api/artwork-credits` is counted by the rate limiter; pressing sync during the schedule's change check is no longer dropped.
+
+### Files changed
+
+`apps/api/src/app.ts`, `drive/client.ts`, `drive/sync.ts`, `library/import.ts`, `media/planner.ts`, `media/source-stream.ts`, `sessions/pairing.ts`, `sessions/playback.ts`, `sessions/routes.ts`; `apps/worker/src/browser-prepare.ts`, `prepared-store.ts`, `probe.ts`; `packages/contracts/src/languages.ts` (new); `apps/web/src/player/languages.ts` (now takes `sameLanguage` from the shared package). Tests: `tests/backend/second-audit.test.ts` and `tests/backend/end-to-end.test.ts` (new); `capabilities.test.ts`, `prepared-sessions.test.ts` and `worker-yield.test.ts` use `PROBE_VERSION` where they wrote `3`. Documentation: the maintainer's private notes (new), the maintainer's private notes, `docs/backend-usage.md`, `README.md`, `AGENT.md`.
+
+### Verification
+
+- `npm run check`: passed. `npm test`: 50 files, 326 passed, 1 skipped (was 48 files, 309). `npm run build`, `build:web`, `build:tv`, `fixtures`: passed. `npm run test:e2e`: 153 passed. `npm audit`: 0 vulnerabilities.
+- Every new test failed before its fix. The new end-to-end test runs the real API, worker and FFmpeg and fetches a two-language film as a player does.
+- Two independent reviews: one of the diff, one looking for more places where the API and the worker disagree. Five of the fixes above came from them.
+
+### Not done
+
+- Nothing is committed, released or changed on the server. The main finding is in the release that is live; releasing needs the owner's approval. After release: remove queued forced re-encodes of multi-language films from the job queue, and play a two-language film signed in.
+- Left open, with reasons, in section 6 of the report: the web player asks for a full re-encode after any failed start (R-20); the packaged television app may be unable to load media because of its `null` origin (R-26, needs a physical television); no continuous integration (R-25).
+
 ## Raouf: 2026-11-16 (Australia/Sydney) — logs and long-term memory
 
 **Scope:** the owner asked for every log and Zurvan to be brought up to date.

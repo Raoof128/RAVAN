@@ -46,6 +46,14 @@ export function runProcess(
       shell: false,
       detached: true,
       stdio: ["ignore", "pipe", "pipe"],
+      // Nothing of this service's own. Its environment holds the encryption
+      // key, the worker key and the Google client secret, and these tools
+      // parse files this server did not write.
+      env: {
+        PATH: process.env.PATH ?? "/usr/bin:/bin",
+        ...(process.env.TMPDIR ? { TMPDIR: process.env.TMPDIR } : {}),
+        LANG: "C.UTF-8",
+      },
     });
     // Only fixed classifications leave this function. Raw stderr may contain
     // private source URLs/headers, so never attach it to errors or logs.

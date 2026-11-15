@@ -13,6 +13,7 @@ import { sessionFixture } from "../fixtures/session-harness.js";
 import { PlaybackService } from "../../apps/api/src/sessions/playback.js";
 import { MediaPlanner } from "../../apps/api/src/media/planner.js";
 import { assetId, makeRoom } from "../../apps/worker/src/prepared-store.js";
+import { PROBE_VERSION } from "../../apps/worker/src/probe.js";
 const source = { fileId: "f", generation: "generation", sizeBytes: "10" };
 const profile = { id: "web", platform: "web" as const, verified: false };
 it("binds prepared video and captions to session, source generation and revocation", async () => {
@@ -96,7 +97,13 @@ it("coalesces preparation, separates forced encodes and does not rebuild evicted
     .prepare(
       "INSERT INTO tracks(id,edition_id,kind,codec,metadata) VALUES('probe-f','source-f','probe','metadata',?)",
     )
-    .run(JSON.stringify({ version: 3, generation: "generation", probe }));
+    .run(
+      JSON.stringify({
+        version: PROBE_VERSION,
+        generation: "generation",
+        probe,
+      }),
+    );
   const planner = new MediaPlanner(h.db, true, "/prepared");
   const a = await planner.planPlayback(source, profile),
     b = await planner.planPlayback(source, profile);

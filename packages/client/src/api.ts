@@ -199,6 +199,10 @@ export function createApiClient(baseUrl: string) {
     stop(id: string) {
       return request<void>(`/api/playback/${encodeURIComponent(id)}`, "DELETE");
     },
+    /** A paired screen gives up its own credential. */
+    forgetDevice() {
+      return request<void>("/api/pairing/forget", "POST", {});
+    },
     approvePairing(code: string) {
       return request<void>("/api/pairing/approve", "POST", { code });
     },

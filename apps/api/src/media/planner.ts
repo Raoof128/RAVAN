@@ -26,7 +26,20 @@ import type {
 import { JobQueue } from "../../../worker/src/leases.js";
 import { HLS_MAX_AUDIO } from "../../../worker/src/hls.js";
 import { capabilitiesSchema } from "../../../../packages/contracts/src/schemas.js";
+import { sameLanguage } from "../../../../packages/contracts/src/languages.js";
 type FileHint = { name?: string | null; mimeType?: string | null };
+export type PlanOptions = PlaybackOptions & {
+  startMs?: number;
+  /** Asked for by a paired screen rather than the owner's own session. */
+  screen?: boolean;
+};
+/**
+ * Conversions a paired screen may have waiting or running, across all films.
+ * A screen's request outranks background work and can remove other films'
+ * copies to make room, so without a bound one screen could queue every film
+ * in every size: hours of work each. The owner is not held to it.
+ */
+export const SCREEN_WAITING_LIMIT = 3;
 /** Audio a browser plays from each container, before asking what this client decodes. */
 const containerAudio = {
   mp4: ["aac", "mp3", "ac3", "eac3", "flac"],
@@ -268,7 +281,7 @@ export class MediaPlanner {
   async planPlayback(
     source: SourceRef,
     profile: DeviceProfile,
-    options: PlaybackOptions & { startMs?: number } = {},
+    options: PlanOptions = {},
     background = false,
   ): Promise<PlaybackPlan> {
     if (!(profile.id in profiles))
@@ -334,7 +347,10 @@ export class MediaPlanner {
     const language = prefs
       ? String(JSON.parse(prefs.data).audioLanguage ?? "original")
       : "original";
-    const preferred = probe.audio.findIndex((a) => a.language === language);
+    // By the rule the players use: a saved "en" is the film's "eng" track.
+    const preferred = probe.audio.findIndex((a) =>
+      sameLanguage(a.language, language),
+    );
     const audio = options.audioTrack ?? Math.max(0, preferred);
     if (audio >= Math.max(1, probe.audio.length))
       return {
@@ -541,6 +557,24 @@ export class MediaPlanner {
         mode: "unsupported",
         assetId: id,
         reason: "Prepared edition reclaimed; play to prepare again.",
+      };
+    if (
+      options.screen &&
+      wanted &&
+      !["queued", "running"].includes(jobState(id) ?? "") &&
+      (
+        this.db
+          .prepare(
+            "SELECT count(*) n FROM jobs WHERE kind='browser-prepare' AND state IN ('queued','running') AND priority>0",
+          )
+          .get() as { n: number }
+      ).n >= SCREEN_WAITING_LIMIT
+    )
+      return {
+        mode: "unsupported",
+        assetId: id,
+        reason:
+          "The server is already preparing other films. Try again when one has finished.",
       };
     // One transaction: the worker's cleanup of superseded jobs must see either
     // none of this request or all of it, priority included.

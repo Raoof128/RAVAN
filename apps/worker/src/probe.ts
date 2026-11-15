@@ -18,6 +18,11 @@ export type Probe = {
     interlaced?: boolean;
     /** Stored sideways (phone footage): shown rotated by a quarter turn. */
     rotated?: boolean;
+    /**
+     * How long the picture itself runs, when the file says. `durationMs` is the
+     * whole file's, which sound or captions can stretch past the last frame.
+     */
+    durationMs?: number;
   };
   audio: Array<{
     codec: string;
@@ -38,9 +43,22 @@ export type Probe = {
 /**
  * Bump when a probe starts recording something planning depends on, so films
  * inspected earlier are inspected again. 3 added the default audio track, pixel
- * shape, interlacing and rotation.
+ * shape, interlacing and rotation; 4 the picture's own length.
  */
-export const PROBE_VERSION = 3;
+export const PROBE_VERSION = 4;
+/**
+ * The length an edition's picture should come out at. A film's stated picture
+ * length is used only when it is shorter than the file: that is the case it
+ * exists for (sound that runs on after the last frame), and a stated length
+ * that is longer, or nonsense, cannot then turn a good conversion into a
+ * failed one.
+ */
+export function pictureMs(probe: Probe): number {
+  const own = probe.video?.durationMs;
+  return own !== undefined && own > 0 && own < probe.durationMs
+    ? own
+    : probe.durationMs;
+}
 const text = z.string().max(256);
 /** The shape a stored probe must have before the worker builds a command from it. */
 export const probeRecord = z.object({
@@ -61,6 +79,7 @@ export const probeRecord = z.object({
         sar: z.number().positive().optional(),
         interlaced: z.boolean().optional(),
         rotated: z.boolean().optional(),
+        durationMs: z.number().positive().optional(),
       })
       .optional(),
     audio: z
@@ -105,12 +124,34 @@ const stream = z.object({
   width: z.number().optional(),
   height: z.number().optional(),
   channels: z.number().optional(),
+  duration: z.string().optional(),
   color_transfer: z.string().optional(),
   sample_aspect_ratio: z.string().optional(),
   field_order: z.string().optional(),
   tags: z.record(z.string(), z.string()).optional(),
   disposition: z.object({ default: z.number().optional() }).optional(),
 });
+/**
+ * A stream's own length in milliseconds: MP4 states it; Matroska keeps it in a
+ * DURATION tag ("01:52:03.416000000"), sometimes suffixed with a language.
+ */
+function streamMs(video: z.infer<typeof stream>): number | undefined {
+  let seconds = Number(video.duration);
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    const tag = Object.entries(video.tags ?? {}).find(([name]) =>
+      /^DURATION(-[A-Za-z]{2,3})?$/i.test(name),
+    )?.[1];
+    const clock = /^(\d{1,3}):([0-5]\d):([0-5]\d(?:\.\d{1,9})?)$/.exec(
+      tag ?? "",
+    );
+    seconds = clock
+      ? Number(clock[1]) * 3600 + Number(clock[2]) * 60 + Number(clock[3])
+      : NaN;
+  }
+  return Number.isFinite(seconds) && seconds > 0
+    ? Math.round(seconds * 1000)
+    : undefined;
+}
 function shape(video: z.infer<typeof stream>) {
   const [n, d] = (video.sample_aspect_ratio ?? "").split(":").map(Number);
   const sar = n && d ? n / d : 1;
@@ -188,6 +229,9 @@ export async function probeMedia(
               video.color_transfer ?? "",
             ),
             ...shape(video),
+            ...(streamMs(video) !== undefined
+              ? { durationMs: streamMs(video) }
+              : {}),
           },
         }
       : {}),

@@ -11,6 +11,7 @@ import { constants } from "node:fs";
 import { join, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import type { Database } from "../../../packages/db/src/open.js";
+import { HLS_FILE } from "./hls.js";
 export const CAPACITY = 20 * 1024 ** 3;
 export const ASSET_ID = /^[a-f0-9]{64}$/;
 export function assetId(
@@ -196,9 +197,12 @@ export function localReader(directory: string, file = "video.mp4") {
       end: bigint,
       signal: AbortSignal,
     ) {
+      // Media and captions of either layout. Playlists are never read here:
+      // they are served only through servePlaylist().
       if (
-        !/^(video\.mp4|subtitle-\d+\.vtt|init\.mp4|seg-\d{5}\.m4s)$/.test(
-          file,
+        !(
+          /^(video\.mp4|subtitle-\d+\.vtt)$/.test(file) ||
+          (HLS_FILE.test(file) && !file.endsWith(".m3u8"))
         ) ||
         !ASSET_ID.test(source.fileId)
       )

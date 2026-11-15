@@ -76,7 +76,7 @@ it("anonymous sign-in attempts cannot exhaust the pending state and lock the own
   }
 });
 
-it("still binds a callback to the browser that started it after older attempts are evicted", async () => {
+it("still binds a callback to the browser that started it, however many attempts follow", async () => {
   const h = await app();
   try {
     const first = await h.instance.inject({
@@ -86,22 +86,27 @@ it("still binds a callback to the browser that started it after older attempts a
     const firstState = new URL(
       first.headers.location as string,
     ).searchParams.get("state");
+    let last = first;
     for (let i = 0; i < 100; i++)
-      await h.instance.inject({
+      last = await h.instance.inject({
         url: "/auth/google/start",
         remoteAddress: `198.51.100.${i}`,
       });
-    // The evicted attempt fails closed instead of being accepted without its state.
-    expect(
-      (
-        await h.instance.inject({
-          url: `/auth/google/callback?code=code&state=${firstState}`,
-          headers: {
-            cookie: first.cookies.map((c) => `${c.name}=${c.value}`).join("; "),
-          },
-        })
-      ).statusCode,
-    ).toBe(400);
+    const answer = (cookie: string) =>
+      h.instance.inject({
+        url: `/auth/google/callback?code=code&state=${firstState}`,
+        headers: { cookie },
+      });
+    const jar = (r: typeof first) =>
+      r.cookies.map((c) => `${c.name}=${c.value}`).join("; ");
+    // This test once asserted that the first attempt, pushed out of a table of
+    // one hundred, failed closed. That was also how a stranger could end the
+    // owner's sign-in (red team, 16 November 2026). An attempt now lives in
+    // its own browser: it cannot be pushed out, and it still answers only to
+    // the browser that started it.
+    expect((await answer(jar(last))).statusCode).toBe(400);
+    expect((await answer("")).statusCode).toBe(400);
+    expect((await answer(jar(first))).statusCode).toBe(302);
   } finally {
     await h.close();
   }

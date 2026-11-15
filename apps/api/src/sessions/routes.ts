@@ -223,6 +223,18 @@ export function registerSessions(
   const pairing = config.encryptionKey
     ? new PairingService(db, Buffer.from(config.encryptionKey, "hex"))
     : undefined;
+  if (pairing) {
+    // Hourly, as well as whenever a screen asks to pair.
+    const tidy = setInterval(() => {
+      try {
+        pairing.expire();
+      } catch {
+        /* A busy database is retried next hour. */
+      }
+    }, 3600000);
+    tidy.unref();
+    app.addHook("onClose", async () => clearInterval(tidy));
+  }
   app.post(
     "/api/pairing",
     { config: { rateLimit: { max: 6, timeWindow: "1 minute" } } },
@@ -287,6 +299,15 @@ export function registerSessions(
     } catch {
       return reply.code(400).send({ error: "pairing_unavailable" });
     }
+  });
+  // "Disconnect this TV": the screen gives up its own credential, so it does
+  // not stay valid on the server after the screen has forgotten it.
+  app.post("/api/pairing/forget", async (request, reply) => {
+    const who = principal(db, request);
+    if (!who.deviceId)
+      return reply.code(400).send({ error: "pairing_unavailable" });
+    revokeDevice(db, who.deviceId);
+    return reply.code(204).send();
   });
   return playback;
 }

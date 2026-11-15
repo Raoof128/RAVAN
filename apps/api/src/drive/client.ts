@@ -40,6 +40,44 @@ export class DriveError extends Error {
     super(`Drive request failed (${status})`);
   }
 }
+/**
+ * Drive answers 403 both for "you may not read this" and for "slow down": a
+ * usage limit comes back as 403 with the domain "usageLimits" as well as 429.
+ * Read as a refusal, a busy minute at Google looked like a film that had been
+ * removed, which ends playback and can close the whole library. Consumes the
+ * body. Anything that cannot be read as a usage limit stays a refusal.
+ */
+export async function usageLimited(response: Response): Promise<boolean> {
+  if (response.status !== 403) return false;
+  const reader = response.body?.getReader();
+  if (!reader) return false;
+  try {
+    const chunks: Uint8Array[] = [];
+    let bytes = 0;
+    for (;;) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      bytes += chunk.value.length;
+      if (bytes > 64 * 1024) return false;
+      chunks.push(chunk.value);
+    }
+    const body = z
+      .object({
+        error: z.object({
+          errors: z.array(z.object({ domain: z.string().optional() })),
+        }),
+      })
+      .safeParse(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+    return (
+      body.success &&
+      body.data.error.errors.some((e) => e.domain === "usageLimits")
+    );
+  } catch {
+    return false;
+  } finally {
+    await reader.cancel().catch(() => {});
+  }
+}
 const fields =
   "id,name,mimeType,parents,size,version,md5Checksum,headRevisionId,trashed,capabilities(canDownload)";
 export const driveId = z.string().regex(/^[A-Za-z0-9_-]{1,160}$/);
@@ -65,17 +103,15 @@ export function createDriveClient(
         redirect: "error",
       });
       if (!response.ok) {
-        await response.body?.cancel();
-        if (
-          (response.status === 429 || response.status >= 500) &&
-          attempt < 2
-        ) {
+        const status = (await usageLimited(response)) ? 429 : response.status;
+        if (response.status !== 403) await response.body?.cancel();
+        if ((status === 429 || status >= 500) && attempt < 2) {
           await delay(250 * 2 ** attempt + Math.random() * 100, undefined, {
             signal,
           });
           continue;
         }
-        throw new DriveError(response.status);
+        throw new DriveError(status);
       }
       // Bound decoded response size even when the server omits Content-Length.
       const reader = response.body?.getReader();

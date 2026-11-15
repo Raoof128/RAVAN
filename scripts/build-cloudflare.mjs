@@ -48,7 +48,7 @@ try {
   Referrer-Policy: no-referrer
   X-Robots-Tag: noindex, nofollow
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; media-src 'self' blob: https://media.example.com; connect-src 'self' https://media.example.com; worker-src 'self' blob:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; media-src 'self' blob: https://media.example.com; connect-src 'self' https://media.example.com; worker-src 'self' blob:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
 `,
   );
   await writeFile(

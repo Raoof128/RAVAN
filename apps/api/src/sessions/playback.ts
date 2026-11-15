@@ -9,8 +9,18 @@ import type {
   PlaybackOptions,
 } from "../../../../packages/contracts/src/index.js";
 import { hash, secret } from "../auth/sessions.js";
+import { sourceGone } from "../drive/sync.js";
 import { owns, type Principal } from "./devices.js";
 import { HLS_FILE, HLS_PLAYLIST } from "../../../worker/src/hls.js";
+/**
+ * Access to a source lasts five minutes and is renewed by the player's
+ * heartbeats, which come every 30 seconds. Renewal starts at half-time, so a
+ * Drive lookup that fails has several heartbeats in which to succeed.
+ */
+const ACCESS_MS = 300000;
+const RENEW_AHEAD_MS = ACCESS_MS / 2;
+/** Within this of the end there is no later heartbeat: a failure is final. */
+const LAST_CHANCE_MS = 30000;
 type Row = {
   id: string;
   movie_id: string;
@@ -35,9 +45,15 @@ export class PlaybackService {
     private plan: (
       source: SourceRef,
       profile: string,
-      options?: PlaybackOptions & { startMs?: number },
+      options?: PlaybackOptions & { startMs?: number; screen?: boolean },
     ) => Promise<PlaybackPlan>,
     private now = Date.now,
+    /**
+     * How long a heartbeat waits for Drive. The player gives a heartbeat 15
+     * seconds and the edge 20, while a Drive lookup may take 30: an answer
+     * that arrives after the player stopped waiting is a failure to it.
+     */
+    private renewWaitMs = 8000,
   ) {}
   private row(id: string) {
     return this.db
@@ -125,7 +141,12 @@ export class PlaybackService {
           : "This source is unavailable.",
       };
     const source = await this.verify(sources[0]!.id);
-    const plan = await this.plan(source, profile, { ...options, startMs });
+    const plan = await this.plan(source, profile, {
+      ...options,
+      startMs,
+      // A screen is bounded in the work it may ask for; see the planner.
+      screen: Boolean(who.deviceId),
+    });
     if (plan.mode === "unsupported")
       return {
         kind: "unsupported",
@@ -170,6 +191,8 @@ export class PlaybackService {
           .run(now, previous.id);
         this.tickets.delete(previous.id);
       }
+      // No other session is live at this point, so no other ticket is either.
+      this.tickets.clear();
       const id = randomUUID(),
         ticket = secret();
       const epoch = (
@@ -191,7 +214,7 @@ export class PlaybackService {
           who.webHash ?? null,
           epoch,
           now + 120000,
-          now + 300000,
+          now + ACCESS_MS,
           now + 21600000,
           plan.mode === "prepared" ? plan.assetId : null,
           plan.label ?? "Original",
@@ -203,16 +226,53 @@ export class PlaybackService {
       };
     })();
   }
+  /**
+   * Drive's confirmation, or a failure once the player would stop waiting. The
+   * lookup itself carries on and can answer the next heartbeat.
+   */
+  private async confirm(sourceId: string): Promise<SourceRef> {
+    const lookup = this.verify(sourceId);
+    // It may lose the race below; its failure is then nobody's to handle.
+    lookup.catch(() => {});
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        lookup,
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(
+            () => reject(new Error("Confirmation slow")),
+            this.renewWaitMs,
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
   async heartbeat(id: string, who: Principal): Promise<PlaybackSession> {
     let row = this.row(id);
     if (!this.active(row) || !owns(row, who))
       throw new Error("Session expired");
     let renewed = false;
-    if (row.access_until <= this.now() + 30000) {
-      const source = await this.verify(row.source_id);
-      if (source.generation !== row.generation)
-        throw new Error("Source changed");
-      renewed = true;
+    if (row.access_until <= this.now() + RENEW_AHEAD_MS) {
+      let source: SourceRef | undefined;
+      try {
+        source = await this.confirm(row.source_id);
+      } catch (error) {
+        // A verdict on the film ends the session. Drive being slow or briefly
+        // unreachable does not, while another heartbeat is still due before
+        // access runs out: one failed lookup used to stop the film.
+        if (
+          sourceGone(error) ||
+          row.access_until <= this.now() + LAST_CHANCE_MS
+        )
+          throw error;
+      }
+      if (source) {
+        if (source.generation !== row.generation)
+          throw new Error("Source changed");
+        renewed = true;
+      }
     }
     return this.db.transaction(() => {
       row = this.row(id);
@@ -237,7 +297,7 @@ export class PlaybackService {
           row.ticket_hash,
           row.expires_at,
           now + 120000,
-          renewed ? now + 300000 : row.access_until,
+          renewed ? now + ACCESS_MS : row.access_until,
           id,
         );
       this.db
@@ -250,10 +310,13 @@ export class PlaybackService {
     ticket: string,
     path: string,
   ): Promise<SourceRef & { assetId?: string }> {
+    // Every name an edition may hold, in either layout. This list once named
+    // only the one-language layout's files, so an all-languages edition could
+    // be planned, prepared and offered, and then never played.
     if (
       !/^[A-Za-z0-9_-]{43}$/.test(ticket) ||
-      !/^(raw|video\.mp4|subtitle-\d+\.vtt|index\.m3u8|init\.mp4|seg-\d{5}\.m4s)$/.test(
-        path,
+      !(
+        /^(raw|video\.mp4|subtitle-\d+\.vtt)$/.test(path) || HLS_FILE.test(path)
       )
     )
       throw new Error("Media denied");

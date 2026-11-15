@@ -22,7 +22,7 @@ import {
   Opening,
   usePending,
 } from "../../../packages/ui/src/Loading.js";
-import { useRoute } from "./router.js";
+import { routeParam, useRoute } from "./router.js";
 import { rememberMotion, restoreMotion } from "./motion.js";
 import { Setup } from "./pages/Setup.js";
 import { Library } from "./pages/Library.js";
@@ -133,6 +133,8 @@ async function start() {
 }
 function App({ api }: { api: ApiClient }) {
   const route = useRoute();
+  const movieId = routeParam(route, "/movie/");
+  const playerId = routeParam(route, "/player/");
   const [session, setSession] = useState<SessionState>(),
     [error, setError] = useState(false),
     [retry, setRetry] = useState(0),
@@ -338,13 +340,10 @@ function App({ api }: { api: ApiClient }) {
                 <Settings />
               ) : route === "/watchlist" ? (
                 <Watchlist />
-              ) : route.startsWith("/movie/") ? (
-                <Detail id={decodeURIComponent(route.slice(7))} />
-              ) : route.startsWith("/player/") ? (
-                <Player
-                  id={decodeURIComponent(route.slice(8).split("?")[0]!)}
-                  startOver={route.includes("?start=0")}
-                />
+              ) : movieId !== undefined ? (
+                <Detail id={movieId} />
+              ) : playerId !== undefined ? (
+                <Player id={playerId} startOver={route.includes("?start=0")} />
               ) : (
                 <Library />
               )}

@@ -32,6 +32,11 @@ server {
     add_header Strict-Transport-Security "max-age=31536000" always;
     location ~ ^/_worker { return 404; }
     location ^~ /media/ {
+        # Decide on the path as it was written. This location is chosen from
+        # the path with ".." and "%2F" resolved, but the request is passed on
+        # unchanged: "/api/x/..%2f..%2fmedia/y" entered here and reached the
+        # API, and "/_worker/...", without the origin key.
+        if ($request_uri !~ "^/media/s/[A-Za-z0-9_-]+/[A-Za-z0-9][A-Za-z0-9._-]*(\?.*)?$") { return 404; }
         if ($request_method !~ ^(GET|HEAD|OPTIONS)$) { return 405; }
         if ($request_method = OPTIONS) { return 204; }
         add_header Access-Control-Allow-Origin "https://cinema.example.com" always;

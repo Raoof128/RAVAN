@@ -15,3 +15,9 @@ playwright-report/
 .DS_Store
 
 .wrangler/
+# Backups, and stray media at the top level: never committed.
+*.ravan
+/*.mkv
+/*.mp4
+/*.webm
+*.p12

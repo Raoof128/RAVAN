@@ -49,7 +49,7 @@ npx playwright install chromium firefox webkit
 npm run test:e2e
 ```
 
-The local suite currently has 263 passing tests and one conditional HDR skip when `zscale` is absent. The browser suite has 57 tests across Chromium, Firefox and WebKit. Production FFmpeg tests cover 64 subtitle outputs under the worker task limit and a real HDR sample with 38 subtitle tracks. These results do not imply that every file or physical television is supported.
+The local suite currently has 337 passing tests and one conditional HDR skip when `zscale` is absent; one of them runs the real API, worker and FFmpeg end to end. The browser suite has 153 tests across Chromium, Firefox and WebKit. Production FFmpeg tests cover 64 subtitle outputs under the worker task limit and a real HDR sample with 38 subtitle tracks. These results do not imply that every file or physical television is supported.
 
 ## Deploy
 

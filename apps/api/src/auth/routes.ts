@@ -1,3 +1,9 @@
+import {
+  createCipheriv,
+  createDecipheriv,
+  hkdfSync,
+  randomBytes,
+} from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { Database } from "../../../../packages/db/src/open.js";
 import type { AppConfig } from "../config.js";
@@ -29,6 +35,7 @@ const deviceRoutes = new Set([
   "/api/playback/:id",
   "/api/progress",
   "/api/pairing/ack",
+  "/api/pairing/forget",
 ]);
 
 export function registerAuth(
@@ -53,10 +60,66 @@ export function registerAuth(
     ? new MfaService(db, Buffer.from(config.encryptionKey!, "hex"))
     : undefined;
   registerMfaRoutes(app, mfa, config.origin);
-  const pending = new Map<
-    string,
-    { nonce: string; verifier: string; browserHash: string; expires: number }
-  >();
+  // A sign-in attempt lives in the browser that started it, sealed with a key
+  // only this server holds, not in a table here. A table has to be bounded,
+  // and whatever bounds it lets strangers push the owner's attempt out: a
+  // hundred anonymous requests from ten networks used to end any sign-in.
+  const sealKey = configured
+    ? Buffer.from(
+        hkdfSync(
+          "sha256",
+          Buffer.from(config.encryptionKey!, "hex"),
+          Buffer.alloc(0),
+          "ravan:oauth:v1",
+          32,
+        ),
+      )
+    : undefined;
+  const sealed = z.strictObject({
+    state: z.string().regex(/^[a-f0-9]{64}$/),
+    nonce: z.string().min(1).max(128),
+    verifier: z.string().min(1).max(128),
+    expires: z.number().int().positive(),
+  });
+  const aad = Buffer.from("ravan:oauth:v1");
+  const seal = (attempt: z.infer<typeof sealed>) => {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv("aes-256-gcm", sealKey!, iv);
+    cipher.setAAD(aad);
+    const body = Buffer.concat([
+      cipher.update(JSON.stringify(attempt), "utf8"),
+      cipher.final(),
+    ]);
+    return Buffer.concat([iv, cipher.getAuthTag(), body]).toString("base64url");
+  };
+  const unseal = (cookie: string | undefined) => {
+    if (!sealKey || !cookie || cookie.length > 2048) return;
+    try {
+      const bytes = Buffer.from(cookie, "base64url");
+      const decipher = createDecipheriv(
+        "aes-256-gcm",
+        sealKey,
+        bytes.subarray(0, 12),
+      );
+      decipher.setAAD(aad);
+      decipher.setAuthTag(bytes.subarray(12, 28));
+      const parsed = sealed.safeParse(
+        JSON.parse(
+          Buffer.concat([
+            decipher.update(bytes.subarray(28)),
+            decipher.final(),
+          ]).toString("utf8"),
+        ),
+      );
+      return parsed.success ? parsed.data : undefined;
+    } catch {
+      return;
+    }
+  };
+  // Answers already acted on, so one cannot be sent twice. Only an answer
+  // carrying a cookie this server sealed is recorded, so strangers cannot fill
+  // it; losing the oldest entry costs nothing, since Google refuses a code twice.
+  const answered = new Map<string, number>();
   const secure = config.origin.startsWith("https://");
   const cookieOptions = {
     httpOnly: true,
@@ -70,24 +133,19 @@ export function registerAuth(
     async (_request, reply) => {
       if (!configured)
         return reply.code(503).send({ error: "google_not_configured" });
-      for (const [key, value] of pending)
-        if (value.expires < Date.now()) pending.delete(key);
-      // Refusing new attempts at capacity lets anonymous requests lock the owner
-      // out: ten starts a minute from one address fill 100 ten-minute slots. Drop
-      // the oldest abandoned attempt instead; a Map iterates in insertion order.
-      while (pending.size >= 100)
-        pending.delete(pending.keys().next().value as string);
       const state = secret(),
         nonce = secret(),
-        verifier = secret(),
-        browser = secret();
-      pending.set(hash(state), {
-        nonce,
-        verifier,
-        browserHash: hash(browser),
-        expires: Date.now() + 600000,
-      });
-      reply.setCookie("mov_oauth", browser, { ...cookieOptions, maxAge: 600 });
+        verifier = secret();
+      reply.setCookie(
+        "mov_oauth",
+        seal({
+          state: hash(state),
+          nonce,
+          verifier,
+          expires: Date.now() + 600000,
+        }),
+        { ...cookieOptions, maxAge: 600 },
+      );
       const challenge = Buffer.from(hash(verifier), "hex").toString(
         "base64url",
       );
@@ -106,14 +164,20 @@ export function registerAuth(
     if (!query.success || !store)
       return reply.code(400).send({ error: "invalid_oauth_callback" });
     const key = hash(query.data.state),
-      entry = pending.get(key);
+      entry = unseal(request.cookies.mov_oauth),
+      now = Date.now();
     if (
       !entry ||
-      entry.expires < Date.now() ||
-      !equal(entry.browserHash, hash(request.cookies.mov_oauth ?? ""))
+      entry.expires < now ||
+      !equal(entry.state, key) ||
+      (answered.get(key) ?? 0) > now
     )
       return reply.code(400).send({ error: "invalid_oauth_state" });
-    pending.delete(key);
+    for (const [used, expires] of answered)
+      if (expires <= now) answered.delete(used);
+    while (answered.size >= 1000)
+      answered.delete(answered.keys().next().value as string);
+    answered.set(key, entry.expires);
     reply.clearCookie("mov_oauth", { path: "/" });
     try {
       const grant = await provider.exchange(

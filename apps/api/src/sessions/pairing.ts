@@ -18,6 +18,8 @@ type Row = {
   device_id: string | null;
   delivered_at: number | null;
 };
+/** How long an approved credential waits for its screen to collect it. */
+const DELIVERY_MS = 60000;
 export class PairingService {
   private polled = new Map<string, number>();
   constructor(
@@ -25,11 +27,29 @@ export class PairingService {
     private key: Buffer,
     private now = Date.now,
   ) {}
+  /**
+   * A credential the owner approved is held for the screen to collect for one
+   * minute. One that was never collected and acknowledged is held by nobody,
+   * and the screen discards anything it could not acknowledge, so it must not
+   * stay valid, or listed among the owner's screens. Then drop requests that
+   * have run out.
+   */
+  expire() {
+    const now = this.now();
+    this.db.transaction(() => {
+      this.db
+        .prepare(
+          "UPDATE devices SET revoked_at=? WHERE revoked_at IS NULL AND id IN (SELECT device_id FROM pairing_requests WHERE state='approved' AND delivered_at<?)",
+        )
+        .run(now, now - DELIVERY_MS);
+      this.db
+        .prepare("DELETE FROM pairing_requests WHERE expires_at<?")
+        .run(now - DELIVERY_MS);
+    })();
+  }
   create(name: string) {
     const now = this.now();
-    this.db
-      .prepare("DELETE FROM pairing_requests WHERE expires_at<?")
-      .run(now - 60000);
+    this.expire();
     for (const [id, time] of this.polled)
       if (time < now - 600000) this.polled.delete(id);
     // Anyone can start a pairing, so a full table must not refuse a real TV.
@@ -127,7 +147,7 @@ export class PairingService {
       throw new Error("Poll too quickly");
     this.polled.set(id, now);
     if (row.state === "pending") return { state: "pending" };
-    if (row.delivered_at === null || now - row.delivered_at > 60000)
+    if (row.delivered_at === null || now - row.delivered_at > DELIVERY_MS)
       throw new Error("Delivery expired");
     const bytes = Buffer.from(row.delivery_ciphertext!, "base64"),
       cipher = createDecipheriv("aes-256-gcm", this.key, bytes.subarray(0, 12));
@@ -152,7 +172,7 @@ export class PairingService {
       !row ||
       row.state !== "approved" ||
       row.delivered_at === null ||
-      this.now() - row.delivered_at > 60000
+      this.now() - row.delivered_at > DELIVERY_MS
     )
       throw new Error("Pairing unavailable");
     this.db

@@ -4,7 +4,7 @@ RAVAN is a private, single-owner cinema: a Fastify API, a media worker, a Cloudf
 
 ## Before changing code
 
-- Read `README.md`, `docs/backend-usage.md`, the maintainer's private notes and the maintainer's private notes. For the web or TV client, also read `docs/visual-design.md`, the maintainer's private notes and the maintainer's private notes.
+- Read `README.md`, `docs/backend-usage.md`, the maintainer's private notes, the maintainer's private notes, the maintainer's private notes and the maintainer's private notes. For the web or TV client, also read `docs/visual-design.md`, the maintainer's private notes and the maintainer's private notes.
 - Run `npm run check` and `npm test` first and note anything already failing.
 - Work on a branch. Do not push to `main`, deploy, or touch the server without the owner's say-so.
 - Publishing goes to the public repository as a sanitized snapshot on a branch, never the private branch. Releasing follows the Releasing section of the maintainer's private notes and needs the owner's approval each time.
@@ -12,22 +12,32 @@ RAVAN is a private, single-owner cinema: a Fastify API, a media worker, a Cloudf
 ## Rules the code depends on
 
 - **Authorize by matched route.** Guards read `request.routeOptions.url`. Never decide on `request.url`: the router decodes a path before matching, so the raw text and the handler can disagree.
+- **The API answers only plainly written paths.** A request whose path holds `%2F`, `%5C`, `%2E`, `%25`, a backslash, `//` or a dot segment is refused before routing (`apps/api/src/app.ts`). The proxy in front resolves those when it chooses a rule and this router does not, and each such difference is a way round a layer. Test crafted paths over a real socket: `app.inject` tidies them first.
 - **Every `/api` route is private unless listed** in `publicApiRoutes` in `apps/api/src/auth/routes.ts`. A route a paired device may call must be added to a device set there.
 - **A library session is created in one place**, inside the MFA verification transaction in `apps/api/src/auth/mfa.ts`. Google sign-in alone yields only a challenge.
+- **A sign-in attempt lives in its own browser**, sealed into the `mov_oauth` cookie. Do not bring back a server-side table of attempts: anything that bounds it lets strangers push the owner's attempt out.
+- **A paired screen is bounded in the work it can ask for** (`SCREEN_WAITING_LIMIT` in `apps/api/src/media/planner.ts`), and can revoke only itself (`POST /api/pairing/forget`).
 - **State changes need the CSRF token and an exact `Origin`.** `GET` handlers must not change state.
 - **Media is authorized per ticket and per chunk.** Paths under a prepared asset come from a 64-hex ID and a filename matched by regular expression.
 - **A source's generation follows its content, never Drive's `version`.** `contentKey` in `apps/api/src/drive/membership.ts` (checksum and size, else head revision) decides whether a scan keeps the generation and whether verification accepts a file. `version` rises with any change to Drive's record of the file; using it re-prepared films and ended playback.
 - **Drive verification may be reused for five seconds, except after a read.** `verifySource(id, true)` must be used whenever the answer has to postdate bytes just fetched.
 - **Subprocesses take fixed argument arrays** with `shell: false`, protocol and format allowlists, and a timeout. Never store or return FFmpeg stderr; classify it to a fixed code.
 - **Errors leave the API as `{ "error": "<code>" }`** with no paths, filenames, tokens or upstream messages.
-- **Logging stays off for requests.** Tickets and OAuth codes travel in URLs.
+- **Logging stays off for requests.** Tickets and OAuth codes travel in URLs. The one line the API writes is for a request that failed inside the server (5xx): method, matched route pattern, error class and code, each reduced to letters, digits and underscores. Never add the address, a header, a message or data to it.
+- **Routes are declared after the rate limiter is registered** in `apps/api/src/app.ts`. The limiter counts only routes it sees added.
 - **Migrations are immutable and append-only.** Add a new numbered file and list it in `packages/db/src/migrate.ts`.
 - **A job interrupted by a service stop or by a viewer's newer request is released, not failed.** Only real failures and crashes spend attempts.
 - **A client's capability report is a claim.** It may shape that client's own request. It is stored for background planning only when the request is authenticated by the owner's browser session, never because of a profile name.
 - **No capabilities means the previous behaviour and the previous asset ids.** An edition only some clients can play carries a `variant` in its asset id and must never replace the universal H.264 one.
+- **FFmpeg and FFprobe get none of the service's environment** (`runProcess` passes a path, a temporary directory and a locale), and a bound on the pixels they may decode for a picture (`MAX_COVER_PIXELS`, `MAX_PICTURE_PIXELS`). A film, its cover and its captions are data the server did not write.
 - **FFmpeg never receives the worker key.** It gets a grant for one file. Do not put any long-lived credential on a command line.
 - **A playlist is served only in the exact form this server writes.** `parsePlaylist` in `apps/worker/src/hls.ts` is the gate; a player fetches every address a playlist names. Never serve a playlist, or add a tag, without going through it.
 - **An edition being written is offered only in state `streaming`, and withdrawn on any failure.** Its files appear only when complete (`temp_file`); do not write into an edition's directory any other way.
+- **One list of an edition's file names: `HLS_FILE` in `apps/worker/src/hls.ts`.** Every gate that admits a media file by name uses it. A second, narrower list in the media route once made every all-languages edition unplayable while each side's tests passed.
+- **A failed Drive call is a verdict only if `sourceGone()` says so** (`apps/api/src/drive/sync.ts`). Drive reports a usage limit as 403 as well as 429; the client turns both into 429. Never end a session, fail a job or close the library on any other failure.
+- **A heartbeat must answer within the player's patience.** It waits eight seconds for Drive, and access is extended only by a confirmation that succeeded.
+- **Languages are compared with `sameLanguage`** (`packages/contracts/src/languages.ts`), by the server and the players alike: "en" is "eng"; "fa", "fas" and "per" are one language.
+- **A film's length for an edition is `pictureMs(probe)`**, not `probe.durationMs`: sound and captions can outlast the last frame.
 - **The API and worker ship together.** They share the database schema and the `/_worker` protocol.
 
 ## Rules the interface depends on
@@ -62,6 +72,7 @@ RAVAN is a private, single-owner cinema: a Fastify API, a media worker, a Cloudf
 - Tests use temporary directories, synthetic media and fake Google clients. Never use real tokens, the real database or personal films.
 - Do not skip, delete or loosen a test to make a run pass.
 - The browser suites mock the API. Backend behaviour is proven in `tests/backend` and `tests/deploy`.
+- `tests/backend/end-to-end.test.ts` runs the real API, the real worker and FFmpeg, and fetches a film as a player does. When the worker starts writing anything a player fetches, or the API starts serving it, extend that test: testing each side alone is how the two came to disagree.
 
 ## Verification commands
 
@@ -203,3 +214,39 @@ Raouf: 2026-11-16 (Australia/Sydney), fifteenth entry
 - Files changed: the maintainer's private notes, `CHANGELOG.md`, this file.
 - Verification: each claim's quote was accepted as verbatim by Zurvan; every RAVAN decision page carries `project: "mov"`.
 - Rule: Zurvan keys ingested files by path, and another project's the maintainer's private notes already holds that key. Ingest RAVAN's guide as a copy under `raw/docs/` with a `ravan-` name.
+
+Raouf: 2026-11-16 (Australia/Sydney), sixteenth entry
+
+- Scope: second full backend audit, with fixes, on `audit/backend-2026-11-16`.
+- Summary: 11 findings fixed. The main one: films with several audio tracks could not be played in the web player, because the media route refused the files of an all-languages edition. Also Drive hiccups and usage limits ending playback, the saved audio language matched two ways, films whose sound outruns their picture, a stop that hung, and faults that left no trace. See the maintainer's private notes.
+- Files changed: see `CHANGELOG.md`.
+- Verification: 50 files, 326 passed, 1 skipped; `npm run check`, all three builds and `npm run fixtures` pass; `npm run test:e2e` 153 passed; two independent reviews.
+- Follow-ups: release (owner's approval), then clear queued forced re-encodes and play a two-language film signed in; R-20 (player asks for a re-encode after any failed start); R-26 (television and the `null` origin) on a physical set; continuous integration.
+- Rule: a feature that crosses the worker and the API is not tested until one test crosses with it. Extend `tests/backend/end-to-end.test.ts`.
+
+Raouf: 2026-11-16 (Australia/Sydney), seventeenth entry
+
+- Scope: release the second-audit fixes, approved by the owner.
+- Summary: backend `89ed78bc12ad-7de5ef21` and Worker version `2ccce3c7` are live. The rehearsal showed the main defect had been hit on production that morning. See the maintainer's private notes.
+- Files changed: the maintainer's private notes, the maintainer's private notes, the maintainer's private notes, `CHANGELOG.md`, this file.
+- Verification: rehearsal on a copy of the live database and the real prepared files, 9 of 9 edge checks, 12 release tests, sign-in page in two browsers, Sentinel host checks; no rollback needed.
+- Follow-ups: signed-in play of a two-language film on production; clear old rollback material; publish the sanitized snapshot if wanted.
+- Rule: rehearse a media fix by reading the real prepared files through the staged code (session, `authorizeMedia`, `servePlaylist`, `localReader`), not only by planning. Planning alone passed five rehearsals while nothing could be played.
+
+Raouf: 2026-11-16 (Australia/Sydney), eighteenth entry
+
+- Scope: red-team exercise on the whole project, on `audit/backend-2026-11-16`.
+- Summary: no attack reached the library or ran script in the owner's browser. Eleven worked in lesser ways and ten are fixed: the origin key could be walked round with `%2f..` paths (confirmed on the live origin), strangers could end a sign-in, a paired screen could flood the conversion queue, a cover image or caption track could exhaust memory or freeze the player, FFmpeg held the service's secrets, and "Disconnect this TV" revoked nothing. See the maintainer's private notes.
+- Files changed: see `CHANGELOG.md`.
+- Verification: 53 files, 337 passed, 1 skipped; `npm run check`; all four builds; 153 browser tests; 12 release tests.
+- Follow-ups: release (owner's approval), including the new Nginx rule; decide RT-10 (how paired screens are approved and kept); the lower open items in section 5 of the report.
+- Rule: when two layers each decide on a request's path, test that they read it the same way, with the path sent over a real socket as written. `app.inject` and URL parsers tidy paths before the code under test sees them.
+
+Raouf: 2026-11-16 (Australia/Sydney), nineteenth entry
+
+- Scope: release the red-team fixes, approved by the owner.
+- Summary: backend `b0dab6b8d873-c4619299`, Worker version `53ad7734` and one Nginx rule are live. See the maintainer's private notes.
+- Files changed: the maintainer's private notes, the maintainer's private notes, the maintainer's private notes, `CHANGELOG.md`, this file.
+- Verification: rehearsal on a copy of the live database, the crafted addresses retried on the server and from outside, 9 of 9 edge checks, 12 release tests, sign-in page in two browsers, Sentinel host checks; no rollback needed.
+- Follow-ups: the owner signs in on production; rebuild the television package; clear old rollback material.
+- Rule: a private document named in a test comment or in the changelog stops the public export. Name the report in words, not by path, anywhere outside `docs/`.

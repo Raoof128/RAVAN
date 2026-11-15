@@ -31,6 +31,15 @@ export const POSTER = { width: 480, height: 720 };
 export const STILL_WIDTH = 1280;
 /** Images larger than this are refused, whatever their source. */
 export const MAX_ARTWORK_BYTES = 8 * 1024 * 1024;
+/**
+ * The most pixels FFmpeg may decode for a picture: the largest frame a film
+ * can have here. A cover is the film's own data, and a flat image of a quarter
+ * of a billion pixels is under a megabyte to carry and about a gigabyte to
+ * decode, inside a worker that shares two with a running conversion.
+ */
+export const MAX_PICTURE_PIXELS = 8192 * 8192;
+/** A cover needs far less: 40 megapixels is larger than any poster scan. */
+export const MAX_COVER_PIXELS = 40_000_000;
 
 export function artworkDirectory(dataDir: string) {
   return join(dataDir, "artwork");
@@ -82,6 +91,8 @@ export async function extractArtwork(
 ): Promise<Picture[]> {
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const input = [
+    "-max_pixels",
+    String(MAX_PICTURE_PIXELS),
     "-protocol_whitelist",
     "file,http,tcp",
     "-format_whitelist",
@@ -219,6 +230,8 @@ export async function extractArtwork(
           const info = await stat(raw);
           if (info.size > MAX_ARTWORK_BYTES) continue;
           from = [
+            "-max_pixels",
+            String(MAX_COVER_PIXELS),
             "-protocol_whitelist",
             "file",
             "-format_whitelist",
@@ -226,7 +239,17 @@ export async function extractArtwork(
             "-i",
             raw,
           ];
-        } else from = [...input, "-i", source, "-map", `0:${image.index}`];
+        } else
+          from = [
+            ...input,
+            // Later options win: a cover is held to a cover's size.
+            "-max_pixels",
+            String(MAX_COVER_PIXELS),
+            "-i",
+            source,
+            "-map",
+            `0:${image.index}`,
+          ];
         await keep(await shape(from, kind), kind, "cover");
       } catch {
         // A damaged cover is no reason to go without a picture.
@@ -246,8 +269,10 @@ export async function extractArtwork(
         "tonemap=tonemap=mobius:desat=2",
         "zscale=t=bt709:m=bt709:r=tv",
       );
-    // The most representative of a second of frames at each point.
-    filters.push("thumbnail=n=24");
+    // The most representative of a second of frames at each point. They are
+    // made small first: the filter holds all 24, and at full size an 8K film's
+    // would be well over a gigabyte.
+    filters.push(`scale=${STILL_WIDTH}:-2`, "thumbnail=n=24");
     const seconds = probe.durationMs / 1000;
     const points = (seconds > 120 ? [0.2, 0.35, 0.5, 0.65] : [0.3, 0.6]).map(
       (f) => Math.max(0, Math.floor(seconds * f)),
