@@ -185,3 +185,27 @@ it("serves prepared ranges and captions only through authorized tickets", async 
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+it("evicts nothing when even evicting everything would not make room", async () => {
+  const dir = await realpath(await mkdtemp(join(tmpdir(), "ravan-room-")));
+  try {
+    const h = await sessionFixture();
+    const id = "e".repeat(64);
+    await mkdir(join(dir, id));
+    await writeFile(join(dir, id, "video.mp4"), "0123456789");
+    h.db
+      .prepare(
+        "INSERT INTO prepared_assets(id,source_id,generation,quality,audio_track,state,last_used,size_bytes) VALUES(?,'f','generation','auto',0,'ready',0,'10')",
+      )
+      .run(id);
+    await expect(makeRoom(h.db, dir, Number.MAX_SAFE_INTEGER)).rejects.toThrow(
+      "Prepared storage full",
+    );
+    expect(
+      h.db.prepare("SELECT state FROM prepared_assets WHERE id=?").get(id),
+    ).toEqual({ state: "ready" });
+    expect((await stat(join(dir, id, "video.mp4"))).isFile()).toBe(true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

@@ -62,6 +62,52 @@ export async function verifyBoundary(
     throw Error("Root storage reserve unavailable");
   return space;
 }
+/** Free space kept beyond an edition's own room. */
+export const ROOM_RESERVE = 256 * 1024 ** 2;
+/**
+ * Room an edition is given before it starts: a copy needs about the source's
+ * size; an encode its bitrate for the film's length. Never less than 64 MiB,
+ * and never more than the volume less a margin for its neighbours.
+ */
+export function editionBytes(input: {
+  copyVideo: boolean;
+  bitrateKbps: number;
+  durationMs: number;
+  sourceBytes: number;
+  capacity: number;
+}) {
+  const largest = Math.max(1024 ** 3, input.capacity - 2 * 1024 ** 3);
+  const estimate = input.copyVideo
+    ? input.sourceBytes * 1.05
+    : ((((input.bitrateKbps * 1000) / 8 + 24000) * input.durationMs) / 1000) *
+      1.15;
+  return Math.ceil(Math.min(largest, Math.max(64 * 1024 ** 2, estimate)));
+}
+/**
+ * The finished editions that would be evicted, oldest use first, to give an
+ * edition `needed` bytes; undefined when evicting everything that is not
+ * being watched would still not be enough.
+ */
+export function roomPlan(
+  db: Database,
+  available: number,
+  needed: number,
+  now = Date.now(),
+) {
+  const rows = db
+    .prepare(
+      "SELECT id,source_id sourceId,size_bytes size FROM prepared_assets WHERE state='ready' AND id NOT IN (SELECT asset_id FROM playback_sessions WHERE revoked_at IS NULL AND lease_until>? AND asset_id IS NOT NULL) ORDER BY last_used",
+    )
+    .all(now) as Array<{ id: string; sourceId: string; size: string | null }>;
+  const evicted: Array<{ id: string; sourceId: string }> = [];
+  let room = available;
+  for (const row of rows) {
+    if (room > needed + ROOM_RESERVE) break;
+    evicted.push({ id: row.id, sourceId: row.sourceId });
+    room += Number(row.size ?? 0);
+  }
+  return room > needed + ROOM_RESERVE ? evicted : undefined;
+}
 export async function makeRoom(
   db: Database,
   directory: string,
@@ -86,7 +132,10 @@ export async function makeRoom(
     const s = await statfs(directory, { bigint: true });
     return Number(s.bavail * s.bsize);
   };
-  const reserve = 256 * 1024 ** 2;
+  // Evict nothing unless evicting can make enough room: otherwise films would
+  // be lost for an edition that still could not be made.
+  if (!roomPlan(db, await available(), needed))
+    throw Error("Prepared storage full");
   // Single leased worker owns cleanup. Never evict an asset referenced by a live session.
   const rows = db
     .prepare(
@@ -94,7 +143,7 @@ export async function makeRoom(
     )
     .all(Date.now()) as { id: string }[];
   for (const row of rows) {
-    if ((await available()) > needed + reserve) break;
+    if ((await available()) > needed + ROOM_RESERVE) break;
     if (!ASSET_ID.test(row.id)) throw Error("Invalid asset");
     // This conditional update and session creation serialize on SQLite's writer lock.
     const removed = db
@@ -105,7 +154,7 @@ export async function makeRoom(
     if (!removed.changes) continue;
     await rm(join(directory, row.id), { recursive: true, force: true });
   }
-  if ((await available()) <= needed + reserve)
+  if ((await available()) <= needed + ROOM_RESERVE)
     throw Error("Prepared storage full");
 }
 /**

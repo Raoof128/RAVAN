@@ -2,6 +2,7 @@ import { createContext, useContext } from "react";
 import type {
   MovieCard,
   MovieDetail,
+  PictureChoice,
   SessionState,
   LibraryStatus,
   Preferences,
@@ -115,6 +116,12 @@ export function createApiClient(baseUrl: string) {
     },
     detail(id: string) {
       return request<MovieDetail>(`/api/movies/${encodeURIComponent(id)}`);
+    },
+    /** What choosing each picture would do to the prepared films (owner only). */
+    pictures(id: string) {
+      return request<{ items: PictureChoice[] }>(
+        `/api/movies/${encodeURIComponent(id)}/pictures`,
+      );
     },
     library() {
       return request<LibraryStatus>("/api/library");

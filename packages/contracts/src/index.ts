@@ -9,6 +9,16 @@ export type ClientCapabilities = {
   audio: Array<"aac" | "mp3" | "ac3" | "eac3" | "flac" | "opus" | "vorbis">;
   containers: Array<"mp4" | "webm" | "matroska">;
 };
+/**
+ * What choosing a picture would do: play a copy that is ready, prepare one in
+ * free space, prepare one by removing `films` other films' prepared copies,
+ * or nothing, because the space it needs is being watched.
+ */
+export type PictureChoice = {
+  quality: Quality;
+  state: "ready" | "fits" | "removes" | "too-large" | "unavailable";
+  films?: number;
+};
 export type PlaybackOptions = {
   quality?: Quality;
   audioTrack?: number;

@@ -50,6 +50,26 @@ export function registerSessions(
         options,
       ),
   );
+  // The owner's own: what choosing each picture would do to the prepared films.
+  app.get<{ Params: { id: string } }>(
+    "/api/movies/:id/pictures",
+    async (request, reply) => {
+      const id = idSchema.safeParse(request.params.id);
+      if (!id.success)
+        return reply.code(400).send({ error: "invalid_request" });
+      const source = db
+        .prepare(
+          "SELECT id fileId,generation,CAST(size_bytes AS TEXT) sizeBytes FROM source_files WHERE movie_id=? AND available=1",
+        )
+        .all(id.data) as Array<{
+        fileId: string;
+        generation: string;
+        sizeBytes: string;
+      }>;
+      if (source.length !== 1) return { items: [] };
+      return { items: await planner.pictureChoices(source[0]!) };
+    },
+  );
   app.post("/api/playback", async (request, reply) => {
     const body = playbackSchema.safeParse(request.body);
     if (!body.success)

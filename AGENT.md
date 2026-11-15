@@ -177,3 +177,21 @@ Raouf: 2026-11-15 (Australia/Sydney), twelfth entry
 - Verification: rehearsal, 9 of 9 edge checks, 12 release tests, sign-in page in two browsers, Sentinel host checks; no rollback needed.
 - Follow-ups: room check before eviction; warn in the Picture list that a 4K encode replaces the other prepared films; signed-in check on production; clear old rollback material.
 - Rule: before activating a release, read the live job queue. A restart throws away a running encode, so wait until no long encode is running and no one is watching.
+
+Raouf: 2026-11-16 (Australia/Sydney), thirteenth entry
+
+- Scope: the panel release's two follow-ups, and preparation speed.
+- Summary: identical editions under another quality's name are reused, ready or in progress; the worker checks room before evicting; the Picture list shows each choice's consequence from server disk figures.
+- Files changed: see `CHANGELOG.md`.
+- Verification: 48 files, 309 passed, 1 skipped; `npm run check`; 153 browser tests.
+- Follow-ups: release; rehearse `pictureChoices` against a copy of the live database first.
+- Rule: an edition's identity includes its quality name. Two names can mean the same plan, so look for a twin (`sameEditions`) before making anything.
+
+Raouf: 2026-11-16 (Australia/Sydney), fourteenth entry
+
+- Scope: release the same-copy and room work, approved by the owner.
+- Summary: backend `e49e0c964e69-9f306da6` and Worker version `a019a0f0` are live. See the maintainer's private notes.
+- Files changed: the maintainer's private notes, the maintainer's private notes, `CHANGELOG.md`, this file.
+- Verification: rehearsal on a copy of the live database, 9 of 9 edge checks, 12 release tests, sign-in page in two browsers, Sentinel host checks; no rollback needed.
+- Follow-ups: signed-in check of the Picture list on production; clear old rollback material.
+- Rule: run the release tests before the deploy, then restore `docs/testing/screenshots/login-production-1488.png`; the deploy refuses an uncommitted tree.

@@ -1,5 +1,6 @@
 import type {
   MovieDetail,
+  PictureChoice,
   Quality,
   TrackOption,
 } from "../../../../packages/contracts/src/index.js";
@@ -95,6 +96,21 @@ export function Player({
     [notice, setNotice] = useState("");
   const title = movie?.title ?? "Your film";
   useTitle(movie?.title);
+  // What choosing each picture would do to the other prepared films. Asked
+  // again whenever what is playing changes, since that changes the answer.
+  const [pictures, setPictures] = useState<PictureChoice[]>([]);
+  useEffect(() => {
+    let active = true;
+    api
+      .pictures?.(id)
+      .then((r) => {
+        if (active) setPictures(Array.isArray(r?.items) ? r.items : []);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [api, id, quality, state.kind]);
   useEffect(() => {
     let active = true;
     // Watching changes what the library shows: positions, and what is in progress.
@@ -376,11 +392,33 @@ export function Player({
   const pictureList: TrackList = {
     options: qualities.map(([id, label]) => {
       const [name, ...rest] = label.split(", ");
-      return { id, label: name!, detail: rest.join(", ") || undefined };
+      const cost = pictures.find((p) => p.quality === id);
+      const consequence =
+        id === quality
+          ? undefined
+          : cost?.state === "ready"
+            ? "ready to play"
+            : cost?.state === "removes" && cost.films
+              ? `removes ${cost.films} prepared ${cost.films === 1 ? "film" : "films"}`
+              : cost?.state === "too-large"
+                ? "no room while other films play"
+                : cost?.state === "unavailable"
+                  ? "not available for this film"
+                  : undefined;
+      return {
+        id,
+        label: name!,
+        detail: [...rest, consequence].filter(Boolean).join(", ") || undefined,
+        disabled:
+          id !== quality &&
+          (cost?.state === "too-large" || cost?.state === "unavailable"),
+      };
     }),
     selected: quality,
     onSelect: (choice) => setQuality(choice as Quality),
-    note: "A different picture is prepared again, and never larger than the original.",
+    note: pictures.some((p) => p.state === "removes" && p.quality !== quality)
+      ? "Preparing a picture makes room by removing the prepared copies of the films least recently watched; they are prepared again when next played."
+      : "A different picture is prepared again unless a copy is ready, and is never larger than the original.",
   };
   const activeSubtitle = streamSubtitles.find((o) => o.active);
   const trackSummary = [

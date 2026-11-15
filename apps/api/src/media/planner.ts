@@ -1,11 +1,19 @@
 import { PROBE_VERSION, type Probe } from "../../../worker/src/probe.js";
 import { profiles } from "./profiles.js";
+import { statfs } from "node:fs/promises";
 import {
   clientDecodes,
   conversionPlan,
+  qualities,
   textSubtitles,
+  type Quality,
 } from "../../../worker/src/compatibility.js";
-import { assetId, CAPACITY } from "../../../worker/src/prepared-store.js";
+import {
+  assetId,
+  CAPACITY,
+  editionBytes,
+  roomPlan,
+} from "../../../worker/src/prepared-store.js";
 import type { Database } from "../../../../packages/db/src/open.js";
 import type {
   SourceRef,
@@ -13,6 +21,7 @@ import type {
   PlaybackPlan,
   PlaybackOptions,
   ClientCapabilities,
+  PictureChoice,
 } from "../../../../packages/contracts/src/index.js";
 import { JobQueue } from "../../../worker/src/leases.js";
 import { HLS_MAX_AUDIO } from "../../../worker/src/hls.js";
@@ -127,6 +136,135 @@ export class MediaPlanner {
       )
       .run(CAPABILITIES_KEY, value, this.now());
   }
+  /** A copy this large would not fit the prepared volume beside anything else. */
+  private tooLargeToCopy(source: SourceRef) {
+    return (
+      Number(source.sizeBytes) >
+      Math.max(0, (this.settings.capacityBytes ?? CAPACITY) - 4 * 1024 ** 3)
+    );
+  }
+  /**
+   * What choosing each picture would do, for the web player: play a copy that
+   * is ready, make one in free space, make one by removing other films'
+   * prepared copies (and how many films), or nothing, because the space is
+   * being watched. Plans for the browser the owner last played from.
+   */
+  async pictureChoices(source: SourceRef): Promise<PictureChoice[]> {
+    const row = this.db
+      .prepare("SELECT metadata FROM tracks WHERE id=? AND kind='probe'")
+      .get(`probe-${source.fileId}`) as { metadata: string } | undefined;
+    const record = row
+      ? (JSON.parse(row.metadata) as {
+          generation: string;
+          probe: Probe;
+          version?: number;
+        })
+      : undefined;
+    if (
+      !this.preparedDir ||
+      !record ||
+      record.generation !== source.generation ||
+      !record.probe.video
+    )
+      return [];
+    const probe = record.probe;
+    const caps =
+      record.version === PROBE_VERSION
+        ? storedCapabilities(this.db)
+        : undefined;
+    const file = this.db
+      .prepare("SELECT name,mime_type mimeType FROM source_files WHERE id=?")
+      .get(source.fileId) as FileHint | undefined;
+    const direct = choosePlayback(probe, "web", caps, file).mode === "direct";
+    const forceFor = (q: Quality) =>
+      q === "auto" && this.tooLargeToCopy(source);
+    const plans = new Map(
+      qualities.map((q) => {
+        try {
+          return [q, conversionPlan(probe, q, forceFor(q), caps?.video)];
+        } catch {
+          return [q, undefined];
+        }
+      }),
+    );
+    const readyQualities = new Set(
+      (
+        this.db
+          .prepare(
+            "SELECT quality FROM prepared_assets WHERE source_id=? AND generation=? AND state='ready' AND format=?",
+          )
+          .all(
+            source.fileId,
+            source.generation,
+            this.settings.format ?? "mp4",
+          ) as Array<{ quality: string }>
+      ).map((r) => r.quality),
+    );
+    // Free space on the volume, as configured: the filesystem's own figure
+    // could be larger than the share prepared films may use.
+    const capacity = this.settings.capacityBytes ?? CAPACITY;
+    const used = Number(
+      (
+        this.db
+          .prepare(
+            "SELECT coalesce(sum(CAST(size_bytes AS INTEGER)),0) n FROM prepared_assets WHERE state='ready'",
+          )
+          .get() as { n: number }
+      ).n,
+    );
+    const space = await statfs(this.preparedDir, { bigint: true }).catch(
+      () => undefined,
+    );
+    const available = Math.max(
+      0,
+      Math.min(
+        space ? Number(space.bavail * space.bsize) : Infinity,
+        capacity - used,
+      ),
+    );
+    const readyFilms = new Map<string, number>();
+    for (const r of this.db
+      .prepare(
+        "SELECT source_id sourceId,count(*) n FROM prepared_assets WHERE state='ready' GROUP BY source_id",
+      )
+      .all() as Array<{ sourceId: string; n: number }>)
+      readyFilms.set(r.sourceId, r.n);
+    return qualities.map((quality): PictureChoice => {
+      const plan = plans.get(quality);
+      if (!plan) return { quality, state: "unavailable" };
+      const key = JSON.stringify(plan);
+      if (
+        (direct &&
+          (quality === "auto" ||
+            quality === "original" ||
+            plan.height === probe.video!.height)) ||
+        qualities.some(
+          (q) => readyQualities.has(q) && JSON.stringify(plans.get(q)) === key,
+        )
+      )
+        return { quality, state: "ready" };
+      const needed = editionBytes({
+        copyVideo: plan.copyVideo,
+        bitrateKbps: plan.bitrate,
+        durationMs: probe.durationMs,
+        sourceBytes: Number(source.sizeBytes),
+        capacity,
+      });
+      const evicted = roomPlan(this.db, available, needed, this.now());
+      if (!evicted) return { quality, state: "too-large" };
+      // Films that would be left with no prepared copy at all.
+      const lost = new Map<string, number>();
+      for (const e of evicted)
+        if (e.sourceId !== source.fileId)
+          lost.set(e.sourceId, (lost.get(e.sourceId) ?? 0) + 1);
+      const films = [...lost].filter(
+        ([id, n]) => n >= (readyFilms.get(id) ?? 0),
+      ).length;
+      return films
+        ? { quality, state: "removes", films }
+        : { quality, state: "fits" };
+    });
+  }
   async planPlayback(
     source: SourceRef,
     profile: DeviceProfile,
@@ -214,15 +352,11 @@ export class MediaPlanner {
     const choice = choosePlayback(probe, profile.id, capabilities, file);
     if (choice.mode === "unsupported")
       return { ...choice, assetId: source.fileId };
-    const forceEncode =
-      options.forceCompatible ||
+    const forceFor = (q: Quality) =>
+      Boolean(options.forceCompatible) ||
       // A copy this large would not fit the prepared volume beside anything else.
-      (quality === "auto" &&
-        Number(source.sizeBytes) >
-          Math.max(
-            0,
-            (this.settings.capacityBytes ?? CAPACITY) - 4 * 1024 ** 3,
-          ));
+      (q === "auto" && this.tooLargeToCopy(source));
+    const forceEncode = forceFor(quality);
     let conversion;
     try {
       conversion = conversionPlan(
@@ -254,15 +388,48 @@ export class MediaPlanner {
         assetId: source.fileId,
         reason: "Compatible-version preparation is not configured.",
       };
-    const identity = (variant: string) =>
-      assetId(
+    // Each edition's identity, under one quality's name.
+    const names = (q: Quality, force: boolean) => ({
+      single: assetId(
         source.fileId,
         source.generation,
-        quality,
+        q,
         audio,
-        forceEncode,
-        variant,
-      );
+        force,
+        conversion.variant,
+      ),
+      oneTrack: assetId(
+        source.fileId,
+        source.generation,
+        q,
+        audio,
+        force,
+        [conversion.variant, "hls"].filter(Boolean).join("+"),
+      ),
+      // A streamed edition of a film with several audio tracks carries all of
+      // them, so changing language needs no new edition. Its identity does not
+      // depend on which track was asked for.
+      everyTrack: assetId(
+        source.fileId,
+        source.generation,
+        q,
+        -1,
+        force,
+        [conversion.variant, "hls", "all-audio"].filter(Boolean).join("+"),
+      ),
+    });
+    type Kind = keyof ReturnType<typeof names>;
+    const own = names(quality, forceEncode);
+    // The same edition can go by several names: on a 4K film, Auto, Original
+    // and 2160p all copy the original picture. One made under another name is
+    // used rather than made again, and so is one being made.
+    const twins = sameEditions(
+      probe,
+      quality,
+      conversion,
+      forceFor,
+      capabilities?.video,
+    ).map(([q, force]) => ({ q, force, ids: names(q, force) }));
     const ready = (candidate: string) => {
       const row = this.db
         .prepare("SELECT state,label FROM prepared_assets WHERE id=?")
@@ -281,21 +448,13 @@ export class MediaPlanner {
     // Only the web player is known to play a segmented edition; other clients
     // keep the single file. Each layout has its own identity.
     const streamed = this.settings.format === "hls" && profile.id === "web";
-    const single = identity(conversion.variant);
-    const oneTrack = identity(
-      [conversion.variant, "hls"].filter(Boolean).join("+"),
-    );
-    // A streamed edition of a film with several audio tracks carries all of
-    // them, so changing language needs no new edition. Its identity does not
-    // depend on which track was asked for.
-    const everyTrack = assetId(
-      source.fileId,
-      source.generation,
-      quality,
-      -1,
-      forceEncode,
-      [conversion.variant, "hls", "all-audio"].filter(Boolean).join("+"),
-    );
+    const { single, everyTrack } = own;
+    const readyAs = (kind: Kind) => {
+      for (const ids of [own, ...twins.map((t) => t.ids)]) {
+        const found = ready(ids[kind]);
+        if (found) return found;
+      }
+    };
     // If the all-languages edition could not be made, fall back to one
     // language at a time rather than leave the film unplayable.
     const allAudio =
@@ -307,7 +466,11 @@ export class MediaPlanner {
           .prepare("SELECT state FROM jobs WHERE unique_key=?")
           .get(`browser:${everyTrack}`) as { state: string } | undefined
       )?.state !== "failed";
-    const id = allAudio ? everyTrack : streamed ? oneTrack : single;
+    const kind: Kind = allAudio
+      ? "everyTrack"
+      : streamed
+        ? "oneTrack"
+        : "single";
     // Editions finished earlier play as well as a new one: the all-tracks one,
     // then one with the asked-for track, streamed or as a single file.
     // A viewer is given what is already finished: the all-languages edition,
@@ -315,10 +478,23 @@ export class MediaPlanner {
     // the all-languages edition of a film that has only one-language copies,
     // so that switching language is instant by the time someone tries.
     const finished =
-      ready(id) ??
-      (allAudio && !background ? ready(oneTrack) : undefined) ??
-      (streamed && !(allAudio && background) ? ready(single) : undefined);
+      readyAs(kind) ??
+      (allAudio && !background ? readyAs("oneTrack") : undefined) ??
+      (streamed && !(allAudio && background) ? readyAs("single") : undefined);
     if (finished) return finished;
+    const jobState = (candidate: string) =>
+      (
+        this.db
+          .prepare("SELECT state FROM jobs WHERE unique_key=?")
+          .get(`browser:${candidate}`) as { state: string } | undefined
+      )?.state;
+    const making = twins.find((t) =>
+      ["queued", "running"].includes(jobState(t.ids[kind]) ?? ""),
+    );
+    const [jobQuality, jobForce] = making
+      ? [making.q, making.force]
+      : [quality, forceEncode];
+    const id = (making?.ids ?? own)[kind];
     const asset = this.db
       .prepare("SELECT state,label FROM prepared_assets WHERE id=?")
       .get(id) as { state: string; label: string } | undefined;
@@ -377,7 +553,7 @@ export class MediaPlanner {
           id,
           source.fileId,
           source.generation,
-          quality,
+          jobQuality,
           audio,
           Date.now(),
           streamed ? "hls" : "mp4",
@@ -387,9 +563,9 @@ export class MediaPlanner {
         `browser:${id}`,
         {
           source,
-          quality,
+          quality: jobQuality,
           audio,
-          forceEncode: forceEncode ?? false,
+          forceEncode: jobForce,
           id,
           format: streamed ? "hls" : "mp4",
           ...(allAudio ? { allAudio: true } : {}),
@@ -505,4 +681,29 @@ export function preparationFailureReason(code: string | null) {
     default:
       return "The server could not finish preparing this edition. This does not necessarily mean the file is damaged or unsupported.";
   }
+}
+
+/**
+ * Other qualities whose plan is the same as this one's, so would make the
+ * very same edition under another name.
+ */
+function sameEditions(
+  probe: Probe,
+  quality: Quality,
+  plan: ReturnType<typeof conversionPlan>,
+  forceFor: (q: Quality) => boolean,
+  caps?: readonly string[],
+): Array<[Quality, boolean]> {
+  const key = JSON.stringify(plan);
+  return qualities.flatMap((q): Array<[Quality, boolean]> => {
+    if (q === quality) return [];
+    try {
+      const force = forceFor(q);
+      return JSON.stringify(conversionPlan(probe, q, force, caps)) === key
+        ? [[q, force]]
+        : [];
+    } catch {
+      return [];
+    }
+  });
 }

@@ -668,3 +668,53 @@ it("removes finished editions of content that has since changed, but not one in 
     h.db.prepare("SELECT id FROM prepared_assets ORDER BY id").all(),
   ).toEqual([{ id: current }, { id: playing }, { id: growing }]);
 });
+
+it("plays a copy made under another quality's name when it is the same edition", async () => {
+  // A 4K film: "Auto" and "2160p" both copy the original picture.
+  const h = await fixture({
+    ...probe,
+    video: { ...probe.video!, codec: "hevc", width: 3840, height: 2160 },
+  });
+  const planner = new MediaPlanner(h.db, true, "/prepared", () => 1_000_000, {
+    format: "hls",
+  });
+  const capabilities = {
+    video: ["h264", "hevc"] as Array<"h264" | "hevc">,
+    audio: ["aac"] as Array<"aac">,
+    containers: ["mp4"] as Array<"mp4">,
+  };
+  const auto = await planner.planPlayback(source, web, { capabilities });
+  expect(auto.mode).toBe("prepare");
+  const jobs = () =>
+    h.db
+      .prepare("SELECT id FROM jobs WHERE kind='browser-prepare'")
+      .all() as Array<{ id: string }>;
+  // While it is being made, asking for 2160p joins the same preparation.
+  const joined = await planner.planPlayback(source, web, {
+    capabilities,
+    quality: "2160p",
+  });
+  expect(joined).toMatchObject({ mode: "prepare", assetId: auto.assetId });
+  expect(jobs()).toHaveLength(1);
+  const made = (
+    h.db.prepare("SELECT id FROM prepared_assets").get() as { id: string }
+  ).id;
+  h.db
+    .prepare(
+      "UPDATE prepared_assets SET state='ready',label='2160p · HEVC',size_bytes='15000000000' WHERE id=?",
+    )
+    .run(made);
+  // Once made, it plays at once under either name.
+  for (const quality of ["2160p", "original"] as const)
+    expect(
+      await planner.planPlayback(source, web, { capabilities, quality }),
+    ).toEqual({ mode: "prepared", assetId: made, label: "2160p · HEVC" });
+  expect(jobs()).toHaveLength(1);
+  // A smaller picture is a different edition, and is made.
+  const smaller = await planner.planPlayback(source, web, {
+    capabilities,
+    quality: "1080p",
+  });
+  expect(smaller.mode).toBe("prepare");
+  expect(jobs()).toHaveLength(2);
+});

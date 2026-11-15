@@ -9,6 +9,7 @@ async function cinema(
     subtitleLanguage?: string;
     subtitles?: Array<{ url: string; language: string; label: string }>;
     detail?: object;
+    pictures?: Array<{ quality: string; state: string; films?: number }>;
   },
 ) {
   await page.route("**/api/**", async (route) => {
@@ -32,6 +33,8 @@ async function cinema(
         ],
         ...options.detail,
       };
+    else if (path === "/api/movies/fixture/pictures")
+      body = { items: options.pictures ?? [] };
     else if (path === "/api/preferences")
       body = {
         audioLanguage: "original",
@@ -313,4 +316,41 @@ test("shows the audio menu for a film with one language, and keeps the menus in 
   await expect
     .poll(() => page.evaluate(() => document.fullscreenElement === null))
     .toBe(true);
+});
+
+test("says before choosing what each picture would do to the other prepared films", async ({
+  page,
+}) => {
+  const bytes = await readFile(".local/test-media/synthetic.mp4");
+  await cinema(page, {
+    mediaUrl: "/media/s/test/video.mp4",
+    pictures: [
+      { quality: "auto", state: "ready" },
+      { quality: "480p", state: "ready" },
+      { quality: "720p", state: "fits" },
+      { quality: "1440p", state: "too-large" },
+      { quality: "2160p", state: "removes", films: 2 },
+    ],
+  });
+  await page.route("**/media/s/test/video.mp4", (route) =>
+    route.fulfill({ contentType: "video/mp4", body: bytes }),
+  );
+  await page.goto("/#/player/fixture");
+  await ready(page);
+  const panel = await openTracks(page);
+  await expect(
+    choice(page, "Picture", "2160p 4K removes 2 prepared films"),
+  ).toBeEnabled();
+  await expect(
+    choice(page, "Picture", "480p saves data, ready to play"),
+  ).toBeVisible();
+  await expect(choice(page, "Picture", "720p HD")).toBeVisible();
+  await expect(
+    choice(page, "Picture", "1440p no room while other films play"),
+  ).toBeDisabled();
+  await expect(
+    panel.getByText(
+      "removing the prepared copies of the films least recently watched",
+    ),
+  ).toBeVisible();
 });

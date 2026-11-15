@@ -11,6 +11,7 @@ import {
   pruneStale,
   verifyBoundary,
   makeRoom,
+  editionBytes,
   ASSET_ID,
   CAPACITY,
 } from "./prepared-store.js";
@@ -302,14 +303,13 @@ export class MediaWorker {
           data.forceEncode,
           data.video,
         );
-        const estimate = plan.copyVideo
-          ? Number(data.source.sizeBytes) * 1.05
-          : ((((plan.bitrate * 1000) / 8 + 24000) * parsed.probe.durationMs) /
-              1000) *
-            1.15;
-        const needed = Math.ceil(
-          Math.min(largest, Math.max(64 * 1024 ** 2, estimate)),
-        );
+        const needed = editionBytes({
+          copyVideo: plan.copyVideo,
+          bitrateKbps: plan.bitrate,
+          durationMs: parsed.probe.durationMs,
+          sourceBytes: Number(data.source.sizeBytes),
+          capacity,
+        });
         await makeRoom(this.db, this.storage.directory, needed);
         const space = await statfs(this.storage.directory, { bigint: true });
         const maxBytes = Math.min(

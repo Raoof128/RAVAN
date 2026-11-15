@@ -1,5 +1,42 @@
 # Changelog
 
+## Raouf: 2026-11-16 (Australia/Sydney) — same-copy and room release
+
+**Scope:** release `e49e0c964e69`, approved by the owner.
+
+- Live: backend `e49e0c964e69-9f306da6`, Cloudflare Worker version `a019a0f0-5726-4782-8798-8092e3ca8c80`. Record: the maintainer's private notes.
+- Rehearsed on a copy of the live database: 2160p, Original and Auto on the 4K film all play its one existing copy; the Picture list's figures match each film's state.
+- Verification: 9 of 9 edge checks; the new route refuses visitors who are not signed in; 12 release tests; sign-in page in Chromium and WebKit; Sentinel host checks; no rollback.
+
+## Raouf: 2026-11-16 (Australia/Sydney) — no copy made twice; room checked before films are removed
+
+**Scope:** the owner asked for the two follow-ups from the panel release, and for faster preparation. Same branch.
+
+### What the live server showed
+
+- Copies were quick: a film repackaged with every language took 95 to 117 seconds; the 4K film's 15 GB copy took about 5 minutes. The server was otherwise idle.
+- The "2160p" choice on the 4K film was not an encode. That film is already 2160p, so it made a second copy identical to the one that was ready, and removed every other prepared film to make room for it. The three removed films then had to be prepared again.
+
+### What changed
+
+- **The same edition is never made twice.** When two pictures would give the same result (on a 4K film, Auto, Original and 2160p all keep the original picture), a copy made under either name plays at once, and a copy being made is joined instead of started again. Identities are unchanged, so every existing copy still counts.
+- **Room is checked before anything is removed.** The worker first works out whether removing finished copies could make enough room; if not, it stops without removing any.
+- **The Picture list says what a choice would do,** from the server's own disk figures: "ready to play", "removes 2 prepared films", or unavailable, "no room while other films play". The note under the list explains how room is made. Owner-only `GET /api/movies/:id/pictures`.
+- The worker and the server share one estimate of the room an edition needs (`editionBytes`, `roomPlan` in `apps/worker/src/prepared-store.ts`).
+
+### Files changed
+
+`apps/worker/src/prepared-store.ts`, `apps/worker/src/main.ts`, `apps/api/src/media/planner.ts`, `apps/api/src/sessions/routes.ts`, `packages/contracts/src/index.ts`, `packages/client/src/api.ts`, `apps/web/src/pages/Player.tsx`. Tests: `tests/backend/picture-costs.test.ts` (new); additions to `tests/backend/streaming-playback.test.ts`, `tests/backend/prepared-sessions.test.ts` and `tests/e2e/tracks.spec.ts`.
+
+### Verification
+
+- `npm run check`: passed. `npm test`: 48 files, 309 passed, 1 skipped. `npx playwright test`: 153 passed in Chromium, Firefox and WebKit.
+
+### Speed: where the time goes
+
+- Copies (most films) take one to two minutes and run in the background before anyone presses play. Duplicate work was the real waste, and it is removed.
+- A true encode (a smaller picture, or a format no browser plays) is limited by the server's two shared CPUs; the encoder already uses its fastest measured setting. Making those faster needs a larger server; nothing in the code would.
+
 ## Raouf: 2026-11-15 (Australia/Sydney) — panel release
 
 **Scope:** release the Audio & subtitles panel and background all-languages editions, approved by the owner.
