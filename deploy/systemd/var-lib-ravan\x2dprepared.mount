@@ -1,0 +1,10 @@
+[Unit]
+Description=RAVAN bounded preparation volume
+Before=ravan-api.service ravan-worker.service
+[Mount]
+What=/var/lib/ravan-prepared.ext4
+Where=/var/lib/ravan-prepared
+Type=ext4
+Options=loop,nodev,nosuid,noexec
+[Install]
+WantedBy=multi-user.target

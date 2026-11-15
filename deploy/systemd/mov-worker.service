@@ -1,0 +1,41 @@
+[Unit]
+Description=RAVAN media compatibility worker
+After=ravan-api.service
+Requires=ravan-api.service
+RequiresMountsFor=/var/lib/ravan-prepared
+[Service]
+Type=simple
+User=ravan
+Group=ravan
+WorkingDirectory=/opt/ravan/current
+EnvironmentFile=/etc/ravan/ravan.env
+ExecStart=/opt/ravan/runtimes/node-v24.22.3-linux-x64/bin/node dist/apps/worker/src/main.js
+Restart=on-failure
+RestartSec=5
+UMask=0077
+Environment=PATH=/opt/ravan/runtimes/node-v24.22.3-linux-x64/bin:/usr/bin:/bin
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/ravan /var/lib/ravan-prepared
+MemoryHigh=1536M
+MemoryMax=2G
+CPUQuota=100%
+Nice=10
+CPUWeight=20
+IOWeight=20
+# Each of up to64 WebVTT outputs needs encoder/muxer tasks as well as AV.
+TasksMax=256
+KillMode=control-group
+TimeoutStopSec=20
+IPAddressDeny=any
+IPAddressAllow=localhost
+[Install]
+WantedBy=multi-user.target

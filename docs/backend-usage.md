@@ -1,0 +1,30 @@
+# Local backend setup
+
+1. Copy `.env.example` to `.env`. The populated file is Git-ignored. Use an absolute private data directory for a deployed installation.
+2. Create a Google Cloud OAuth web client with Drive API enabled. Register `http://localhost:5173/auth/google/callback` for local development. The production callback must use the final HTTPS hostname.
+3. Set the client ID/secret and a **verified Google subject** for the owner. Owner binding must come from a controlled, verified identity flow; there is no public first-user-wins setup. Do not paste credentials into chat.
+4. Generate independent 32-byte hexadecimal values locally for `MOV_ENCRYPTION_KEY` and `MOV_WORKER_KEY`. Store the encryption key outside the database and preserve its recovery custody. Changing it makes stored refresh credentials and MFA authenticator seeds unreadable. Preserve it separately from the database backup.
+5. Start API and worker in separate terminals:
+
+```sh
+node --env-file=.env --import tsx apps/api/src/main.ts
+node --env-file=.env --import tsx apps/worker/src/main.ts
+npm run dev:web
+```
+
+6. Open `http://localhost:5173`, sign in as the pinned owner and grant Drive read access. The Google scope can read the account; Mov enforces the selected folder in its own membership checks. Enroll an authenticator, verify its six-digit code and save the one-use recovery codes before entering. On later logins, Google verification is followed by the authenticator. Select the folder ID from your Drive folder URL in Your cinema. Shortcuts are excluded.
+7. Wait for the library refresh, open a film and choose Watch. The worker checks the source format first. Compatible H.264/AAC MP4 can play directly. With `MOV_PREPARED_DIR` configured, other supported formats are prepared automatically as browser-compatible MP4, including HDR-to-SDR conversion and WebVTT text subtitles. Leave Quality on Auto; initial preparation continues in the background.
+
+Only one playback session is active by default. Replacing it requires an explicit button press. Progress is saved periodically and on pause/end. The TV receives its own revocable credential; Google tokens remain on the server.
+
+The worker's private routes are `/_worker/*`. They require a separate key and must also be excluded by the public proxy. Media operations use fixed executable argument arrays, bounded output and timeouts. Source downloads use immutable generation-keyed blocks; the input file is never changed.
+
+The API runs on loopback port 4310. `/healthz` checks liveness; `/readyz` checks the open database and disk reserve. Missing Google configuration leaves the setup screen available and private API routes protected. Normal development commands do not auto-load `.env`; use the explicit commands above when connecting Google.
+
+The current implementation disables application request logging. The proxy template disables ticket-bearing media access logs and error logs. Add telemetry only with explicit redaction of paths, credentials and private filenames.
+
+Source edition reassignment is available to the owner via `PATCH /api/movies/:targetId` with `{ "associateSourceId": "source-id" }` and the normal session/CSRF headers. It retains the original movie's history and revokes playback of the moved source. Multiple available sources currently require disambiguation before playback. Optional TMDB enrichment is not connected; locally edited titles/descriptions and generated fallback posters work independently.
+
+Set `MOV_ORIGIN=http://localhost:5173` when using the Vite proxy locally, matching the exact browser origin and Google callback registration. The production origin must be the final HTTPS hostname. See [MFA recovery](security/mfa-usage.md).
+
+For local preparation, set `MOV_PREPARED_DIR` to an absolute real directory (not a symlink). In production it must be a separate bounded filesystem, with sufficient space reserved on the parent disk. The worker needs FFmpeg with libx264, AAC, zscale and tonemap. The service template allows 256 tasks for up to 64 subtitle outputs while retaining a one-core CPU limit and 2 GiB memory ceiling. Do not lower the task limit to the video encoder's thread count.

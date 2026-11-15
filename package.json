@@ -1,0 +1,70 @@
+{
+  "name": "mov",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.21.0 <25"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "tsx watch apps/api/src/main.ts",
+    "test": "vitest run",
+    "check": "tsc --noEmit && eslint .",
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-migrations.mjs",
+    "start": "node dist/apps/api/src/main.js",
+    "dev:web": "npm run dev -w @mov/web",
+    "build:web": "npm run build -w @mov/web",
+    "test:e2e": "playwright test",
+    "format": "prettier --write apps packages tests scripts *.json *.ts *.js",
+    "dev:worker": "tsx watch apps/worker/src/main.ts",
+    "start:worker": "node dist/apps/worker/src/main.js",
+    "dev:tv": "npm run dev -w @mov/tv",
+    "build:tv": "npm run build -w @mov/tv",
+    "fixtures": "node scripts/generate-media.mjs",
+    "package:tv": "node scripts/package-tv.mjs",
+    "build:cloudflare": "node scripts/build-cloudflare.mjs",
+    "deploy:cloudflare": "node scripts/deploy-cloudflare.mjs"
+  },
+  "dependencies": {
+    "@fastify/cookie": "11.1.5",
+    "@fastify/rate-limit": "11.2.2",
+    "@fontsource/cormorant-garamond": "5.3.0",
+    "@fontsource/dm-sans": "5.3.0",
+    "better-sqlite3": "13.2.0",
+    "fastify": "5.12.8",
+    "google-auth-library": "11.3.4",
+    "hls.js": "1.7.4",
+    "otpauth": "9.6.0",
+    "qrcode": "1.5.4",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@testing-library/react": "16.3.3",
+    "@types/better-sqlite3": "9.6.0",
+    "@types/node": "24.19.2",
+    "@types/qrcode": "1.5.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "eslint": "10.15.0",
+    "jsdom": "31.0.1",
+    "prettier": "3.10.1",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.2",
+    "vite": "8.3.8",
+    "vitest": "5.1.0"
+  },
+  "overrides": {
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.8"
+    }
+  }
+}

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Privacy · RAVAN</title>
+    <style>
+      body {
+        background: #101313;
+        color: #ece9df;
+        font:
+          18px/1.7 system-ui,
+          sans-serif;
+        margin: 0;
+      }
+      main {
+        max-width: 760px;
+        margin: 7vh auto;
+        padding: 28px;
+      }
+      a {
+        color: #b8d6bd;
+      }
+      h1 {
+        font:
+          48px Georgia,
+          serif;
+      }
+      h2 {
+        font-size: 22px;
+        margin-top: 36px;
+      }
+      .brand {
+        letter-spacing: 0.3em;
+        color: #c1a873;
+      }
+      footer {
+        border-top: 1px solid #38423b;
+        margin-top: 48px;
+        padding-top: 20px;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a class="brand" href="/">RAVAN</a>
+      <h1>Your collection stays personal.</h1>
+      <p>
+        RAVAN is a private, single-owner cinema application operated by its
+        account owner. This notice describes the current personal deployment.
+        Updated 15 November 2026.
+      </p>
+      <h2>Google and your library</h2>
+      <p>
+        Google sign-in identifies the configured owner. With your consent, RAVAN
+        requests read-only Google Drive access to discover and stream files from
+        the library folder you select. This Google permission covers reading
+        Drive files; RAVAN does not request permission to edit or delete them.
+        Authentication tokens stay on the backend and are encrypted at rest.
+      </p>
+      <h2>What the server stores</h2>
+      <p>
+        The application stores library metadata, selected folder information,
+        playback progress, watchlist choices, device registrations and security
+        records. It keeps an encrypted authenticator seed and hashed recovery
+        codes. Movie byte ranges may be cached in a private server directory for
+        playback. Metadata backups are encrypted; they do not include the media
+        cache.
+      </p>
+      <h2>Hosting and use</h2>
+      <p>
+        The interface and API routing use Cloudflare. Video delivery uses the
+        owner's server directly over HTTPS. Google provides identity and Drive
+        services. Those providers process connection data under their own
+        policies. RAVAN does not sell Google user data, use it for advertising
+        or use it to train AI models. The deployment has no third-party
+        advertising or analytics scripts.
+      </p>
+      <h2>Retention and control</h2>
+      <p>
+        Library metadata and authentication records remain until the owner
+        removes them. Cached movie ranges are evicted as space is needed.
+        Scheduled encrypted backups retain up to fourteen daily copies. Signing
+        out ends the browser session; it does not delete library data or revoke
+        Google's grant. You can revoke RAVAN's Google access in
+        <a href="https://myaccount.google.com/connections"
+          >Google Account connections</a
+        >. The operator can remove stored application data and backups on
+        request.
+      </p>
+      <h2>Contact</h2>
+      <p>
+        For privacy questions or removal of stored application data, use the
+        support address shown on Google’s RAVAN consent screen.
+      </p>
+      <footer>
+        <a href="/">Return to your cinema</a> · Every Story Flows.
+      </footer>
+    </main>
+  </body>
+</html>

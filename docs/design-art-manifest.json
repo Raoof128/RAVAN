@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-15",
+  "tool": "built-in image_gen",
+  "usage": "Original fictional sample-library artwork. Distributed assets live in packages/ui/src/art.",
+  "assets": [
+    {
+      "name": "coast",
+      "prompt": "Use case: photorealistic-natural. Asset: immersive cinematic backdrop for an original private cinema app, also cropped as a fictional film poster titled The Quiet Coast. Generate a breathtaking widescreen 16:9 film still, no text. Wild Atlantic coast at blue hour, towering dark cliffs along the right edge, a tiny lone figure in a rust-red coat on the right third overlooking luminous pale silver ocean, low rolling fog, pale apricot light fading at the horizon. Shot on 35mm film, subtle analog grain, natural dramatic light, rich blue-green shadows, exquisite fine photographic detail, editorial art-house cinematography. Broad dark ocean negative space on the left 45 percent reserved for large white UI text; distinct rugged cliff and person on the right. No letters, no typography, no borders, no watermarks. This is original fictional film artwork."
+    },
+    {
+      "name": "transit",
+      "prompt": "Use case: photorealistic-natural. Asset: original fictional cinema poster artwork, portrait 2:3. A solitary distant person at an empty elevated train platform at night in a rain-soaked city, train receding toward the vanishing point, warm amber fluorescent lights against deep petrol and near-black shadows, reflections on wet concrete, mist in the distance, long lens compressed architectural framing, authentic 35mm film grain, arresting art-house film still. Cinematic and photographic, restrained amber and teal, no oversaturation, sophisticated negative space at bottom for title overlay. No text, no lettering, no logos or watermark."
+    },
+    {
+      "name": "skies",
+      "prompt": "Use case: photorealistic-natural. Asset: original fictional cinema poster artwork, portrait 2:3. Vast rust-red desert dunes at twilight beneath a deep indigo sky, enormous pale ivory moon just above the horizon, a tiny lone astronaut in an off-white suit at the foot of a sweeping dune in lower right, sculptural wind-carved sand, dust hanging in backlight. A lyrical cinematic science-fiction still shot on 65mm, tangible realism, subtle film grain, extraordinary sense of scale and solitude. Muted burnt orange, umber and inky blue. Refined art-house poster composition, clear darker lower portion for live title overlay. No words, no logos, no watermark."
+    },
+    {
+      "name": "between",
+      "prompt": "Use case: photorealistic-natural. Asset: original art-house film poster backdrop, portrait 2:3, no words. A lonely small mid-century roadside motel at the edge of a vast lavender mountain valley, one red-orange illuminated doorway, dusty pink and violet dusk sky, distant blue mountains reflected in an empty swimming pool, a single tiny traveller with a suitcase beside the doorway. Restrained Wes-era pastel architectural color without copying any existing film, 35mm photographic realism and fine grain, elegant symmetrical wide architecture within a vertical composition, deep lower foreground shadows for an overlaid title. Beautiful, mysterious and contemplative. No text, no signage, no logos, no watermark."
+    },
+    {
+      "name": "rain",
+      "prompt": "Use case: photorealistic-natural. Asset: original fictional film poster backdrop, portrait 2:3, no text. Rainy narrow old city street, viewed through a partly fogged cafe window, a lone distant woman with a crimson umbrella in the street, wet cobblestones catching warm amber light from shops, cool green shadows, droplets sharply defined on the glass, soft buildings behind. Intimate poetic 35mm cinema photography with subtle grain, convincing natural reflections, moody olive and amber palette. Strong vertical framing, dark bottom for title overlay. No writing, no logos, no watermark."
+    },
+    {
+      "name": "light",
+      "prompt": "Use case: photorealistic-natural. Asset: original fictional film poster backdrop, portrait 2:3, no text. A sunlit abandoned Mediterranean room, tall arched window framing a distant pale turquoise sea, translucent white curtain drifting in breeze, a single wooden chair in a deep pool of sunlight, warm ochre plaster walls and terracotta floor, contemplative cinematic photographic composition, tactile wall texture, elegant chiaroscuro and authentic 35mm fine film grain. Warm honey and washed pale blue, quiet and dreamlike, darker lower foreground for a live typography overlay. No words, no logos, no watermark."
+    },
+    {
+      "name": "cinema-login",
+      "prompt": "Standalone portrait artwork derived from the RAVAN sign-in concept: empty intimate cinema, warm evening window light, rust velvet seats, blank screen with tree shadows. No text, no interface, no people.",
+      "output": "packages/ui/src/art/cinema-login.webp"
+    }
+  ]
+}

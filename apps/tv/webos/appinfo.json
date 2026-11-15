@@ -1,0 +1,11 @@
+{
+  "id": "com.mov.privatecinema",
+  "version": "0.1.0",
+  "vendor": "RAVAN",
+  "type": "web",
+  "main": "index.html",
+  "title": "RAVAN",
+  "icon": "icon.png",
+  "resolution": "1920x1080",
+  "disableBackHistoryAPI": true
+}

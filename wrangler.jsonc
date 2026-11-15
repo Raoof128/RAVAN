@@ -1,0 +1,32 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ravan",
+  "main": "apps/edge/src/index.ts",
+  "compatibility_date": "2026-11-15",
+  "workers_dev": true,
+  "preview_urls": false,
+  "routes": [{ "pattern": "cinema.example.com", "custom_domain": true }],
+  "assets": {
+    "directory": ".local/cloudflare/public",
+    "not_found_handling": "none",
+    "html_handling": "auto-trailing-slash",
+    "run_worker_first": [
+      "/api",
+      "/api/*",
+      "/auth",
+      "/auth/*",
+      "/media",
+      "/media/*",
+      "/_worker",
+      "/_worker/*",
+      "/healthz",
+      "/version.json",
+    ],
+  },
+  "observability": { "enabled": false },
+  "vars": {
+    "RELEASE": "unbuilt",
+    "PRIVATE_ORIGIN": "https://media.example.com",
+    "PUBLIC_ORIGIN": "https://cinema.example.com",
+  },
+}
