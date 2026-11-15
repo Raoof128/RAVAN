@@ -134,3 +134,11 @@ Raouf: 2026-11-15 (Australia/Sydney), seventh entry
 - Files changed: see `CHANGELOG.md`.
 - Verification: 46 files, 300 passed, 1 skipped, 0 failed; `npm run check`, all four builds and the release suite pass; `npm run test:e2e` 146 of 147 (one Firefox timeout under load, 36 of 36 on repeat).
 - Follow-ups: release migration 007 with API, worker and frontend together; TMDB logo in the credits before enabling it; let the edge and Nginx pass picture caching.
+
+Raouf: 2026-11-15 (Australia/Sydney), eighth entry
+
+- Scope: publish and release the language, subtitle and picture work, at the owner's request.
+- Summary: sanitized snapshot pushed; backend `aae2f72c0a54-a680efab` and the same frontend revision are live; migration 007 applied; pictures made for all five films. See the maintainer's private notes.
+- Files changed: the maintainer's private notes, the maintainer's private notes, `CHANGELOG.md`, this file.
+- Verification: server rehearsal (migration on a copy, two-language edition, pictures), 9 of 9 edge checks, host checks, sign-in page in two browsers; no rollback needed.
+- Follow-ups: signed-in check of the new menus on production; TMDB logo before enabling TMDB; clear old rollback material.

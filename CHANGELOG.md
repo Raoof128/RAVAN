@@ -1,5 +1,32 @@
 # Changelog
 
+## Raouf: 2026-11-15 (Australia/Sydney) — languages and pictures released
+
+**Scope:** publish and release the language, subtitle and picture work, as the owner asked. Record: the maintainer's private notes.
+
+### What was done
+
+- **Published.** A sanitized snapshot was pushed to the public repository's audit branch; its default branch was not touched.
+- **Backend released.** Release `aae2f72c0a54-a680efab` replaced `29d3e328524b`. Migration 007 ran; the schema is now 7. Units and Nginx were unchanged.
+- **Frontend released.** The same revision on Cloudflare (Worker version `a06b7838-b162-4d40-9ca9-3a715438dee2`).
+- **Pictures made.** Within a minute the worker had made a poster and a still for every film in the library (five of five), from frames of the films.
+
+### Verification
+
+- Rehearsed on the server before switching: migration 007 on a copy of the live database (`integrity_check` `ok`); a two-language film, one track much shorter than the picture, prepared as an all-languages edition with the release's code and the server's FFmpeg; pictures made from its frames.
+- No rollback was needed. Both services have not restarted since.
+- Edge checks: 9 of 9, version `aae2f72c0a54`. The new picture routes refuse unauthenticated access.
+- Host checks: Nginx, SSH and the host's other service passed.
+- Sign-in page: loaded in Chromium and WebKit four of four times. One earlier attempt, seconds after the frontend deploy, timed out before the page appeared, most likely while the new files reached Cloudflare's edge.
+- Before deploying: 300 unit tests passed, 1 skipped; 147 browser tests; 12 release tests.
+
+### Follow-ups
+
+- Sign in and try a film with two languages, and the subtitle menu.
+- Films already prepared get the language switch the next time another language is chosen.
+- Optional TMDB: needs a token on the server and TMDB's logo in the credits first.
+- Remove the older rollback material when satisfied.
+
 ## Raouf: 2026-11-15 (Australia/Sydney) — switch language and subtitles; automatic film pictures
 
 **Scope:** two owner requests: change audio and subtitles in films that have several, and show good pictures for films automatically. Same branch, `audit/frontend-2026-11-15`. Nothing was pushed or deployed.
