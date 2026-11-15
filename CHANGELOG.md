@@ -1,5 +1,13 @@
 # Changelog
 
+## Raouf: 2026-11-16 (Australia/Sydney) — logs and long-term memory
+
+**Scope:** the owner asked for every log and Zurvan to be brought up to date.
+
+- the maintainer's private notes now explains how editions are shared between pictures, how room is made, what the Picture list reports, and how long preparation takes on the production server.
+- Zurvan: the five release records of 15–16 November and the operations guide are ingested; five evidence-backed claims, a release decision and a decision on shared editions are recorded under `mov`; the earlier open question on eviction is marked answered.
+- No code changed.
+
 ## Raouf: 2026-11-16 (Australia/Sydney) — same-copy and room release
 
 **Scope:** release `e49e0c964e69`, approved by the owner.

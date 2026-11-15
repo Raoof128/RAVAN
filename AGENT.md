@@ -195,3 +195,11 @@ Raouf: 2026-11-16 (Australia/Sydney), fourteenth entry
 - Verification: rehearsal on a copy of the live database, 9 of 9 edge checks, 12 release tests, sign-in page in two browsers, Sentinel host checks; no rollback needed.
 - Follow-ups: signed-in check of the Picture list on production; clear old rollback material.
 - Rule: run the release tests before the deploy, then restore `docs/testing/screenshots/login-production-1488.png`; the deploy refuses an uncommitted tree.
+
+Raouf: 2026-11-16 (Australia/Sydney), fifteenth entry
+
+- Scope: bring every log and Zurvan up to date.
+- Summary: operations guide describes shared editions, room and Picture costs; release records and the guide ingested into Zurvan with claims and decisions under `mov`.
+- Files changed: the maintainer's private notes, `CHANGELOG.md`, this file.
+- Verification: each claim's quote was accepted as verbatim by Zurvan; every RAVAN decision page carries `project: "mov"`.
+- Rule: Zurvan keys ingested files by path, and another project's the maintainer's private notes already holds that key. Ingest RAVAN's guide as a copy under `raw/docs/` with a `ravan-` name.
