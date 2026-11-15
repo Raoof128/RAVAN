@@ -1,5 +1,59 @@
 # Changelog
 
+## Raouf: 2026-11-15 (Australia/Sydney) — switch language and subtitles; automatic film pictures
+
+**Scope:** two owner requests: change audio and subtitles in films that have several, and show good pictures for films automatically. Same branch, `audit/frontend-2026-11-15`. Nothing was pushed or deployed.
+
+### What changed
+
+- **Languages switch at once.** A film with several audio tracks is now prepared for the web player as one edition carrying every language: the picture as one HLS stream, each language as its own, and a top-level playlist written by RAVAN. The player's Audio menu switches with HLS.js (or Safari's own audio tracks) without preparing the film again, and starts in the saved audio language. Each language is made exactly the picture's length. Older one-language editions still play; choosing another language on one prepares the all-languages edition. A failure, or more than 16 tracks, falls back to one language per edition.
+- **Subtitles menu.** Off, or any text subtitle track; it starts in the saved subtitle language (`fa`, `fas` and `per` are all Persian), keeps the viewer's choice when captions arrive late, and lists Blu-ray and DVD picture subtitles as ones browsers cannot show. C steps through the tracks. The film page lists subtitles and audio in words ("Persian · 5.1").
+- **TV.** Subtitles and Audio buttons. The TV still plays one language per edition, so Audio waits for presses to stop before preparing the next one.
+- **Pictures for every film.** After a film is inspected, the worker makes a poster and a wide still: from a cover the file carries (Matroska attachment or MP4 cover), or from the most detailed of several moments in the film, with the title set over the poster. The library hero, film page and player show the still; cards show the poster. No external service is used.
+- **Optional TMDB.** With `MOV_TMDB_TOKEN` set, the API looks films up on The Movie Database and downloads real posters and backdrops when the title (and any known year) match. Off by default; when on, film titles and years are sent to TMDB, and Your cinema and the privacy page say so with TMDB's required notice.
+- **Database.** Migration 007: picture kind, generation and time on `artwork`, and `artwork_lookups`.
+
+### Found by review and fixed
+
+An independent reviewer read the diff and reported 14 findings; all were fixed with tests:
+
+- the player switched audio back after the viewer chose another language;
+- a commentary track of a different length, more than 16 tracks, or a long non-Latin title could make a film unplayable;
+- picture jobs could delay inspecting a film being opened;
+- a restore left picture records without files;
+- a TMDB error locked a film out for a month;
+- an unreadable film finished its picture job with nothing and was never retried;
+- the saved audio language was ignored in all-languages editions;
+- each TV Audio press queued a conversion;
+- repeated track names were numbered wrongly;
+- titles with a year in them ("Blade Runner 2049") and same-title films ("Dune") were mismatched;
+- picture records and files could get out of step;
+- a download without a stated length was not size-limited;
+- some tests did not check what they claimed.
+
+### Files changed
+
+Source: `apps/worker/src/hls.ts`, `browser-prepare.ts`, `tracks.ts` (new), `artwork.ts` (new), `main.ts`, `leases.ts`; `apps/api/src/media/planner.ts`, `media/tmdb.ts` (new), `sessions/routes.ts`, `library/routes.ts`, `auth/routes.ts`, `app.ts`, `config.ts`; `packages/db/migrations/007_artwork.sql`, `packages/db/src/migrate.ts`, `packages/db/src/backup.ts`; `packages/contracts/src/index.ts`; `packages/client/src/api.ts`; `packages/ui/src/MovieCard.tsx`, `FilmStill.tsx`, `artwork.ts`; `apps/web/src/player/BrowserAdapter.ts`, `player/languages.ts` (new), `pages/Player.tsx`, `pages/Detail.tsx`, `pages/Library.tsx`, `pages/Settings.tsx`, `cinema.css`, `public/privacy/index.html`; `apps/tv/src/main.tsx`, `tv.css`; `scripts/generate-media.mjs`; `.env.example`.
+
+Tests added: `tests/backend/audio-tracks.test.ts`, `artwork.test.ts`, `tmdb.test.ts`, `tests/e2e/tracks.spec.ts`, `tests/e2e/artwork-pictures.spec.ts`. Extended: `tests/backend/streaming-playback.test.ts`. `tests/backend/capabilities.test.ts` now counts conversion jobs separately from the new picture jobs, and asserts the picture job.
+
+Docs: the maintainer's private notes (Languages and subtitles, Pictures), `AGENT.md`, this file.
+
+### Verification
+
+- `npm run check`: passed.
+- `npm test`: 46 files, 300 passed, 1 skipped, 0 failed.
+- `npm run build`, `build:web`, `build:tv`, `build:cloudflare`: passed. Release suite: 12 passed.
+- `npm run test:e2e`: 146 of 147 passed in Chromium, Firefox and WebKit. The one failure was a Firefox TV test that timed out under a load average near 15; it passed 36 of 36 when repeated.
+- Multi-language editions, covers, frames and the orphan sweep were tested with real FFmpeg on synthetic films; TMDB only against a fake, so no real lookup was made.
+
+### Follow-ups
+
+- Needs a release to reach the server: migration 007, API, worker and frontend together.
+- Films already prepared keep their one-language editions until a language change asks for the new kind.
+- To use TMDB: get an API Read Access Token at themoviedb.org and add `MOV_TMDB_TOKEN` to the server's environment. TMDB's terms also ask for its logo in the credits, which is not added yet.
+- Pictures are not cached by browsers until the edge and Nginx pass the API's cache header for `/api/artwork/`.
+
 ## Raouf: 2026-11-15 (Australia/Sydney) — released to production
 
 **Scope:** publish and deploy everything on `audit/frontend-2026-11-15`: the backend audit, the preparation work, the frontend audit and the UI/UX audit. The owner approved a full redeploy on the production server. Record: the maintainer's private notes.

@@ -11,7 +11,10 @@ import {
   useDelayed,
   usePending,
 } from "../../../../packages/ui/src/Loading.js";
-import { cinematicArtwork } from "../../../../packages/ui/src/artwork.js";
+import {
+  backdropUrl,
+  cinematicArtwork,
+} from "../../../../packages/ui/src/artwork.js";
 import type { MovieCard as Movie } from "../../../../packages/contracts/src/index.js";
 import { Icon } from "../../../../packages/ui/src/Icon.js";
 import { recallLibrary, rememberLibrary } from "../libraryCache.js";
@@ -123,7 +126,8 @@ export function Library({ saved = false }: { saved?: boolean }) {
   const resume = items.filter((m) => m.available && m.resumeMs > 0);
   const featured = home ? (resume[0] ?? items.find((m) => m.available)) : null;
   const others = home ? resume.filter((m) => m !== featured) : [];
-  const still = featured ? cinematicArtwork(featured.posterUrl) : undefined;
+  const backdrop = featured ? backdropUrl(featured) : undefined;
+  const still = cinematicArtwork(backdrop);
   // The hero carries the page's first heading. Without one, the list's does.
   const hero = featured !== null && featured !== undefined;
   const Heading = hero || (!saved && !query && first) ? "h2" : "h1";
@@ -148,7 +152,7 @@ export function Library({ saved = false }: { saved?: boolean }) {
             featured.resumeMs ? "Continue watching" : "From your collection"
           }
         >
-          <FilmStill url={featured.posterUrl} priority />
+          <FilmStill url={backdrop} priority />
           <div className="feature-shade" />
           <div className="feature-copy">
             <p className="eyebrow">

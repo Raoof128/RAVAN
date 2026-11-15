@@ -41,6 +41,11 @@ const schema = z
       .string()
       .regex(/^[a-f0-9]{64}$/i)
       .optional(),
+    // TMDB's API Read Access Token. Unset, no title ever leaves the server.
+    tmdbToken: z
+      .string()
+      .regex(/^[A-Za-z0-9._-]{20,1000}$/)
+      .optional(),
   })
   .superRefine((v, ctx) => {
     // CSRF compares the browser's Origin header to this value exactly. A trailing
@@ -91,6 +96,7 @@ export function environmentConfig(): AppConfig {
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     ownerSubject: process.env.MOV_OWNER_SUBJECT,
     encryptionKey: process.env.MOV_ENCRYPTION_KEY,
+    tmdbToken: process.env.MOV_TMDB_TOKEN || undefined,
   });
 }
 /**

@@ -15,6 +15,7 @@ import type {
   ClientCapabilities,
 } from "../../../../packages/contracts/src/index.js";
 import { JobQueue } from "../../../worker/src/leases.js";
+import { HLS_MAX_AUDIO } from "../../../worker/src/hls.js";
 import { capabilitiesSchema } from "../../../../packages/contracts/src/schemas.js";
 type FileHint = { name?: string | null; mimeType?: string | null };
 /** Audio a browser plays from each container, before asking what this client decodes. */
@@ -281,11 +282,38 @@ export class MediaPlanner {
     // keep the single file. Each layout has its own identity.
     const streamed = this.settings.format === "hls" && profile.id === "web";
     const single = identity(conversion.variant);
-    const id = streamed
-      ? identity([conversion.variant, "hls"].filter(Boolean).join("+"))
-      : single;
-    // A single-file edition finished earlier plays as well as a new streamed one.
-    const finished = ready(id) ?? (streamed ? ready(single) : undefined);
+    const oneTrack = identity(
+      [conversion.variant, "hls"].filter(Boolean).join("+"),
+    );
+    // A streamed edition of a film with several audio tracks carries all of
+    // them, so changing language needs no new edition. Its identity does not
+    // depend on which track was asked for.
+    const everyTrack = assetId(
+      source.fileId,
+      source.generation,
+      quality,
+      -1,
+      forceEncode,
+      [conversion.variant, "hls", "all-audio"].filter(Boolean).join("+"),
+    );
+    // If the all-languages edition could not be made, fall back to one
+    // language at a time rather than leave the film unplayable.
+    const allAudio =
+      streamed &&
+      probe.audio.length > 1 &&
+      probe.audio.length <= HLS_MAX_AUDIO &&
+      (
+        this.db
+          .prepare("SELECT state FROM jobs WHERE unique_key=?")
+          .get(`browser:${everyTrack}`) as { state: string } | undefined
+      )?.state !== "failed";
+    const id = allAudio ? everyTrack : streamed ? oneTrack : single;
+    // Editions finished earlier play as well as a new one: the all-tracks one,
+    // then one with the asked-for track, streamed or as a single file.
+    const finished =
+      ready(id) ??
+      (allAudio ? ready(oneTrack) : undefined) ??
+      (streamed ? ready(single) : undefined);
     if (finished) return finished;
     const asset = this.db
       .prepare("SELECT state,label FROM prepared_assets WHERE id=?")
@@ -360,6 +388,7 @@ export class MediaPlanner {
           forceEncode: forceEncode ?? false,
           id,
           format: streamed ? "hls" : "mp4",
+          ...(allAudio ? { allAudio: true } : {}),
           ...(capabilities ? { video: capabilities.video } : {}),
         },
         priority,

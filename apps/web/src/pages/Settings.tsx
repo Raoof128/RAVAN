@@ -76,7 +76,8 @@ export function Settings() {
     [failed, setFailed] = useState(false),
     [retry, setRetry] = useState(0),
     [notes, setNotes] = useState<Record<string, Note | undefined>>({}),
-    [removing, setRemoving] = useState<string>();
+    [removing, setRemoving] = useState<string>(),
+    [credit, setCredit] = useState<string>();
   const [folderBusy, runFolder] = usePending();
   const [syncBusy, runSync] = usePending();
   const [prefsBusy, runPrefs] = usePending();
@@ -102,6 +103,18 @@ export function Settings() {
     }
   }, [removing]);
   useTitle("Your cinema");
+  useEffect(() => {
+    let active = true;
+    api
+      .artworkCredits()
+      .then((c) => {
+        if (active && typeof c.tmdb === "string") setCredit(c.tmdb);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [api]);
   useEffect(() => {
     let active = true;
     setFailed(false);
@@ -520,8 +533,16 @@ export function Settings() {
           Signs this browser out. Paired televisions stay connected until you
           remove them above.
         </p>
+
         <Outcome note={notes.account} />
       </section>
+      <p className="fine-print artwork-credit">
+        Posters and pictures come from each film’s own cover or from a frame of
+        the film.
+        {credit
+          ? ` Where neither is good enough, they come from The Movie Database (TMDB), which receives the film’s title and year to find them. ${credit}`
+          : ""}
+      </p>
     </main>
   );
 }

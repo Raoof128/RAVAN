@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useApi } from "../../../../packages/client/src/api.js";
 import type { MovieDetail } from "../../../../packages/contracts/src/index.js";
 import { Poster } from "../../../../packages/ui/src/MovieCard.js";
+import { backdropUrl } from "../../../../packages/ui/src/artwork.js";
 import { StatusPanel } from "../../../../packages/ui/src/StatusPanel.js";
 import {
   ActionButton,
@@ -132,7 +133,7 @@ export function Detail({ id }: { id: string }) {
   return (
     <main id="main" className="detail-page">
       <div className="detail-atmosphere">
-        <FilmStill url={film.posterUrl} priority />
+        <FilmStill url={backdropUrl(film)} priority />
       </div>
       {back}
       <div className="detail-grid">
@@ -205,6 +206,18 @@ export function Detail({ id }: { id: string }) {
                 <span>Audio</span>
                 <span className="muted">
                   {audio.map((a) => a.label).join(", ")}
+                </span>
+              </div>
+            )}
+            {(film.subtitleTracks ?? []).length > 0 && (
+              <div className="edition">
+                <span>Subtitles</span>
+                <span className="muted">
+                  {film
+                    .subtitleTracks!.map((t) =>
+                      t.text ? t.label : `${t.label} (picture, can’t be shown)`,
+                    )
+                    .join(", ")}
                 </span>
               </div>
             )}

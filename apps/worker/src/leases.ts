@@ -14,16 +14,19 @@ export type Job = {
  * a film the viewer just opened is inspected at once instead of waiting behind
  * whatever conversion is running.
  */
-export type Lane = "probe" | "prepare";
+export type Lane = "probe" | "prepare" | "artwork";
 /** A failed job may be tried again on request once this long has passed. */
 export const RETRY_COOLDOWN_MS = 600000;
 /** A newer request must be this much newer to interrupt the running job. */
 const YIELD_MARGIN_MS = 30000;
 /** Work this close to finishing is cheaper to finish than to redo. */
 const YIELD_PROGRESS_LIMIT = 90;
+// Pictures have a lane of their own: a film being opened is never inspected
+// behind them, and they never wait behind an hours-long conversion.
 const lanes: Record<Lane, string> = {
   probe: "kind='probe'",
-  prepare: "kind<>'probe'",
+  prepare: "kind NOT IN ('probe','artwork')",
+  artwork: "kind='artwork'",
 };
 export class JobQueue {
   constructor(

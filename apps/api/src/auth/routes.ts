@@ -21,6 +21,7 @@ const deviceReadRoutes = new Set([
   "/api/movies",
   "/api/movies/:id",
   "/api/preferences",
+  "/api/artwork/:id",
 ]);
 const deviceRoutes = new Set([
   "/api/playback",

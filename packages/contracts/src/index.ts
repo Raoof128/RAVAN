@@ -62,6 +62,10 @@ export type MovieCard = {
   title: string;
   year?: number;
   posterUrl?: string;
+  /** The poster is a frame of the film, with no title on it. */
+  posterTitled?: boolean;
+  /** A wide picture from the film, for backgrounds. */
+  stillUrl?: string;
   resumeMs: number;
   available: boolean;
 };
@@ -77,6 +81,11 @@ export interface PlayerAdapter {
   selectSubtitle(trackId: string | null): Promise<void>;
   /** Replace the caption tracks without reloading the picture. */
   setSubtitles?(subtitles: NonNullable<PlaybackSession["subtitles"]>): void;
+  /** Audio tracks carried by the stream itself, switchable without reloading. */
+  audioOptions?(): TrackOption[];
+  subtitleOptions?(): TrackOption[];
+  /** Called when either list, or the active choice, changes. */
+  onTracks?(listener: () => void): () => void;
   onState(listener: (state: PlaybackState) => void): () => void;
   destroy(): Promise<void>;
 }
@@ -94,8 +103,20 @@ export type LibraryStatus = {
   counts: { upserts?: number; unavailable?: number };
   error?: string;
 };
+/** A track the player can switch to, as the player itself reports it. */
+export type TrackOption = {
+  id: string;
+  label: string;
+  language: string;
+  active: boolean;
+};
 export type MovieDetail = MovieCard & {
   audioTracks?: Array<{ index: number; language: string; label: string }>;
+  /**
+   * The film's subtitle tracks. Text subtitles are shown in the player once
+   * an edition with them is ready; picture-based ones (Blu-ray, DVD) cannot be.
+   */
+  subtitleTracks?: Array<{ language: string; label: string; text: boolean }>;
   description: string;
   saved: boolean;
   editions: Array<{

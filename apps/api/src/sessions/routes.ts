@@ -15,7 +15,7 @@ import { principal, revokeDevice } from "./devices.js";
 import { MediaPlanner } from "../media/planner.js";
 import { localReader, ASSET_ID } from "../../../worker/src/prepared-store.js";
 import { lstat, readFile } from "node:fs/promises";
-import { HLS_PLAYLIST, parsePlaylist } from "../../../worker/src/hls.js";
+import { servePlaylist } from "../../../worker/src/hls.js";
 import { join } from "node:path";
 import { sendRaw } from "../media/raw-route.js";
 export function registerSessions(
@@ -130,19 +130,19 @@ export function registerSessions(
           const file = await lstat(join(config.preparedDir, ref.assetId, path));
           if (!file.isFile() || file.isSymbolicLink())
             throw Error("Media denied");
-          if (path === HLS_PLAYLIST) {
-            // The playlist is replaced as the edition grows, so it is read whole,
+          if (path.endsWith(".m3u8")) {
+            // A playlist is replaced as the edition grows, so it is read whole,
             // and only the strict form this server writes is passed on.
             if (file.size > 2 * 1024 * 1024) throw Error("Media denied");
-            const playlist = parsePlaylist(
+            // Checked before the reply is typed: a refusal must go out as JSON.
+            const text = servePlaylist(
+              path,
               await readFile(
                 join(config.preparedDir, ref.assetId, path),
                 "utf8",
               ),
             );
-            return reply
-              .type("application/vnd.apple.mpegurl")
-              .send(playlist.text);
+            return reply.type("application/vnd.apple.mpegurl").send(text);
           }
           return await sendRaw(
             request,

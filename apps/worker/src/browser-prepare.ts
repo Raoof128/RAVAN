@@ -1,4 +1,4 @@
-import { mkdir, rm, rename, stat, readFile } from "node:fs/promises";
+import { mkdir, rm, rename, stat, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { runProcess } from "./process.js";
 import { probeMedia, type Probe } from "./probe.js";
@@ -9,17 +9,21 @@ import {
   textSubtitles,
   type Quality,
 } from "./compatibility.js";
+import { trackLanguage, trackName } from "./tracks.js";
+export { trackLanguage, trackName } from "./tracks.js";
 import {
   directoryBytes,
-  HLS_PLAYABLE_SEGMENTS,
+  HLS_MAX_AUDIO,
   HLS_PLAYLIST,
   HLS_SEGMENT_SECONDS,
-  readPlaylist,
+  playableNow,
   validateEdition,
+  writeMaster,
+  type AudioRendition,
 } from "./hls.js";
 export type Caption = { file: string; language: string; label: string };
 export async function prepareBrowser(
-  input: string,
+  source: string,
   output: string,
   probe: Probe,
   quality: Quality,
@@ -43,6 +47,11 @@ export async function prepareBrowser(
     format?: "mp4" | "hls";
     /** Called once when enough of an "hls" edition exists to start playing. */
     playable?: () => void;
+    /**
+     * Carry every audio track, each as its own stream, so the player can
+     * switch between them. Only for "hls", and only with more than one track.
+     */
+    allAudio?: boolean;
     verify: () => Promise<void>;
   },
 ) {
@@ -58,6 +67,10 @@ export async function prepareBrowser(
     ? plan.bitrate
     : boundedBitrate(plan.bitrate, options.maxBytes, probe.durationMs);
   const streaming = options.format === "hls";
+  const multi =
+    streaming && options.allAudio === true && probe.audio.length > 1;
+  if (multi && probe.audio.length > HLS_MAX_AUDIO)
+    throw Error("Too many audio tracks");
   // A streamed edition is served from its final place while it grows; the
   // caller decides when it may be offered and removes it if this fails.
   const partial = streaming ? output : output + ".partial";
@@ -85,41 +98,31 @@ export async function prepareBrowser(
         "format=yuv420p",
       );
     const selected = probe.audio[audio];
-    const captions: Caption[] = [];
-    for (const [i, s] of probe.subtitles.entries())
-      if (
-        textSubtitles.has(s.codec) &&
-        s.index !== undefined &&
-        captions.length < 64
-      )
-        captions.push({
-          file: `subtitle-${i}.vtt`,
-          language: (s.language ?? "und").slice(0, 32),
-          label: (s.title ?? s.language ?? `Captions ${i + 1}`).slice(0, 100),
-        });
-    const args = [
-      "-nostdin",
-      "-v",
-      "error",
-      "-threads",
-      threads,
-      "-filter_threads",
-      threads,
-      "-protocol_whitelist",
-      "file,http,tcp",
-      "-format_whitelist",
-      inputFormats,
-      ...(options.headers ? ["-headers", options.headers] : []),
-      "-i",
-      input,
-      "-map",
-      "0:v:0",
-      ...(selected ? ["-map", `0:a:${audio}`] : []),
-      "-sn",
-      "-map_metadata",
-      "-1",
-      "-map_chapters",
-      "-1",
+    // A copied picture keeps stereo AAC as it is; anything else becomes it.
+    const audioCodec = (track: (typeof probe.audio)[number]) =>
+      plan.copyVideo && track.codec === "aac" && track.channels <= 2
+        ? ["-c:a", "copy"]
+        : ["-c:a", "aac", "-ac", "2", "-ar", "48000", "-b:a", "192k"];
+    const hls = (prefix: string, playlist: string) => [
+      "-f",
+      "hls",
+      "-hls_time",
+      String(HLS_SEGMENT_SECONDS),
+      // Append-only until finished, then closed with an end marker.
+      "-hls_playlist_type",
+      "event",
+      "-hls_segment_type",
+      "fmp4",
+      "-hls_fmp4_init_filename",
+      `${prefix}init.mp4`,
+      "-hls_segment_filename",
+      join(partial, `${prefix}seg-%05d.m4s`),
+      // temp_file: a segment and the playlist appear only when complete.
+      "-hls_flags",
+      "independent_segments+temp_file",
+      join(partial, playlist),
+    ];
+    const pictureArgs = [
       "-c:v",
       plan.copyVideo ? "copy" : "libx264",
       // Apple players only accept HEVC in MP4 under the hvc1 sample entry.
@@ -144,19 +147,106 @@ export async function prepareBrowser(
             "yuv420p",
           ]
         : []),
-      ...(selected
-        ? [
-            "-c:a",
-            plan.copyVideo && selected.codec === "aac" && selected.channels <= 2
-              ? "copy"
-              : "aac",
-            ...(plan.copyVideo &&
-            selected.codec === "aac" &&
-            selected.channels <= 2
-              ? []
-              : ["-ac", "2", "-ar", "48000", "-b:a", "192k"]),
-          ]
+    ];
+    const renditions: AudioRendition[] = multi
+      ? probe.audio.map((track, i) => ({
+          name: trackName(track, i),
+          language: trackLanguage(track.language),
+          default: i === audio,
+        }))
+      : [];
+    // Tracks may share a name ("English", "English"): number the repeats, and
+    // keep every name distinct, as a player's menu needs them to be.
+    const used = new Set<string>();
+    for (const r of renditions) {
+      let name = r.name;
+      for (let n = 2; used.has(name); n++)
+        name = `${Array.from(r.name).slice(0, 44).join("").trim()} ${n}`;
+      used.add(name);
+      r.name = name;
+    }
+    // Every language is made exactly as long as the picture: a commentary that
+    // ends early is padded with silence, one that runs on is cut. Streams of
+    // different lengths would stall a player switching between them.
+    const filmSeconds = (probe.durationMs / 1000).toFixed(3);
+    const captions: Caption[] = [];
+    for (const [i, s] of probe.subtitles.entries())
+      if (
+        textSubtitles.has(s.codec) &&
+        s.index !== undefined &&
+        captions.length < 64
+      )
+        captions.push({
+          file: `subtitle-${i}.vtt`,
+          language: (s.language ?? "und").slice(0, 32),
+          label: (s.title ?? s.language ?? `Captions ${i + 1}`).slice(0, 100),
+        });
+    const input = [
+      "-nostdin",
+      "-v",
+      "error",
+      "-threads",
+      threads,
+      "-filter_threads",
+      threads,
+      "-protocol_whitelist",
+      "file,http,tcp",
+      "-format_whitelist",
+      inputFormats,
+      ...(options.headers ? ["-headers", options.headers] : []),
+      "-i",
+      source,
+    ];
+    const multiArgs = [
+      ...input,
+      // The picture alone, then each audio track as its own stream.
+      "-map",
+      "0:v:0",
+      "-an",
+      "-sn",
+      "-map_metadata",
+      "-1",
+      "-map_chapters",
+      "-1",
+      ...pictureArgs,
+      ...(!plan.copyVideo
+        ? ["-force_key_frames", `expr:gte(t,n_forced*${HLS_SEGMENT_SECONDS})`]
         : []),
+      ...hls("v-", "video.m3u8"),
+      ...probe.audio.flatMap((track, i) => [
+        "-map",
+        `0:a:${i}`,
+        "-vn",
+        "-sn",
+        "-map_metadata",
+        "-1",
+        "-af",
+        `apad=whole_dur=${filmSeconds}`,
+        "-t",
+        filmSeconds,
+        "-c:a",
+        "aac",
+        "-ac",
+        "2",
+        "-ar",
+        "48000",
+        "-b:a",
+        `${track.channels > 2 ? 192 : 160}k`,
+        ...hls(`a${i}-`, `audio-${i}.m3u8`),
+      ]),
+    ];
+    const singleArgs = [
+      ...input,
+      "-map",
+      "0:v:0",
+      ...(selected ? ["-map", `0:a:${audio}`] : []),
+      "-sn",
+      "-map_metadata",
+      "-1",
+      "-map_chapters",
+      "-1",
+      ...pictureArgs,
+      ...(selected ? audioCodec(selected) : []),
       ...(streaming
         ? [
             // Segments must start on a keyframe. A copied picture is cut at the
@@ -167,23 +257,7 @@ export async function prepareBrowser(
                   "-force_key_frames",
                   `expr:gte(t,n_forced*${HLS_SEGMENT_SECONDS})`,
                 ]),
-            "-f",
-            "hls",
-            "-hls_time",
-            String(HLS_SEGMENT_SECONDS),
-            // Append-only until finished, then closed with an end marker.
-            "-hls_playlist_type",
-            "event",
-            "-hls_segment_type",
-            "fmp4",
-            "-hls_fmp4_init_filename",
-            "init.mp4",
-            "-hls_segment_filename",
-            join(partial, "seg-%05d.m4s"),
-            // temp_file: a segment and the playlist appear only when complete.
-            "-hls_flags",
-            "independent_segments+temp_file",
-            join(partial, HLS_PLAYLIST),
+            ...hls("", HLS_PLAYLIST),
           ]
         : [
             "-movflags",
@@ -195,6 +269,7 @@ export async function prepareBrowser(
             join(partial, "video.mp4"),
           ]),
     ];
+    const args = multi ? multiArgs : singleArgs;
     for (const c of captions) {
       const index = Number(c.file.match(/\d+/)![0]);
       args.push(
@@ -230,12 +305,7 @@ export async function prepareBrowser(
       try {
         if ((await directoryBytes(partial)) > options.maxBytes)
           throw Error("Output budget exceeded");
-        const playlist = await readPlaylist(partial);
-        if (
-          !announced &&
-          playlist &&
-          (playlist.ended || playlist.segments.length >= HLS_PLAYABLE_SEGMENTS)
-        ) {
+        if (!announced && (await playableNow(partial))) {
           announced = true;
           options.playable?.();
         }
@@ -246,6 +316,13 @@ export async function prepareBrowser(
         checking = false;
       }
     };
+    // The top-level playlist is fixed from the start; the streams under it grow.
+    if (multi)
+      await writeFile(
+        join(partial, HLS_PLAYLIST),
+        writeMaster(renditions, bitrate * 1000 + renditions.length * 192_000),
+        { mode: 0o600 },
+      );
     const watch = streaming
       ? setInterval(() => void inspect(), 1000)
       : undefined;
@@ -312,7 +389,8 @@ export async function prepareBrowser(
       actual.video?.codec !== expected.codec ||
       actual.video.pixelFormat !== expected.pixelFormat ||
       actual.video.hdr !== expected.hdr ||
-      actual.audio.some((a) => a.codec !== "aac")
+      actual.audio.some((a) => a.codec !== "aac") ||
+      (multi && actual.audio.length !== probe.audio.length)
     )
       throw Error("Prepared media failed completeness or codec validation");
     for (const c of captions) {

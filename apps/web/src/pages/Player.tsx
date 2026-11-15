@@ -1,13 +1,16 @@
 import type {
   MovieDetail,
   Quality,
+  TrackOption,
 } from "../../../../packages/contracts/src/index.js";
 import { useEffect, useRef, useState } from "react";
 import { useApi } from "../../../../packages/client/src/api.js";
 import { FilmStill } from "../../../../packages/ui/src/FilmStill.js";
+import { backdropUrl } from "../../../../packages/ui/src/artwork.js";
 import { Flow, Opening } from "../../../../packages/ui/src/Loading.js";
 import { BrowserAdapter } from "../player/BrowserAdapter.js";
 import { Preparing } from "../player/Preparing.js";
+import { preferredTrack } from "../player/languages.js";
 import {
   detectCapabilities,
   refineCapabilities,
@@ -36,7 +39,7 @@ const shortcuts: Array<[string, string]> = [
   ["← →", "Back or forward 10 seconds"],
   ["↑ ↓", "Volume"],
   ["M", "Mute"],
-  ["C", "Captions"],
+  ["C", "Next subtitle track, then off"],
   ["F", "Full screen"],
 ];
 type FullscreenElement = HTMLElement & {
@@ -56,6 +59,20 @@ export function Player({
   const [audioTracks, setAudioTracks] = useState<
     Array<{ index: number; label: string }>
   >([]);
+  const [subtitleTracks, setSubtitleTracks] = useState<
+    NonNullable<MovieDetail["subtitleTracks"]>
+  >([]);
+  // What the stream itself offers, as the adapter reports it.
+  const [streamAudio, setStreamAudio] = useState<TrackOption[]>([]);
+  const [streamSubtitles, setStreamSubtitles] = useState<TrackOption[]>([]);
+  // The viewer's subtitle choice for this viewing: undefined follows the
+  // saved preference, null is off, otherwise a track label and language.
+  const subtitleChoice = useRef<
+    { label: string; language: string } | null | undefined
+  >(undefined);
+  const preferredSubtitles = useRef("off");
+  const preferredAudio = useRef("original");
+  const adapterRef = useRef<BrowserAdapter | null>(null);
   const replacement = useRef<string | undefined>(undefined);
   const video = useRef<HTMLVideoElement>(null),
     controller = useRef<PlayerController | null>(null);
@@ -63,7 +80,8 @@ export function Player({
     undefined,
   );
   const [state, setState] = useState<ControllerState>({ kind: "loading" }),
-    [movie, setMovie] = useState<Pick<MovieDetail, "title" | "posterUrl">>(),
+    [movie, setMovie] =
+      useState<Pick<MovieDetail, "title" | "posterUrl" | "stillUrl">>(),
     [retry, setRetry] = useState(0),
     [resume, setResume] = useState(0),
     [waiting, setWaiting] = useState(false),
@@ -76,12 +94,53 @@ export function Player({
     let active = true;
     // Watching changes what the library shows: positions, and what is in progress.
     forgetLibrary(api);
+    const adapter = new BrowserAdapter(video.current!);
+    adapterRef.current = adapter;
+    // Keep the menus in step with the stream, and keep the viewer's subtitle
+    // choice when the captions are replaced (they arrive when preparation ends).
+    // The language to start in is settled once per stream: the one asked for
+    // (on the old one-language editions), else the saved preference. After
+    // that only the viewer changes it.
+    let audioSettled = false;
+    const tracksChanged = () => {
+      if (!active) return;
+      const audioOptions = adapter.audioOptions();
+      const subtitleOptions = adapter.subtitleOptions();
+      setStreamAudio(audioOptions);
+      setStreamSubtitles(subtitleOptions);
+      if (!audioSettled && audioOptions.length > 1) {
+        audioSettled = true;
+        const wanted =
+          audioTrack !== undefined
+            ? audioOptions[audioTrack]
+            : preferredTrack(audioOptions, preferredAudio.current);
+        if (wanted && !wanted.active)
+          void adapter.selectAudio(wanted.id).catch(() => {});
+      }
+      const showing = subtitleOptions.find((o) => o.active);
+      const choice = subtitleChoice.current;
+      // The viewer turned them off: keep them off whatever arrives.
+      if (choice === null) {
+        if (showing) void adapter.selectSubtitle(null).catch(() => {});
+        return;
+      }
+      // The viewer's choice, else the saved language. A saved "off" leaves
+      // alone a track the browser showed for the system's caption setting.
+      const target = choice
+        ? (subtitleOptions.find(
+            (o) => o.label === choice.label && o.language === choice.language,
+          ) ?? preferredTrack(subtitleOptions, choice.language))
+        : preferredTrack(subtitleOptions, preferredSubtitles.current);
+      if (target && target.id !== showing?.id)
+        void adapter.selectSubtitle(target.id).catch(() => {});
+    };
+    const stopWatching = adapter.onTracks(tracksChanged);
     setWaiting(false);
     setEnded(false);
     setPlaying(false);
     const player = new PlayerController(
       api,
-      new BrowserAdapter(video.current!),
+      adapter,
       (s) => {
         if (active) {
           // The controller says "loading" before each of its checks on a film
@@ -95,7 +154,9 @@ export function Player({
             void api
               .detail(id)
               .then((film) => {
-                if (active) setAudioTracks(film.audioTracks ?? []);
+                if (!active) return;
+                setAudioTracks(film.audioTracks ?? []);
+                setSubtitleTracks(film.subtitleTracks ?? []);
               })
               .catch(() => {});
         }
@@ -107,8 +168,13 @@ export function Player({
       .detail(id)
       .then((film) => {
         if (active) {
-          setMovie({ title: film.title, posterUrl: film.posterUrl });
+          setMovie({
+            title: film.title,
+            posterUrl: film.posterUrl,
+            stillUrl: film.stillUrl,
+          });
           setAudioTracks(film.audioTracks ?? []);
+          setSubtitleTracks(film.subtitleTracks ?? []);
           const start =
             checkpoint.current?.id === id
               ? checkpoint.current.position
@@ -126,6 +192,8 @@ export function Player({
       });
     return () => {
       active = false;
+      stopWatching();
+      adapterRef.current = null;
       if (video.current && video.current.readyState > 0)
         checkpoint.current = {
           id,
@@ -137,6 +205,42 @@ export function Player({
     };
   }, [api, id, startOver, retry, quality, audioTrack]);
   const visible = state.kind === "ready" || state.kind === "paused";
+  useEffect(() => {
+    let active = true;
+    api
+      .preferences()
+      .then((p) => {
+        if (!active) return;
+        preferredSubtitles.current =
+          typeof p.subtitleLanguage === "string" ? p.subtitleLanguage : "off";
+        preferredAudio.current =
+          typeof p.audioLanguage === "string" ? p.audioLanguage : "original";
+        // Apply it to captions that were already there.
+        const adapter = adapterRef.current;
+        const options = adapter?.subtitleOptions() ?? [];
+        const target = preferredTrack(options, preferredSubtitles.current);
+        if (subtitleChoice.current === undefined && target && !target.active)
+          void adapter?.selectSubtitle(target.id).catch(() => {});
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [api]);
+  function chooseSubtitle(id: string) {
+    const adapter = adapterRef.current;
+    if (!adapter) return;
+    const option = streamSubtitles.find((o) => o.id === id);
+    subtitleChoice.current = option
+      ? { label: option.label, language: option.language }
+      : null;
+    void adapter.selectSubtitle(option ? option.id : null).catch(() => {});
+  }
+  // Audio switches inside the stream when it carries every track; otherwise
+  // a different track means a different edition.
+  const inStream = streamAudio.length > 1;
+  const textSubtitles = subtitleTracks.filter((t) => t.text);
+  const pictureSubtitles = subtitleTracks.filter((t) => !t.text);
   // What the element itself reports: stalled for data, playing, finished.
   useEffect(() => {
     const element = video.current;
@@ -221,15 +325,18 @@ export function Player({
         element.muted = !element.muted;
         say(element.muted ? "Muted" : "Sound on");
       } else if (key === "c") {
-        const tracks = Array.from(element.textTracks).filter(
-          (t) => t.kind === "subtitles" || t.kind === "captions",
-        );
-        if (!tracks.length) say("This film has no captions");
+        const adapter = adapterRef.current;
+        const options = adapter?.subtitleOptions() ?? [];
+        if (!adapter || !options.length) say("No subtitles to show yet");
         else {
-          const on = tracks.some((t) => t.mode === "showing");
-          for (const t of tracks) t.mode = "disabled";
-          if (!on) tracks[0]!.mode = "showing";
-          say(on ? "Captions off" : `Captions: ${tracks[0]!.label || "on"}`);
+          // Off, then each track in turn, then off again.
+          const at = options.findIndex((o) => o.active);
+          const next = options[at + 1];
+          subtitleChoice.current = next
+            ? { label: next.label, language: next.language }
+            : null;
+          void adapter.selectSubtitle(next ? next.id : null).catch(() => {});
+          say(next ? `Subtitles: ${next.label}` : "Subtitles off");
         }
       } else if (key === "f") {
         const stage = element as FullscreenElement;
@@ -262,7 +369,7 @@ export function Player({
       >
         {!visible && (
           <div className="stage-backdrop">
-            <FilmStill url={movie?.posterUrl} />
+            <FilmStill url={movie ? backdropUrl(movie) : undefined} />
           </div>
         )}
         <video
@@ -383,22 +490,68 @@ export function Player({
             ))}
           </select>
         </label>
-        {audioTracks.length > 1 && (
+        {inStream ? (
           <label>
             <span>Audio</span>
             <select
               aria-label="Audio track"
-              value={audioTrack ?? ""}
+              value={streamAudio.find((o) => o.active)?.id ?? ""}
               onChange={(e) =>
-                setAudioTrack(
-                  e.target.value === "" ? undefined : Number(e.target.value),
-                )
+                void adapterRef.current
+                  ?.selectAudio(e.target.value)
+                  .catch(() => {})
               }
             >
-              <option value="">Preferred / original</option>
-              {audioTracks.map((a) => (
-                <option key={a.index} value={a.index}>
-                  {a.label}
+              {streamAudio.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {audioTracks[Number(o.id)]?.label ?? o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          audioTracks.length > 1 && (
+            <label>
+              <span>Audio</span>
+              <select
+                aria-label="Audio track"
+                aria-describedby="audio-note"
+                value={audioTrack ?? ""}
+                onChange={(e) =>
+                  setAudioTrack(
+                    e.target.value === "" ? undefined : Number(e.target.value),
+                  )
+                }
+              >
+                <option value="">Preferred / original</option>
+                {audioTracks.map((a) => (
+                  <option key={a.index} value={a.index}>
+                    {a.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )
+        )}
+        {(streamSubtitles.length > 0 || subtitleTracks.length > 0) && (
+          <label>
+            <span>Subtitles</span>
+            <select
+              aria-label="Subtitles"
+              aria-describedby="subtitle-note"
+              value={streamSubtitles.find((o) => o.active)?.id ?? ""}
+              disabled={streamSubtitles.length === 0}
+              onChange={(e) => chooseSubtitle(e.target.value)}
+            >
+              <option value="">Off</option>
+              {streamSubtitles.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+              {pictureSubtitles.map((t, i) => (
+                <option key={`picture-${i}`} value={`picture-${i}`} disabled>
+                  {t.label} (picture subtitles, can’t be shown)
                 </option>
               ))}
             </select>
@@ -410,6 +563,26 @@ export function Player({
           </span>
         )}
       </div>
+      {!inStream && audioTracks.length > 1 && visible && (
+        <p className="playback-note" id="audio-note">
+          This edition carries one language. Choosing another prepares the film
+          again with it; films prepared from now on carry every language and
+          switch at once.
+        </p>
+      )}
+      {streamSubtitles.length === 0 && textSubtitles.length > 0 && (
+        <p className="playback-note" id="subtitle-note">
+          Subtitles appear here once this film’s preparation has finished.
+        </p>
+      )}
+      {streamSubtitles.length === 0 &&
+        textSubtitles.length === 0 &&
+        pictureSubtitles.length > 0 && (
+          <p className="playback-note" id="subtitle-note">
+            This film’s subtitles are pictures (from a Blu-ray or DVD), which
+            browsers cannot show.
+          </p>
+        )}
       <details className="player-help">
         <summary>Keyboard shortcuts</summary>
         <dl>

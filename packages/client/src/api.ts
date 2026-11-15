@@ -93,6 +93,26 @@ export function createApiClient(baseUrl: string) {
         `/api/movies?${params}`,
       );
     },
+    /** A picture from /api/artwork, fetched with this client's credential. */
+    async artwork(url: string, signal?: AbortSignal): Promise<Blob> {
+      if (!/^\/api\/artwork\/[a-f0-9]{32}$/.test(url))
+        throw new ApiError(400, "invalid_artwork");
+      const response = await fetch(`${baseUrl}${url}`, {
+        credentials: "same-origin",
+        signal,
+        headers: credential ? { Authorization: `Bearer ${credential}` } : {},
+      });
+      if (!response.ok)
+        throw new ApiError(response.status, "artwork_unavailable");
+      const type = response.headers.get("content-type") ?? "";
+      if (!/^image\/(jpeg|png)$/.test(type))
+        throw new ApiError(415, "artwork_unavailable");
+      return response.blob();
+    },
+    /** Credits owed to picture sources, such as TMDB when it is enabled. */
+    artworkCredits() {
+      return request<{ tmdb?: string }>("/api/artwork-credits");
+    },
     detail(id: string) {
       return request<MovieDetail>(`/api/movies/${encodeURIComponent(id)}`);
     },

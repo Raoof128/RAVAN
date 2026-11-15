@@ -5,13 +5,23 @@ import type { MovieCard as Movie } from "../../contracts/src/index.js";
 export function Poster({
   movie,
   large = false,
+  source,
 }: {
   movie: Movie;
   large?: boolean;
+  /**
+   * The picture already loaded by the caller, as a local object URL. The TV
+   * fetches pictures with its device credential, which an img cannot send.
+   */
+  source?: string;
 }) {
   const [failed, setFailed] = useState<string>();
-  const artwork = artworkUrl(movie.posterUrl);
-  const illustrated = artwork !== undefined && sampleArtwork.includes(artwork);
+  const artwork =
+    source && source.startsWith("blob:") ? source : artworkUrl(movie.posterUrl);
+  // A sample's artwork and a frame from the film carry no title: set one.
+  const illustrated =
+    artwork !== undefined &&
+    (sampleArtwork.includes(artwork) || movie.posterTitled === true);
   const hasArtwork = artwork !== undefined && failed !== artwork;
   const tone =
     Array.from(movie.id).reduce((n, c) => n + c.charCodeAt(0), 0) % 6;

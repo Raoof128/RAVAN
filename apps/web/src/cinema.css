@@ -1848,3 +1848,21 @@ button.danger:hover {
     max-height: 100dvh;
   }
 }
+
+/* Notes under the playback menus. */
+.playback-note {
+  max-width: 75ch;
+  margin: 2px 0 10px;
+  color: var(--muted);
+  font-size: 0.8667rem;
+  line-height: 1.6;
+}
+.playback-options select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.artwork-credit {
+  max-width: 75ch;
+  margin-top: 28px;
+}

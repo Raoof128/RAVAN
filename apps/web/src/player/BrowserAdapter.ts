@@ -2,9 +2,18 @@ import type {
   PlaybackSession,
   PlaybackState,
   PlayerAdapter,
+  TrackOption,
 } from "../../../../packages/contracts/src/index.js";
+/** Safari's list of audio tracks in a stream; absent from other engines. */
+type NativeAudioTracks = ArrayLike<{
+  label: string;
+  language: string;
+  enabled: boolean;
+}> &
+  EventTarget;
 export class BrowserAdapter implements PlayerAdapter {
   private listeners = new Set<(s: PlaybackState) => void>();
+  private trackListeners = new Set<() => void>();
   private removers: Array<() => void> = [];
   private loading?: AbortController;
   private hls?: import("hls.js").default;
@@ -37,6 +46,66 @@ export class BrowserAdapter implements PlayerAdapter {
     };
     video.addEventListener("seeked", seeked);
     this.removers.push(() => video.removeEventListener("seeked", seeked));
+    // Captions arrive and change; Safari also lists a stream's audio tracks.
+    const tracks = () => this.emitTracks();
+    for (const list of [video.textTracks, this.nativeAudio()]) {
+      // Older engines, and test doubles, give lists that are not event targets.
+      if (typeof list?.addEventListener !== "function") continue;
+      for (const event of ["addtrack", "removetrack", "change"]) {
+        list.addEventListener(event, tracks);
+        this.removers.push(() => list.removeEventListener(event, tracks));
+      }
+    }
+  }
+  private nativeAudio() {
+    return (this.video as unknown as { audioTracks?: NativeAudioTracks })
+      .audioTracks;
+  }
+  private emitTracks() {
+    if (!this.destroyed) for (const listener of this.trackListeners) listener();
+  }
+  onTracks(listener: () => void) {
+    this.trackListeners.add(listener);
+    return () => {
+      this.trackListeners.delete(listener);
+    };
+  }
+  /** Audio tracks the stream carries; empty when it has one, or the engine cannot switch. */
+  audioOptions(): TrackOption[] {
+    if (this.destroyed) return [];
+    const hls = this.hls;
+    if (hls)
+      return hls.audioTracks.map((track, i) => ({
+        id: String(i),
+        label: track.name || `Audio ${i + 1}`,
+        language: track.lang ?? "und",
+        active: i === hls.audioTrack,
+      }));
+    const native = this.nativeAudio();
+    if (!native) return [];
+    return Array.from({ length: native.length }, (_, i) => native[i]!).map(
+      (track, i) => ({
+        id: String(i),
+        label: track.label || `Audio ${i + 1}`,
+        language: track.language || "und",
+        active: track.enabled,
+      }),
+    );
+  }
+  /** The film's text subtitles, as tracks on the video element. */
+  subtitleOptions(): TrackOption[] {
+    if (this.destroyed) return [];
+    return Array.from(this.video.textTracks)
+      .map((track, i) => ({ track, i }))
+      .filter(
+        ({ track }) => track.kind === "subtitles" || track.kind === "captions",
+      )
+      .map(({ track, i }) => ({
+        id: String(i),
+        label: track.label || `Subtitles ${i + 1}`,
+        language: track.language || "und",
+        active: track.mode === "showing",
+      }));
   }
   async load(session: PlaybackSession) {
     if (this.destroyed) throw new Error("Player closed");
@@ -119,6 +188,12 @@ export class BrowserAdapter implements PlayerAdapter {
             hls.destroy();
             for (const listener of this.listeners) listener("error");
           });
+          for (const event of [
+            Hls.Events.MANIFEST_PARSED,
+            Hls.Events.AUDIO_TRACKS_UPDATED,
+            Hls.Events.AUDIO_TRACK_SWITCHED,
+          ])
+            hls.on(event, () => this.emitTracks());
           hls.loadSource(url.href);
           hls.attachMedia(this.video);
           this.watchStart(hls);
@@ -229,27 +304,30 @@ export class BrowserAdapter implements PlayerAdapter {
     return Number.isFinite(value) ? Math.max(0, value) : 0;
   }
   async selectAudio(trackId: string) {
-    if (!this.hls)
-      throw new Error("Audio selection is unavailable for this original file.");
     const index = Number(trackId);
-    if (!Number.isInteger(index) || !this.hls.audioTracks[index])
-      throw new Error("Audio track unavailable");
-    this.hls.audioTrack = index;
-  }
-  async selectSubtitle(trackId: string | null) {
     if (this.hls) {
-      const index = trackId === null ? -1 : Number(trackId);
-      if (
-        index !== -1 &&
-        (!Number.isInteger(index) || !this.hls.subtitleTracks[index])
-      )
-        throw new Error("Subtitle track unavailable");
-      this.hls.subtitleTrack = index;
+      if (!Number.isInteger(index) || !this.hls.audioTracks[index])
+        throw new Error("Audio track unavailable");
+      this.hls.audioTrack = index;
       return;
     }
-    for (let i = 0; i < this.video.textTracks.length; i++)
-      this.video.textTracks[i]!.mode =
-        String(i) === trackId ? "showing" : "disabled";
+    const native = this.nativeAudio();
+    if (!native || !Number.isInteger(index) || !native[index])
+      throw new Error("Audio selection is unavailable for this original file.");
+    for (let i = 0; i < native.length; i++) native[i]!.enabled = i === index;
+    this.emitTracks();
+  }
+  /** Show one subtitle track, or none. The ids are those subtitleOptions() gives. */
+  async selectSubtitle(trackId: string | null) {
+    const tracks = this.video.textTracks;
+    if (
+      trackId !== null &&
+      !this.subtitleOptions().some((option) => option.id === trackId)
+    )
+      throw new Error("Subtitle track unavailable");
+    for (let i = 0; i < tracks.length; i++)
+      tracks[i]!.mode = String(i) === trackId ? "showing" : "disabled";
+    this.emitTracks();
   }
   onState(listener: (state: PlaybackState) => void) {
     this.listeners.add(listener);
@@ -263,6 +341,7 @@ export class BrowserAdapter implements PlayerAdapter {
     this.loading?.abort();
     for (const remove of this.removers.splice(0)) remove();
     this.listeners.clear();
+    this.trackListeners.clear();
     clearInterval(this.startWatch);
     this.hls?.destroy();
     this.hls = undefined;

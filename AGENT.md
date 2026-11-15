@@ -50,6 +50,9 @@ RAVAN is a private, single-owner cinema: a Fastify API, a media worker, a Cloudf
 - **Anything that changes what the library lists must call `forgetLibrary(api)`** (`apps/web/src/libraryCache.ts`): playing, saving, editing.
 - **Escape a hyphen in an HTML `pattern`.** Browsers compile it with the `v` flag and silently ignore a pattern that is invalid there.
 - **One `h1` per screen.** `StatusPanel` takes `level={1}` when it is the only heading.
+- **Every playlist and picture is served only in the form this server writes.** `servePlaylist` (`apps/worker/src/hls.ts`) is the gate for media and top-level playlists; track names from a film are reduced to safe characters before they are written. Pictures are served by random id from `<data directory>/artwork` only (`ARTWORK_FILE`). Never serve a URL or path a client or a film supplies.
+- **No title leaves the server unless `MOV_TMDB_TOKEN` is set.** TMDB is reached only from the API (the worker cannot reach the internet), only at its fixed hosts, with redirects refused and every answer size-limited. A match needs the title and, when several films share it, the year.
+- **The TV fetches pictures with its credential.** It must never put a server picture's address in an `img`; use `useArtwork` in `apps/tv/src/main.tsx`.
 
 ## Testing
 
@@ -123,3 +126,11 @@ Raouf: 2026-11-15 (Australia/Sydney), sixth entry
 - Files changed: the maintainer's private notes, the maintainer's private notes, `CHANGELOG.md`, this file.
 - Verification: rehearsal on the server before switching (configuration, volume check, migrations on a database copy, FFmpeg in the new sandbox); 9 of 9 edge checks; host health checks; sign-in page in two browsers. No rollback was needed.
 - Follow-ups: exercise the signed-in screens on production; remove the rollback material from the server later; rebuild the TV package.
+
+Raouf: 2026-11-15 (Australia/Sydney), seventh entry
+
+- Scope: switch audio and subtitles in films with several, and automatic pictures for every film, on `audit/frontend-2026-11-15`.
+- Summary: all-languages HLS editions switch language in place; a subtitle menu follows the saved language; the worker makes posters and stills from each film's cover or frames; optional TMDB posters behind `MOV_TMDB_TOKEN`. 14 review findings fixed. See `CHANGELOG.md` and the maintainer's private notes.
+- Files changed: see `CHANGELOG.md`.
+- Verification: 46 files, 300 passed, 1 skipped, 0 failed; `npm run check`, all four builds and the release suite pass; `npm run test:e2e` 146 of 147 (one Firefox timeout under load, 36 of 36 on repeat).
+- Follow-ups: release migration 007 with API, worker and frontend together; TMDB logo in the credits before enabling it; let the edge and Nginx pass picture caching.

@@ -500,3 +500,17 @@
   margin-right: 14px;
   vertical-align: -4px;
 }
+
+.tv-player-controls .button-row > button[data-focus-id="subtitles"],
+.tv-player-controls .button-row > button[data-focus-id="audio"] {
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tv-movie .poster-credit {
+  font-size: 11px;
+  white-space: nowrap;
+  left: 4%;
+  right: 4%;
+}

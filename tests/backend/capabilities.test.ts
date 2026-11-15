@@ -339,9 +339,13 @@ it("remembers the browser's report and drops background conversions it made poin
   // Before any browser has played: the universal conversion is queued in the background.
   expect(storedCapabilities(h.db)).toBeUndefined();
   await worker.queueLibrary();
-  expect(h.db.prepare("SELECT kind,priority FROM jobs").all()).toEqual([
-    { kind: "browser-prepare", priority: 0 },
-  ]);
+  expect(
+    h.db.prepare("SELECT kind,priority FROM jobs WHERE kind<>'artwork'").all(),
+  ).toEqual([{ kind: "browser-prepare", priority: 0 }]);
+  // Pictures for the film are made once, beside the conversion work.
+  expect(
+    h.db.prepare("SELECT kind,priority FROM jobs WHERE kind='artwork'").all(),
+  ).toEqual([{ kind: "artwork", priority: 0 }]);
   // The owner's browser reports that it can take the original directly.
   const planner = new MediaPlanner(h.db, true, dir);
   planner.rememberCapabilities(modern);
@@ -350,7 +354,9 @@ it("remembers the browser's report and drops background conversions it made poin
   ).toBe("direct");
   expect(storedCapabilities(h.db)).toEqual(modern);
   await worker.queueLibrary();
-  expect(h.db.prepare("SELECT * FROM jobs").all()).toEqual([]);
+  expect(
+    h.db.prepare("SELECT * FROM jobs WHERE kind<>'artwork'").all(),
+  ).toEqual([]);
   expect(h.db.prepare("SELECT * FROM prepared_assets").all()).toEqual([]);
   // Planning on its own never changes the stored report.
   await planner.planPlayback(source, web, { capabilities: basic });
@@ -423,7 +429,9 @@ it("never drops a conversion that a viewer asked for or that is running", async 
   await worker.queueLibrary();
   expect(
     (
-      h.db.prepare("SELECT id FROM jobs ORDER BY rowid").all() as Array<{
+      h.db
+        .prepare("SELECT id FROM jobs WHERE kind<>'artwork' ORDER BY rowid")
+        .all() as Array<{
         id: string;
       }>
     ).map((row) => row.id),

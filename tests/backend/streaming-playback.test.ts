@@ -577,3 +577,55 @@ it("names the step a preparation is at, and only steps the server is in", async 
     progress: 25,
   });
 });
+
+it("prepares one edition for every audio track of a film that has several", async () => {
+  const languages = {
+    ...probe,
+    audio: [
+      { codec: "ac3", channels: 6, language: "eng" },
+      { codec: "aac", channels: 2, language: "fas" },
+    ],
+  };
+  const h = await fixture(languages);
+  const planner = new MediaPlanner(h.db, true, "/prepared", () => 1_000_000, {
+    format: "hls",
+  });
+  const first = await planner.planPlayback(source, web);
+  // Asking for the other language is the same edition, not a new one.
+  const other = await planner.planPlayback(source, web, { audioTrack: 1 });
+  expect(other.assetId).toBe(first.assetId);
+  const jobs = h.db
+    .prepare("SELECT payload FROM jobs WHERE kind='browser-prepare'")
+    .all() as Array<{ payload: string }>;
+  expect(jobs).toHaveLength(1);
+  expect(JSON.parse(jobs[0]!.payload)).toMatchObject({
+    format: "hls",
+    allAudio: true,
+  });
+  // The TV keeps one file per track.
+  const forTv = await planner.planPlayback(source, tv, { audioTrack: 1 });
+  expect(forTv.assetId).not.toBe(first.assetId);
+  // An edition already finished for the asked-for track is used rather than
+  // preparing the film again.
+  const oneTrack = assetId("f", "generation", "auto", 0, false, "hls");
+  h.db
+    .prepare(
+      "INSERT INTO prepared_assets(id,source_id,generation,quality,audio_track,last_used,format,state,label,size_bytes) VALUES(?,?,?,?,?,?,?,?,?,?)",
+    )
+    .run(
+      oneTrack,
+      "f",
+      "generation",
+      "auto",
+      0,
+      1,
+      "hls",
+      "ready",
+      "360p · H.264",
+      "1",
+    );
+  expect(await planner.planPlayback(source, web)).toMatchObject({
+    mode: "prepared",
+    assetId: oneTrack,
+  });
+});

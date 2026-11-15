@@ -21,6 +21,14 @@ import {
 import { rm, statfs } from "node:fs/promises";
 import { mediaFailureCode } from "./process.js";
 import { probeMedia, probeRecord, PROBE_VERSION } from "./probe.js";
+import {
+  artworkDirectory,
+  extractArtwork,
+  storeArtwork,
+  sweepArtwork,
+} from "./artwork.js";
+/** Bump to make every film's pictures again, for example after a better method. */
+export const ARTWORK_VERSION = 1;
 const sourceSchema = z.strictObject({
   fileId: z.string().regex(/^[A-Za-z0-9_-]{1,160}$/),
   generation: z.string().regex(/^[a-f0-9]{64}$/),
@@ -54,8 +62,48 @@ export class MediaWorker {
     if (url.protocol !== "http:" || url.hostname !== "127.0.0.1")
       throw new Error("Worker input must use loopback");
   }
+  private swept = 0;
   async queueLibrary() {
     if (!this.storage) return;
+    // Once an hour, remove picture files that nothing refers to.
+    if (Date.now() - this.swept > 3600000) {
+      this.swept = Date.now();
+      await sweepArtwork(this.db, artworkDirectory(this.storage.dataDir)).catch(
+        () => 0,
+      );
+    }
+    // Pictures for each film once it has been inspected: one source per film,
+    // made again when the file changes.
+    const queue = this.queue;
+    this.db.transaction(() => {
+      const missing = this.db
+        .prepare(
+          `SELECT s.id fileId,s.generation,s.size_bytes sizeBytes,s.movie_id movieId FROM source_files s JOIN tracks t ON t.id='probe-'||s.id
+           WHERE s.available=1 AND json_extract(t.metadata,'$.generation')=s.generation
+           AND s.id=(SELECT min(id) FROM source_files o WHERE o.movie_id=s.movie_id AND o.available=1)
+           AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.unique_key='artwork-v${ARTWORK_VERSION}:'||s.id||':'||s.generation)
+           LIMIT 100`,
+        )
+        .all() as Array<{
+        fileId: string;
+        generation: string;
+        sizeBytes: string;
+        movieId: string;
+      }>;
+      for (const film of missing)
+        queue.enqueue(
+          "artwork",
+          `artwork-v${ARTWORK_VERSION}:${film.fileId}:${film.generation}`,
+          {
+            source: {
+              fileId: film.fileId,
+              generation: film.generation,
+              sizeBytes: film.sizeBytes,
+            },
+            movieId: film.movieId,
+          },
+        );
+    })();
     const sources = this.db
       .prepare(
         "SELECT id AS fileId,generation,size_bytes AS sizeBytes FROM source_files WHERE available=1 ORDER BY size_bytes+0 LIMIT 1000",
@@ -183,7 +231,11 @@ export class MediaWorker {
       try {
         this.queue.renew(job);
         // Make way when a viewer is now waiting on a different film.
-        if (job.kind !== "probe" && this.queue.shouldYield(job)) {
+        if (
+          job.kind !== "probe" &&
+          job.kind !== "artwork" &&
+          this.queue.shouldYield(job)
+        ) {
           yielded = true;
           controller.abort();
         }
@@ -205,6 +257,8 @@ export class MediaWorker {
             audio: z.number().int().min(0).max(99),
             video: z.array(z.string().max(16)).max(8).optional(),
             format: z.enum(["mp4", "hls"]).default("mp4"),
+            // Every audio track, each its own stream (HLS only).
+            allAudio: z.boolean().default(false),
             id: z.string().regex(ASSET_ID),
           })
           .parse(JSON.parse(job.payload));
@@ -282,6 +336,7 @@ export class MediaWorker {
             threads: this.storage.threads,
             preset: this.storage.preset,
             format: data.format,
+            allAudio: data.allAudio,
             // Enough exists to start watching while the rest is produced.
             playable: () => {
               this.db
@@ -324,6 +379,60 @@ export class MediaWorker {
           throw error;
         }
         preparing = undefined;
+        return "completed";
+      }
+      if (job.kind === "artwork") {
+        if (!this.storage) throw new Error("Artwork unavailable");
+        const data = z
+          .object({
+            source: sourceSchema,
+            movieId: z.string().min(1).max(200),
+          })
+          .parse(JSON.parse(job.payload));
+        const record = this.db
+          .prepare("SELECT metadata FROM tracks WHERE id=?")
+          .get(`probe-${data.source.fileId}`) as
+          { metadata: string } | undefined;
+        if (!record) throw new Error("Probe missing");
+        const parsed = probeRecord.parse(JSON.parse(record.metadata));
+        if (parsed.generation !== data.source.generation)
+          throw new Error("Source changed");
+        const directory = artworkDirectory(this.storage.dataDir);
+        granted = await this.grant(data.source.fileId, combined, "short");
+        const pictures = await extractArtwork(
+          `${this.origin}/_worker/source/${data.source.fileId}`,
+          `Authorization: Bearer ${granted}\r\n`,
+          parsed.probe,
+          directory,
+          combined,
+        );
+        try {
+          const verified = sourceSchema.parse(
+            await this.ask(
+              `/_worker/verify/${data.source.fileId}`,
+              "GET",
+              combined,
+              45000,
+            ),
+          );
+          if (verified.generation !== data.source.generation)
+            throw new Error("Source changed");
+          // Both of the worker's sources in one step: never one without the other.
+          await storeArtwork(
+            this.db,
+            directory,
+            data.movieId,
+            data.source.generation,
+            ["cover", "frame"],
+            pictures,
+          );
+        } catch (error) {
+          await Promise.all(
+            pictures.map((p) => rm(join(directory, p.file), { force: true })),
+          );
+          throw error;
+        }
+        this.queue.complete(job);
         return "completed";
       }
       if (job.kind !== "probe") throw new Error("Unknown media job");
@@ -446,6 +555,7 @@ export async function runLoops(
     }),
     lane("probe"),
     lane("prepare"),
+    lane("artwork"),
   ]);
 }
 async function main() {

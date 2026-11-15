@@ -4,7 +4,8 @@ import rateLimit from "@fastify/rate-limit";
 import { verifyBoundary } from "../../worker/src/prepared-store.js";
 import { mkdir, statfs } from "node:fs/promises";
 import { join } from "node:path";
-import type { AppConfig } from "./config.js";
+import { startupReason, type AppConfig } from "./config.js";
+import { lookupArtwork, TMDB_NOTICE } from "./media/tmdb.js";
 import { openDatabase } from "../../../packages/db/src/open.js";
 import { registerAuth } from "./auth/routes.js";
 import type { OAuthProvider } from "./auth/oauth.js";
@@ -24,6 +25,8 @@ export async function buildApp(
     oauthProvider?: OAuthProvider;
     driveClient?: DriveClient;
     sourceFetch?: typeof fetch;
+    /** How TMDB is reached; tests pass a fake. */
+    artworkFetch?: typeof fetch;
   } = {},
 ) {
   await mkdir(config.dataDir, { recursive: true, mode: 0o700 });
@@ -67,6 +70,44 @@ export async function buildApp(
   }, 3600000);
   housekeeping.unref();
   app.addHook("onClose", async () => clearInterval(housekeeping));
+  // Optional posters from TMDB, a few films at a time, never two runs at once.
+  if (config.tmdbToken) {
+    const token = config.tmdbToken;
+    let running = false,
+      refused = false;
+    const lookup = async () => {
+      if (running || refused) return;
+      running = true;
+      try {
+        const outcome = await lookupArtwork(db, config.dataDir, token, {
+          fetcher: options.artworkFetch,
+        });
+        if (outcome.refused) {
+          refused = true;
+          console.error(
+            "TMDB refused the configured token; artwork lookup stopped.",
+          );
+        }
+      } catch (error) {
+        console.error("Artwork lookup failed.", startupReason(error));
+      } finally {
+        running = false;
+      }
+    };
+    const first = setTimeout(() => void lookup(), 30000);
+    const every = setInterval(() => void lookup(), 600000);
+    first.unref();
+    every.unref();
+    app.addHook("onClose", async () => {
+      clearTimeout(first);
+      clearInterval(every);
+    });
+    app.decorate("lookupArtwork", lookup);
+  }
+  // The credit TMDB asks for, shown wherever its pictures may appear.
+  app.get("/api/artwork-credits", async () =>
+    config.tmdbToken ? { tmdb: TMDB_NOTICE } : {},
+  );
   await app.register(cookie);
   await app.register(rateLimit, { max: 120, timeWindow: "1 minute" });
   app.addHook("onRequest", async (request, reply) => {
@@ -91,8 +132,10 @@ export async function buildApp(
   app.addHook("onSend", async (_request, reply) => {
     reply
       .header("X-Content-Type-Options", "nosniff")
-      .header("Referrer-Policy", "no-referrer")
-      .header("Cache-Control", "no-store");
+      .header("Referrer-Policy", "no-referrer");
+    // Nothing is cached unless its route says it may be (only artwork does).
+    if (!reply.getHeader("Cache-Control"))
+      reply.header("Cache-Control", "no-store");
   });
   app.setErrorHandler((error, _request, reply) => {
     const status = (error as { statusCode?: number }).statusCode ?? 500;
@@ -145,7 +188,7 @@ export async function buildApp(
   );
   await cache.init();
   registerSessions(app, db, config, library, cache);
-  registerCatalogue(app, db);
+  registerCatalogue(app, db, config.dataDir);
   if (config.workerKey) {
     const workerAuth = async (
       request: import("fastify").FastifyRequest,

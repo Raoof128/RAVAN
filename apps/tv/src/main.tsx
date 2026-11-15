@@ -8,8 +8,10 @@ import {
 import type {
   MovieCard,
   MovieDetail,
+  TrackOption,
 } from "../../../packages/contracts/src/index.js";
 import { Poster } from "../../../packages/ui/src/MovieCard.js";
+import { backdropUrl } from "../../../packages/ui/src/artwork.js";
 import { Icon } from "../../../packages/ui/src/Icon.js";
 import { installRemote, restoreFocus, saveFocus } from "./focus.js";
 import { pairDevice, credentialStore } from "./pairing.js";
@@ -26,6 +28,7 @@ import {
   Placeholder,
 } from "../../../packages/ui/src/Loading.js";
 import { Preparing } from "../../web/src/player/Preparing.js";
+import { sameLanguage } from "../../web/src/player/languages.js";
 import "../../../packages/ui/src/tokens.css";
 import "../../../packages/ui/src/loading.css";
 import "./tv.css";
@@ -42,6 +45,63 @@ async function launch() {
   createRoot(document.getElementById("root")!).render(<TV api={api} />);
 }
 void launch();
+/**
+ * A picture from the server, fetched with this TV's credential (an img cannot
+ * send it) and shown through a local object URL, released when unused.
+ */
+function useArtwork(api: ApiClient, url?: string) {
+  const [source, setSource] = useState<string>();
+  useEffect(() => {
+    setSource(undefined);
+    if (!url || !/^\/api\/artwork\/[a-f0-9]{32}$/.test(url)) return;
+    const controller = new AbortController();
+    let created: string | undefined;
+    api
+      .artwork(url, controller.signal)
+      .then((blob) => {
+        created = URL.createObjectURL(blob);
+        setSource(created);
+      })
+      .catch(() => {});
+    return () => {
+      controller.abort();
+      if (created) URL.revokeObjectURL(created);
+    };
+  }, [api, url]);
+  return source;
+}
+function TVPoster({
+  api,
+  movie,
+  large,
+}: {
+  api: ApiClient;
+  movie: MovieCard;
+  large?: boolean;
+}) {
+  const source = useArtwork(api, movie.posterUrl);
+  // Never the server's address itself: an img would ask without the credential.
+  const own = movie.posterUrl?.startsWith("/api/artwork/");
+  return (
+    <Poster
+      movie={own && !source ? { ...movie, posterUrl: undefined } : movie}
+      large={large}
+      source={source}
+    />
+  );
+}
+function TVBackdrop({ api, movie }: { api: ApiClient; movie?: MovieCard }) {
+  const url = movie ? backdropUrl(movie) : undefined;
+  const source = useArtwork(api, url);
+  // Only bundled samples are given by address; the server's are fetched.
+  return (
+    <FilmStill
+      url={url?.startsWith("/api/artwork/") ? undefined : url}
+      source={source}
+      priority
+    />
+  );
+}
 function greeting() {
   const hour = new Date().getHours();
   return hour < 5
@@ -236,7 +296,7 @@ function TV({ api }: { api: ApiClient }) {
       ) : page === "library" ? (
         <main className="tv-library">
           <div className="tv-library-atmosphere">
-            <FilmStill url={items[0]?.posterUrl} priority />
+            <TVBackdrop api={api} movie={items[0]} />
           </div>
           <p className="eyebrow">{greeting()}. MAKE YOURSELF AT HOME.</p>
           <h1>Something worth watching.</h1>
@@ -277,7 +337,7 @@ function TV({ api }: { api: ApiClient }) {
                   key={m.id}
                   onClick={() => void open(m.id)}
                 >
-                  <Poster movie={m} />
+                  <TVPoster api={api} movie={m} />
                   <strong>{m.title}</strong>
                   <small>
                     {!m.available
@@ -320,9 +380,9 @@ function TV({ api }: { api: ApiClient }) {
       ) : page === "detail" && movie ? (
         <main className="tv-detail">
           <div className="tv-library-atmosphere">
-            <FilmStill url={movie.posterUrl} priority />
+            <TVBackdrop api={api} movie={movie} />
           </div>
-          <Poster movie={movie} large />
+          <TVPoster api={api} movie={movie} large />
           <section>
             <h1>{movie.title}</h1>
             {movie.year ? <p className="tv-year">{movie.year}</p> : null}
@@ -421,7 +481,41 @@ function TVPlayer({
     [time, setTime] = useState({ at: 0, of: 0 }),
     [playing, setPlaying] = useState(false),
     [stalled, setStalled] = useState(false),
-    [shown, setShown] = useState(true);
+    [shown, setShown] = useState(true),
+    [audioTrack, setAudioTrack] = useState<number | undefined>(),
+    // A press of Audio only names the next language; preparing it waits until
+    // the presses stop, so several presses ask for one edition, not several.
+    [pendingAudio, setPendingAudio] = useState<number | undefined>(),
+    [preferredAudio, setPreferredAudio] = useState(0),
+    [subtitles, setSubtitles] = useState<TrackOption[]>([]),
+    [streamAudio, setStreamAudio] = useState<TrackOption[]>([]);
+  const adapterRef = useRef<WebOSAdapter | null>(null);
+  const audioTracks = movie.audioTracks ?? [];
+  useEffect(() => {
+    let active = true;
+    // The edition plays the saved language unless another was chosen.
+    api
+      .preferences()
+      .then((p) => {
+        const index = audioTracks.findIndex((t) =>
+          sameLanguage(t.language, p.audioLanguage),
+        );
+        if (active && index >= 0) setPreferredAudio(index);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [api, movie.id]);
+  useEffect(() => {
+    if (pendingAudio === undefined) return;
+    const timer = setTimeout(() => {
+      setPendingAudio(undefined);
+      if (pendingAudio !== (audioTrack ?? preferredAudio))
+        setAudioTrack(pendingAudio);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [pendingAudio]);
   const shownRef = useRef(true);
   const hide = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const live = state.kind === "ready" || state.kind === "paused";
@@ -444,14 +538,27 @@ function TVPlayer({
     // Retain the element itself: React clears refs before unmount cleanup.
     const element = video.current!;
     const adapter = new WebOSAdapter(element, origin || location.origin);
-    const player = new PlayerController(api, adapter, (s) => {
-      // The controller says "loading" before each of its checks on a film
-      // being prepared. The panel stays up between them.
-      if (active)
-        setState((previous) =>
-          s.kind === "loading" && previous.kind === "preparing" ? previous : s,
-        );
+    adapterRef.current = adapter;
+    const stopTracks = adapter.onTracks(() => {
+      if (!active) return;
+      setSubtitles(adapter.subtitleOptions());
+      setStreamAudio(adapter.audioOptions());
     });
+    const player = new PlayerController(
+      api,
+      adapter,
+      (s) => {
+        // The controller says "loading" before each of its checks on a film
+        // being prepared. The panel stays up between them.
+        if (active)
+          setState((previous) =>
+            s.kind === "loading" && previous.kind === "preparing"
+              ? previous
+              : s,
+          );
+      },
+      audioTrack === undefined ? {} : { audioTrack },
+    );
     controller.current = player;
     const capturePosition = () => {
       if (element.readyState > 0)
@@ -473,11 +580,18 @@ function TVPlayer({
     return () => {
       capturePosition();
       active = false;
+      stopTracks();
+      adapterRef.current = null;
       controller.current = null;
       document.removeEventListener("visibilitychange", visibility);
       void player.destroy();
     };
-  }, [api, movie.id, retry]);
+  }, [api, movie.id, retry, audioTrack]);
+  const activeSubtitle = subtitles.find((o) => o.active);
+  const inStream = streamAudio.length > 1;
+  const currentAudio = inStream
+    ? streamAudio.findIndex((o) => o.active)
+    : (pendingAudio ?? audioTrack ?? preferredAudio);
   // What the element reports, at most once a second: the C1 need not repaint
   // the transport for every frame of the film.
   useEffect(() => {
@@ -687,6 +801,44 @@ function TVPlayer({
               <button data-focus-id="forward" onClick={() => seek(10)}>
                 +10 sec
               </button>
+              {subtitles.length > 0 && (
+                <button
+                  data-focus-id="subtitles"
+                  onClick={() => {
+                    // Off, then each track in turn, then off again.
+                    const at = subtitles.findIndex((o) => o.active);
+                    const next = subtitles[at + 1];
+                    void adapterRef.current
+                      ?.selectSubtitle(next ? next.id : null)
+                      .catch(() => {});
+                  }}
+                >
+                  Subtitles: {activeSubtitle ? activeSubtitle.label : "Off"}
+                </button>
+              )}
+              {(inStream || audioTracks.length > 1) && (
+                <button
+                  data-focus-id="audio"
+                  onClick={() => {
+                    const count = inStream
+                      ? streamAudio.length
+                      : audioTracks.length;
+                    const next = (Math.max(0, currentAudio) + 1) % count;
+                    if (inStream)
+                      void adapterRef.current
+                        ?.selectAudio(String(next))
+                        .catch(() => {});
+                    // This edition has one language: prepare the next one,
+                    // once the viewer has stopped pressing.
+                    else setPendingAudio(next);
+                  }}
+                >
+                  Audio:{" "}
+                  {audioTracks[Math.max(0, currentAudio)]?.label ??
+                    streamAudio[Math.max(0, currentAudio)]?.label ??
+                    "Original"}
+                </button>
+              )}
             </>
           ) : null}
           <button data-focus-id="close" onClick={close}>

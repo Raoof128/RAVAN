@@ -1,4 +1,11 @@
 import type { Probe } from "../../../worker/src/probe.js";
+import { textSubtitles } from "../../../worker/src/compatibility.js";
+import { artworkDirectory, readArtwork } from "../../../worker/src/artwork.js";
+import {
+  audioLabel,
+  trackLanguage,
+  trackName,
+} from "../../../worker/src/tracks.js";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { Database } from "../../../../packages/db/src/open.js";
@@ -19,8 +26,15 @@ type MovieRow = {
   resume_ms: number;
   available: number;
   saved: number;
+  poster_id: string | null;
+  poster_provider: string | null;
+  still_id: string | null;
 };
-const selection = `SELECT m.*,COALESCE((SELECT CASE WHEN ended=1 THEN 0 ELSE position_ms END FROM progress p WHERE p.movie_id=m.id),0) resume_ms,EXISTS(SELECT 1 FROM source_files s WHERE s.movie_id=m.id AND s.available=1) available,EXISTS(SELECT 1 FROM watchlist w WHERE w.movie_id=m.id) saved FROM movies m`;
+// The best picture of each kind: from TMDB, then the film's own cover, then a
+// frame of the film.
+const best = (kind: string, column: string) =>
+  `(SELECT a.${column} FROM artwork a WHERE a.movie_id=m.id AND a.kind='${kind}' ORDER BY CASE a.provider WHEN 'tmdb' THEN 0 WHEN 'cover' THEN 1 ELSE 2 END LIMIT 1)`;
+const selection = `SELECT m.*,COALESCE((SELECT CASE WHEN ended=1 THEN 0 ELSE position_ms END FROM progress p WHERE p.movie_id=m.id),0) resume_ms,EXISTS(SELECT 1 FROM source_files s WHERE s.movie_id=m.id AND s.available=1) available,EXISTS(SELECT 1 FROM watchlist w WHERE w.movie_id=m.id) saved,${best("poster", "id")} poster_id,${best("poster", "provider")} poster_provider,${best("still", "id")} still_id FROM movies m`;
 function card(row: MovieRow): MovieCard {
   return {
     id: row.id,
@@ -28,9 +42,21 @@ function card(row: MovieRow): MovieCard {
     ...(row.year !== null ? { year: row.year } : {}),
     resumeMs: row.resume_ms,
     available: Boolean(row.available),
+    ...(row.poster_id
+      ? {
+          posterUrl: `/api/artwork/${row.poster_id}`,
+          // A frame of the film has no title on it; the card sets one.
+          ...(row.poster_provider === "frame" ? { posterTitled: true } : {}),
+        }
+      : {}),
+    ...(row.still_id ? { stillUrl: `/api/artwork/${row.still_id}` } : {}),
   };
 }
-export function registerCatalogue(app: FastifyInstance, db: Database) {
+export function registerCatalogue(
+  app: FastifyInstance,
+  db: Database,
+  dataDir: string,
+) {
   function detail(id: string): MovieDetail | undefined {
     const row = db.prepare(`${selection} WHERE m.id=?`).get(id) as
       MovieRow | undefined;
@@ -57,10 +83,13 @@ export function registerCatalogue(app: FastifyInstance, db: Database) {
     return {
       audioTracks: probe?.audio.map((a, index) => ({
         index,
-        language: a.language ?? "und",
-        label:
-          a.title ??
-          `${a.language ?? "Audio"} · ${a.codec} · ${a.channels} channels`,
+        language: trackLanguage(a.language),
+        label: audioLabel(a, index),
+      })),
+      subtitleTracks: probe?.subtitles.map((s, index) => ({
+        language: trackLanguage(s.language),
+        label: trackName(s, index).replace(/^Audio /, "Subtitles "),
+        text: textSubtitles.has(s.codec),
       })),
       ...card(row),
       description: row.description,
@@ -164,6 +193,10 @@ export function registerCatalogue(app: FastifyInstance, db: Database) {
           Date.now(),
           request.params.id,
         );
+      // A corrected title or year deserves another look for a poster.
+      db.prepare(
+        "DELETE FROM artwork_lookups WHERE movie_id=? AND outcome<>'found'",
+      ).run(request.params.id);
       if (!changed.changes)
         return reply.code(404).send({ error: "movie_not_found" });
       return detail(request.params.id);
@@ -205,9 +238,32 @@ export function registerCatalogue(app: FastifyInstance, db: Database) {
     ).run(JSON.stringify(body.data));
     return body.data;
   });
-  // Artwork enrichment is optional and disabled. A missing image is a local
-  // typographic poster in the client; no user URL is fetched by the server.
-  app.get("/api/artwork/:id", async (_request, reply) =>
-    reply.code(404).send({ error: "artwork_unavailable" }),
+  // Pictures made by the worker from the films, or fetched by this server
+  // when TMDB is configured. Served only by their random id, only to the owner
+  // and paired screens, and never from a URL a client supplies.
+  app.get<{ Params: { id: string } }>(
+    "/api/artwork/:id",
+    { config: { rateLimit: { max: 600, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const id = request.params.id;
+      const row = /^[a-f0-9]{32}$/.test(id)
+        ? (db.prepare("SELECT path FROM artwork WHERE id=?").get(id) as
+            { path: string } | undefined)
+        : undefined;
+      const bytes = row
+        ? await readArtwork(artworkDirectory(dataDir), row.path).catch(
+            () => undefined,
+          )
+        : undefined;
+      if (!row || !bytes)
+        return reply.code(404).send({ error: "artwork_unavailable" });
+      return (
+        reply
+          .type(row.path.endsWith(".png") ? "image/png" : "image/jpeg")
+          // A picture's id changes whenever the picture does.
+          .header("Cache-Control", "private, max-age=31536000, immutable")
+          .send(bytes)
+      );
+    },
   );
 }
