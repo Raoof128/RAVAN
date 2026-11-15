@@ -249,3 +249,36 @@ it("still closes the whole library when the root itself is confirmed lost", asyn
   ).rejects.toThrow();
   expect(sources(db).map((f) => f.available)).toEqual([0, 0]);
 });
+
+it("keeps a film's generation when Drive raises its version without new content", async () => {
+  const { sync, files, db } = await fixture();
+  for (const f of files)
+    if (f.id === "one" || f.id === "two") f.md5Checksum = `md5-${f.id}`;
+  await sync.syncLibrary("root", new AbortController().signal);
+  const before = sources(db);
+  // Drive raises the version for changes to the record, not the bytes.
+  for (const f of files)
+    if (f.version) f.version = String(Number(f.version) + 7);
+  await sync.syncLibrary("root", new AbortController().signal);
+  expect(sources(db)).toEqual(before);
+  // Checking the source against Drive agrees, and neither closes it nor its sessions.
+  const ref = await sync.verifySource("one", true);
+  expect(ref.generation).toBe(before.find((s) => s.id === "one")!.generation);
+  expect(sources(db).find((s) => s.id === "one")!.available).toBe(1);
+  // New content is a new generation.
+  files.find((f) => f.id === "one")!.md5Checksum = "md5-replaced";
+  await expect(sync.verifySource("one", true)).rejects.toThrow();
+  await sync.syncLibrary("root", new AbortController().signal);
+  expect(sources(db).find((s) => s.id === "one")!.generation).not.toBe(
+    before.find((s) => s.id === "one")!.generation,
+  );
+  // Without a checksum, the head revision identifies the content.
+  const two = files.find((f) => f.id === "two")!;
+  delete two.md5Checksum;
+  two.headRevisionId = "rev-1";
+  await sync.syncLibrary("root", new AbortController().signal);
+  const settled = sources(db).find((s) => s.id === "two")!.generation;
+  two.version = "99";
+  await sync.syncLibrary("root", new AbortController().signal);
+  expect(sources(db).find((s) => s.id === "two")!.generation).toBe(settled);
+});

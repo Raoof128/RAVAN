@@ -239,6 +239,52 @@ export function Player({
   // Audio switches inside the stream when it carries every track; otherwise
   // a different track means a different edition.
   const inStream = streamAudio.length > 1;
+  // Full screen holds the picture and the menus together. Where an element
+  // cannot be full screen (an iPhone), the video's own full screen is used,
+  // which has its own language menus.
+  const frame = useRef<HTMLDivElement>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [idle, setIdle] = useState(false);
+  const idleTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const wake = () => {
+    setIdle(false);
+    clearTimeout(idleTimer.current);
+    idleTimer.current = setTimeout(() => setIdle(true), 3000);
+  };
+  useEffect(() => {
+    const change = () =>
+      setFullscreen(
+        document.fullscreenElement === frame.current ||
+          (document as unknown as { webkitFullscreenElement?: Element })
+            .webkitFullscreenElement === frame.current,
+      );
+    document.addEventListener("fullscreenchange", change);
+    document.addEventListener("webkitfullscreenchange", change);
+    return () => {
+      clearTimeout(idleTimer.current);
+      document.removeEventListener("fullscreenchange", change);
+      document.removeEventListener("webkitfullscreenchange", change);
+    };
+  }, []);
+  function toggleFullscreen() {
+    const box = frame.current as FullscreenElement | null;
+    const doc = document as unknown as {
+      webkitFullscreenElement?: Element;
+      webkitExitFullscreen?: () => void;
+    };
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => {});
+      return;
+    }
+    if (doc.webkitFullscreenElement) {
+      doc.webkitExitFullscreen?.();
+      return;
+    }
+    if (box?.requestFullscreen) void box.requestFullscreen().catch(() => {});
+    else if (box?.webkitRequestFullscreen) box.webkitRequestFullscreen();
+    else (video.current as FullscreenElement | null)?.webkitEnterFullscreen?.();
+    wake();
+  }
   const textSubtitles = subtitleTracks.filter((t) => t.text);
   const pictureSubtitles = subtitleTracks.filter((t) => !t.text);
   // What the element itself reports: stalled for data, playing, finished.
@@ -339,12 +385,7 @@ export function Player({
           say(next ? `Subtitles: ${next.label}` : "Subtitles off");
         }
       } else if (key === "f") {
-        const stage = element as FullscreenElement;
-        if (document.fullscreenElement) void document.exitFullscreen();
-        else if (stage.requestFullscreen)
-          void stage.requestFullscreen().catch(() => {});
-        else if (stage.webkitRequestFullscreen) stage.webkitRequestFullscreen();
-        else stage.webkitEnterFullscreen?.();
+        toggleFullscreen();
       } else return;
       event.preventDefault();
     };
@@ -364,210 +405,251 @@ export function Player({
         </a>
       </div>
       <div
-        className={`stage${visible ? " stage-live" : ""}`}
-        data-state={state.kind}
+        ref={frame}
+        className={`player-frame${idle ? " is-idle" : ""}${playing ? " is-playing" : ""}`}
+        onPointerMove={wake}
+        onFocusCapture={wake}
       >
-        {!visible && (
-          <div className="stage-backdrop">
-            <FilmStill url={movie ? backdropUrl(movie) : undefined} />
-          </div>
-        )}
-        <video
-          ref={video}
-          controls
-          playsInline
-          preload="metadata"
-          aria-label={`${title} player`}
-          hidden={!visible}
-        />
-        {visible && waiting && (
-          <div className="stage-buffering" role="status">
-            <Flow />
-            <span className="sr-only">Buffering</span>
-          </div>
-        )}
-        {visible && !playing && state.kind === "paused" && !ended && (
-          <button
-            className="stage-play primary"
-            onClick={() => void video.current?.play().catch(() => {})}
-          >
-            <Icon name="play" />
-            Play film
-          </button>
-        )}
-        {visible && ended && (
-          <div className="stage-ended">
-            <p>The end.</p>
-            <div className="button-row">
-              <button
-                className="primary"
-                onClick={() => {
-                  const element = video.current;
-                  if (!element) return;
-                  element.currentTime = 0;
-                  void element.play().catch(() => {});
-                }}
-              >
-                Watch again
-              </button>
-              <a className="button" href="#/library">
-                Back to the collection
-              </a>
+        <div
+          className={`stage${visible ? " stage-live" : ""}`}
+          data-state={state.kind}
+        >
+          {!visible && (
+            <div className="stage-backdrop">
+              <FilmStill url={movie ? backdropUrl(movie) : undefined} />
             </div>
-          </div>
-        )}
-        {visible && (
-          <p className="stage-notice" aria-live="polite">
-            {notice}
-          </p>
-        )}
-        {state.kind === "loading" ? (
-          <Opening words="Connecting to your film" />
-        ) : state.kind === "preparing" ? (
-          <Preparing
-            phase={state.phase}
-            progress={state.progress}
-            reason={state.reason}
+          )}
+          <video
+            ref={video}
+            controls
+            // Full screen is the frame's, so the language menus come along.
+            controlsList="nofullscreen"
+            playsInline
+            preload="metadata"
+            aria-label={`${title} player`}
+            hidden={!visible}
           />
-        ) : state.kind === "unsupported" ? (
-          <section className="stage-message" role="alert">
-            <h2>This film can’t play here yet.</h2>
-            <p>{state.reason}</p>
-            <div className="button-row">
-              <button onClick={() => setRetry((n) => n + 1)}>Try again</button>
-              <a className="button" href={`#/movie/${encodeURIComponent(id)}`}>
-                Back to the film
-              </a>
+          {visible && waiting && (
+            <div className="stage-buffering" role="status">
+              <Flow />
+              <span className="sr-only">Buffering</span>
             </div>
-          </section>
-        ) : state.kind === "conflict" ? (
-          <section className="stage-message" role="status">
-            <h2>A film is already playing.</h2>
-            <p>Continuing here will stop playback on the other screen.</p>
-            <div className="button-row">
-              <button
-                className="primary"
-                onClick={() =>
-                  void controller.current?.start(
-                    id,
-                    "web",
-                    resume,
-                    state.sessionId,
-                  )
-                }
-              >
-                Stop that session and play here
-              </button>
-            </div>
-          </section>
-        ) : state.kind === "error" ? (
-          <section className="stage-message" role="alert">
-            <h2>Let’s try that again.</h2>
-            <p>{state.reason}</p>
-            <div className="button-row">
-              <button
-                className="primary"
-                onClick={() => setRetry((n) => n + 1)}
-              >
-                Retry playback
-              </button>
-            </div>
-          </section>
-        ) : null}
-      </div>
-      <div className="playback-options">
-        <label>
-          <span>Quality</span>
-          <select
-            aria-label="Playback quality"
-            value={quality}
-            onChange={(e) => setQuality(e.target.value as Quality)}
-          >
-            {qualities.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        {inStream ? (
-          <label>
-            <span>Audio</span>
-            <select
-              aria-label="Audio track"
-              value={streamAudio.find((o) => o.active)?.id ?? ""}
-              onChange={(e) =>
-                void adapterRef.current
-                  ?.selectAudio(e.target.value)
-                  .catch(() => {})
-              }
+          )}
+          {visible && !playing && state.kind === "paused" && !ended && (
+            <button
+              className="stage-play primary"
+              onClick={() => void video.current?.play().catch(() => {})}
             >
-              {streamAudio.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {audioTracks[Number(o.id)]?.label ?? o.label}
+              <Icon name="play" />
+              Play film
+            </button>
+          )}
+          {visible && ended && (
+            <div className="stage-ended">
+              <p>The end.</p>
+              <div className="button-row">
+                <button
+                  className="primary"
+                  onClick={() => {
+                    const element = video.current;
+                    if (!element) return;
+                    element.currentTime = 0;
+                    void element.play().catch(() => {});
+                  }}
+                >
+                  Watch again
+                </button>
+                <a className="button" href="#/library">
+                  Back to the collection
+                </a>
+              </div>
+            </div>
+          )}
+          {visible && (
+            <p className="stage-notice" aria-live="polite">
+              {notice}
+            </p>
+          )}
+          {state.kind === "loading" ? (
+            <Opening words="Connecting to your film" />
+          ) : state.kind === "preparing" ? (
+            <Preparing
+              phase={state.phase}
+              progress={state.progress}
+              reason={state.reason}
+            />
+          ) : state.kind === "unsupported" ? (
+            <section className="stage-message" role="alert">
+              <h2>This film can’t play here yet.</h2>
+              <p>{state.reason}</p>
+              <div className="button-row">
+                <button onClick={() => setRetry((n) => n + 1)}>
+                  Try again
+                </button>
+                <a
+                  className="button"
+                  href={`#/movie/${encodeURIComponent(id)}`}
+                >
+                  Back to the film
+                </a>
+              </div>
+            </section>
+          ) : state.kind === "conflict" ? (
+            <section className="stage-message" role="status">
+              <h2>A film is already playing.</h2>
+              <p>Continuing here will stop playback on the other screen.</p>
+              <div className="button-row">
+                <button
+                  className="primary"
+                  onClick={() =>
+                    void controller.current?.start(
+                      id,
+                      "web",
+                      resume,
+                      state.sessionId,
+                    )
+                  }
+                >
+                  Stop that session and play here
+                </button>
+              </div>
+            </section>
+          ) : state.kind === "error" ? (
+            <section className="stage-message" role="alert">
+              <h2>Let’s try that again.</h2>
+              <p>{state.reason}</p>
+              <div className="button-row">
+                <button
+                  className="primary"
+                  onClick={() => setRetry((n) => n + 1)}
+                >
+                  Retry playback
+                </button>
+              </div>
+            </section>
+          ) : null}
+        </div>
+        <div className="playback-options">
+          <label>
+            <span>Quality</span>
+            <select
+              aria-label="Playback quality"
+              value={quality}
+              onChange={(e) => setQuality(e.target.value as Quality)}
+            >
+              {qualities.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
                 </option>
               ))}
             </select>
           </label>
-        ) : (
-          audioTracks.length > 1 && (
+          {inStream ? (
+            <label>
+              <span>Audio</span>
+              <select
+                aria-label="Audio track"
+                value={streamAudio.find((o) => o.active)?.id ?? ""}
+                onChange={(e) =>
+                  void adapterRef.current
+                    ?.selectAudio(e.target.value)
+                    .catch(() => {})
+                }
+              >
+                {streamAudio.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {audioTracks[Number(o.id)]?.label ?? o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : audioTracks.length === 1 ? (
             <label>
               <span>Audio</span>
               <select
                 aria-label="Audio track"
                 aria-describedby="audio-note"
-                value={audioTrack ?? ""}
-                onChange={(e) =>
-                  setAudioTrack(
-                    e.target.value === "" ? undefined : Number(e.target.value),
-                  )
-                }
+                value="0"
+                disabled
               >
-                <option value="">Preferred / original</option>
-                {audioTracks.map((a) => (
-                  <option key={a.index} value={a.index}>
-                    {a.label}
+                <option value="0">{audioTracks[0]!.label}</option>
+              </select>
+            </label>
+          ) : (
+            audioTracks.length > 1 && (
+              <label>
+                <span>Audio</span>
+                <select
+                  aria-label="Audio track"
+                  aria-describedby="audio-note"
+                  value={audioTrack ?? ""}
+                  onChange={(e) =>
+                    setAudioTrack(
+                      e.target.value === ""
+                        ? undefined
+                        : Number(e.target.value),
+                    )
+                  }
+                >
+                  <option value="">Preferred / original</option>
+                  {audioTracks.map((a) => (
+                    <option key={a.index} value={a.index}>
+                      {a.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )
+          )}
+          {(streamSubtitles.length > 0 || subtitleTracks.length > 0) && (
+            <label>
+              <span>Subtitles</span>
+              <select
+                aria-label="Subtitles"
+                aria-describedby="subtitle-note"
+                value={streamSubtitles.find((o) => o.active)?.id ?? ""}
+                disabled={streamSubtitles.length === 0}
+                onChange={(e) => chooseSubtitle(e.target.value)}
+              >
+                <option value="">Off</option>
+                {streamSubtitles.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.label}
+                  </option>
+                ))}
+                {pictureSubtitles.map((t, i) => (
+                  <option key={`picture-${i}`} value={`picture-${i}`} disabled>
+                    {t.label} (picture subtitles, can’t be shown)
                   </option>
                 ))}
               </select>
             </label>
-          )
-        )}
-        {(streamSubtitles.length > 0 || subtitleTracks.length > 0) && (
-          <label>
-            <span>Subtitles</span>
-            <select
-              aria-label="Subtitles"
-              aria-describedby="subtitle-note"
-              value={streamSubtitles.find((o) => o.active)?.id ?? ""}
-              disabled={streamSubtitles.length === 0}
-              onChange={(e) => chooseSubtitle(e.target.value)}
-            >
-              <option value="">Off</option>
-              {streamSubtitles.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.label}
-                </option>
-              ))}
-              {pictureSubtitles.map((t, i) => (
-                <option key={`picture-${i}`} value={`picture-${i}`} disabled>
-                  {t.label} (picture subtitles, can’t be shown)
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        {state.kind === "ready" && state.session.label && (
-          <span className="playback-edition">
-            Now playing: {state.session.label}
-          </span>
-        )}
+          )}
+          <button
+            type="button"
+            className="fullscreen-button"
+            aria-pressed={fullscreen}
+            onClick={toggleFullscreen}
+          >
+            {fullscreen ? "Exit full screen" : "Full screen"}
+          </button>
+          {state.kind === "ready" && state.session.label && (
+            <span className="playback-edition">
+              Now playing: {state.session.label}
+            </span>
+          )}
+        </div>
       </div>
       {!inStream && audioTracks.length > 1 && visible && (
         <p className="playback-note" id="audio-note">
           This edition carries one language. Choosing another prepares the film
           again with it; films prepared from now on carry every language and
           switch at once.
+        </p>
+      )}
+      {audioTracks.length === 1 && (
+        <p className="playback-note" id="audio-note">
+          This film has one language. Films with several show each of them here.
         </p>
       )}
       {streamSubtitles.length === 0 && textSubtitles.length > 0 && (

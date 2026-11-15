@@ -108,6 +108,37 @@ export async function makeRoom(
   if ((await available()) <= needed + reserve)
     throw Error("Prepared storage full");
 }
+/**
+ * Remove finished editions of content that has since changed: the server
+ * refuses to play them, so they only take space. Never one a live session
+ * is using. Returns how many were removed.
+ */
+export async function pruneStale(
+  db: Database,
+  directory: string,
+  now = Date.now(),
+) {
+  const stale = db
+    .prepare(
+      `SELECT a.id FROM prepared_assets a LEFT JOIN source_files s ON s.id=a.source_id
+       WHERE a.state IN ('ready','evicted') AND (s.id IS NULL OR s.generation<>a.generation)
+       AND NOT EXISTS (SELECT 1 FROM playback_sessions p WHERE p.asset_id=a.id AND p.revoked_at IS NULL AND p.lease_until>?)`,
+    )
+    .all(now) as { id: string }[];
+  let removed = 0;
+  for (const row of stale) {
+    if (!ASSET_ID.test(row.id)) continue;
+    const gone = db
+      .prepare(
+        "DELETE FROM prepared_assets WHERE id=? AND state IN ('ready','evicted') AND NOT EXISTS (SELECT 1 FROM playback_sessions WHERE asset_id=? AND revoked_at IS NULL AND lease_until>?)",
+      )
+      .run(row.id, row.id, now);
+    if (!gone.changes) continue;
+    await rm(join(directory, row.id), { recursive: true, force: true });
+    removed++;
+  }
+  return removed;
+}
 export function localReader(directory: string, file = "video.mp4") {
   return {
     async *readSource(

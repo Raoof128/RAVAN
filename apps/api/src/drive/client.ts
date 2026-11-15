@@ -8,6 +8,7 @@ const fileSchema = z.object({
   size: z.string().regex(/^\d+$/).optional(),
   version: z.string().optional(),
   md5Checksum: z.string().optional(),
+  headRevisionId: z.string().optional(),
   trashed: z.boolean().optional(),
   capabilities: z.object({ canDownload: z.boolean().optional() }).optional(),
 });
@@ -40,7 +41,7 @@ export class DriveError extends Error {
   }
 }
 const fields =
-  "id,name,mimeType,parents,size,version,md5Checksum,trashed,capabilities(canDownload)";
+  "id,name,mimeType,parents,size,version,md5Checksum,headRevisionId,trashed,capabilities(canDownload)";
 export const driveId = z.string().regex(/^[A-Za-z0-9_-]{1,160}$/);
 export function createDriveClient(
   token: () => Promise<string>,

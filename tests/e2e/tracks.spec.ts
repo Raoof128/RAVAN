@@ -231,3 +231,43 @@ test("keeps the language the viewer picks, after a one-language edition led to a
   await expect(audio).toHaveValue("0");
   expect(calls).toBe(2);
 });
+
+test("shows the audio menu for a film with one language, and keeps the menus in full screen", async ({
+  page,
+  browserName,
+}) => {
+  const bytes = await readFile(".local/test-media/synthetic.mp4");
+  await cinema(page, {
+    mediaUrl: "/media/s/test/video.mp4",
+    detail: {
+      audioTracks: [{ index: 0, language: "eng", label: "English · 5.1" }],
+    },
+  });
+  await page.route("**/media/s/test/video.mp4", (route) =>
+    route.fulfill({ contentType: "video/mp4", body: bytes }),
+  );
+  await page.goto("/#/player/fixture");
+  await ready(page);
+  const audio = page.getByRole("combobox", { name: "Audio track" });
+  await expect(audio).toBeVisible();
+  await expect(audio).toBeDisabled();
+  await expect(audio.locator("option")).toHaveText(["English · 5.1"]);
+  await expect(page.locator("#audio-note")).toContainText("one language");
+  // The browser's own full-screen button is hidden; ours takes the menus along.
+  await expect(page.locator("video")).toHaveAttribute(
+    "controlslist",
+    "nofullscreen",
+  );
+  if (browserName !== "chromium") return;
+  await page.getByRole("button", { name: "Full screen" }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.fullscreenElement?.className ?? ""),
+    )
+    .toContain("player-frame");
+  await expect(audio).toBeVisible();
+  await page.getByRole("button", { name: "Exit full screen" }).click();
+  await expect
+    .poll(() => page.evaluate(() => document.fullscreenElement === null))
+    .toBe(true);
+});

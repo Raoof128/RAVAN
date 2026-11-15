@@ -4,6 +4,7 @@ import {
   mkdir,
   mkdtemp,
   readFile,
+  readdir,
   realpath,
   rm,
   stat,
@@ -14,7 +15,7 @@ import { join } from "node:path";
 import { sessionFixture } from "../fixtures/session-harness.js";
 import { MediaPlanner, playableNow } from "../../apps/api/src/media/planner.js";
 import { PlaybackService } from "../../apps/api/src/sessions/playback.js";
-import { assetId } from "../../apps/worker/src/prepared-store.js";
+import { assetId, pruneStale } from "../../apps/worker/src/prepared-store.js";
 import { JobQueue } from "../../apps/worker/src/leases.js";
 import { MediaWorker } from "../../apps/worker/src/main.js";
 import { runProcess } from "../../apps/worker/src/process.js";
@@ -628,4 +629,38 @@ it("prepares one edition for every audio track of a film that has several", asyn
     mode: "prepared",
     assetId: oneTrack,
   });
+});
+
+it("removes finished editions of content that has since changed, but not one in use", async () => {
+  const h = await fixture();
+  const dir = await mkdtemp(join(tmpdir(), "ravan-stale-"));
+  cleanup.push(() => rm(dir, { recursive: true, force: true }));
+  const add = (id: string, generation: string, state = "ready") => {
+    h.db
+      .prepare(
+        "INSERT INTO prepared_assets(id,source_id,generation,quality,audio_track,last_used,format,state) VALUES(?,?,?,?,?,?,?,?)",
+      )
+      .run(id, "f", generation, "auto", 0, 1, "hls", state);
+    return mkdir(join(dir, id));
+  };
+  const current = "a".repeat(64),
+    old = "b".repeat(64),
+    playing = "c".repeat(64),
+    growing = "d".repeat(64);
+  await add(current, "generation");
+  await add(old, "an-earlier-generation");
+  await add(playing, "an-earlier-generation");
+  await add(growing, "an-earlier-generation", "streaming");
+  h.db
+    .prepare(
+      "INSERT INTO playback_sessions(id,ticket_hash,movie_id,source_id,generation,epoch,lease_until,access_until,expires_at,asset_id) VALUES('s','t','m','f','an-earlier-generation',1,?,?,?,?)",
+    )
+    .run(Date.now() + 60000, Date.now() + 60000, Date.now() + 60000, playing);
+  expect(await pruneStale(h.db, dir)).toBe(1);
+  expect((await readdir(dir)).sort()).toEqual(
+    [current, playing, growing].sort(),
+  );
+  expect(
+    h.db.prepare("SELECT id FROM prepared_assets ORDER BY id").all(),
+  ).toEqual([{ id: current }, { id: playing }, { id: growing }]);
 });

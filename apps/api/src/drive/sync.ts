@@ -7,7 +7,12 @@ import {
   DriveError,
   driveId,
 } from "./client.js";
-import { belongsTo, folderMime, generation } from "./membership.js";
+import {
+  belongsTo,
+  folderMime,
+  generation,
+  sameContent,
+} from "./membership.js";
 export function isVideoFile(file: Pick<DriveFile, "mimeType" | "name">) {
   // Some uploaders use generic MIME types for MKV/AVI. Probe the bytes before playback.
   return (
@@ -368,10 +373,19 @@ export class LibrarySync {
       this.db.prepare("UPDATE source_files SET available=0").run();
       for (const file of files) {
         const previous = this.db
-          .prepare("SELECT movie_id,generation FROM source_files WHERE id=?")
-          .get(file.id) as { movie_id: string; generation: string } | undefined;
+          .prepare(
+            "SELECT movie_id,generation,metadata FROM source_files WHERE id=?",
+          )
+          .get(file.id) as
+          | { movie_id: string; generation: string; metadata: string }
+          | undefined;
         const movie = previous?.movie_id ?? randomUUID();
-        const gen = generation(file);
+        // The same bytes keep their generation, so what was prepared from
+        // them stays valid; only a real change of content starts afresh.
+        const gen =
+          previous && sameContent(previous.metadata, file)
+            ? previous.generation
+            : generation(file);
         if (!previous)
           this.db
             .prepare("INSERT INTO movies(id,title) VALUES(?,?)")
@@ -455,6 +469,15 @@ export class LibrarySync {
       throw error;
     }
   }
+  /** Whether Drive's answer is still the content catalogued as `expected`. */
+  private sameGeneration(fileId: string, expected: string, file: DriveFile) {
+    const stored = this.db
+      .prepare("SELECT metadata FROM source_files WHERE id=? AND generation=?")
+      .get(fileId, expected) as { metadata: string } | undefined;
+    return stored
+      ? sameContent(stored.metadata, file)
+      : generation(file) === expected;
+  }
   private async verifyRemote(
     fileId: string,
     expected: string,
@@ -468,7 +491,7 @@ export class LibrarySync {
     if (
       rootFile.trashed ||
       file.capabilities?.canDownload === false ||
-      generation(file) !== expected ||
+      !this.sameGeneration(fileId, expected, file) ||
       !(await belongsTo(this.client, file, root, signal))
     ) {
       // Only condemn the generation this check was asked about. A scan may have

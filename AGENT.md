@@ -16,6 +16,7 @@ RAVAN is a private, single-owner cinema: a Fastify API, a media worker, a Cloudf
 - **A library session is created in one place**, inside the MFA verification transaction in `apps/api/src/auth/mfa.ts`. Google sign-in alone yields only a challenge.
 - **State changes need the CSRF token and an exact `Origin`.** `GET` handlers must not change state.
 - **Media is authorized per ticket and per chunk.** Paths under a prepared asset come from a 64-hex ID and a filename matched by regular expression.
+- **A source's generation follows its content, never Drive's `version`.** `contentKey` in `apps/api/src/drive/membership.ts` (checksum and size, else head revision) decides whether a scan keeps the generation and whether verification accepts a file. `version` rises with any change to Drive's record of the file; using it re-prepared films and ended playback.
 - **Drive verification may be reused for five seconds, except after a read.** `verifySource(id, true)` must be used whenever the answer has to postdate bytes just fetched.
 - **Subprocesses take fixed argument arrays** with `shell: false`, protocol and format allowlists, and a timeout. Never store or return FFmpeg stderr; classify it to a fixed code.
 - **Errors leave the API as `{ "error": "<code>" }`** with no paths, filenames, tokens or upstream messages.
@@ -142,3 +143,11 @@ Raouf: 2026-11-15 (Australia/Sydney), eighth entry
 - Files changed: the maintainer's private notes, the maintainer's private notes, `CHANGELOG.md`, this file.
 - Verification: server rehearsal (migration on a copy, two-language edition, pictures), 9 of 9 edge checks, host checks, sign-in page in two browsers; no rollback needed.
 - Follow-ups: signed-in check of the new menus on production; TMDB logo before enabling TMDB; clear old rollback material.
+
+Raouf: 2026-11-15 (Australia/Sydney), ninth entry
+
+- Scope: two problems reported on the live site.
+- Summary: generations now follow content (Drive's `version` changed several times an hour and caused films to be prepared again and playback to end); stale editions are pruned; the audio menu shows for every film and stays with the picture in full screen.
+- Files changed: see `CHANGELOG.md`.
+- Verification: 46 files, 302 passed, 1 skipped; `npm run check`; 150 browser tests passed.
+- Follow-ups: release.

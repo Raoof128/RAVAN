@@ -1,5 +1,34 @@
 # Changelog
 
+## Raouf: 2026-11-15 (Australia/Sydney) — prepared films kept; audio menu always shown
+
+**Scope:** two problems the owner reported on the live site: the audio choice was missing, and films the server had already prepared were prepared again. Same branch. Not yet released.
+
+### What was wrong
+
+- **Prepared films were thrown away.** A film's generation included Google Drive's `version` number. Drive raises it for any change to the file's record, not only its content, and on the live server it rose several times an hour on films no one had touched. Each rise made the server treat the film as new. It prepared the film again (one film had four finished copies from 30 minutes), and source verification closed the source and ended playback in progress.
+- **No audio choice.** The two films played after the release each have one language, and the menu was hidden for one-language films. It was also out of reach in full screen, which belonged to the video element alone.
+
+### What changed
+
+- **Generations follow content.** A film keeps its generation while its MD5 checksum and size are unchanged, or its head revision when Drive gives no checksum. `version` is used only when Drive gives neither. Library scans and source verification both use this. Editions made for content that has since changed are removed hourly, never one in use.
+- **Audio menu for every film.** One-language films show their single language and say so. Films with several languages list them all.
+- **Full screen keeps the menus.** A Full screen button (and F) puts the picture and the Audio, Subtitles and Quality menus on screen together. The menus fade after three seconds of playing and return when the pointer moves. On iPhone the video's own full screen is used, which has its own language menus. The browser's full-screen button is hidden where it would leave the menus behind.
+
+### Files changed
+
+`apps/api/src/drive/membership.ts`, `drive/sync.ts`, `drive/client.ts`; `apps/worker/src/prepared-store.ts`, `main.ts`; `apps/web/src/pages/Player.tsx`, `cinema.css`. Tests: `tests/backend/sync.test.ts`, `streaming-playback.test.ts`, `tests/e2e/tracks.spec.ts`; `tests/backend/drive-efficiency.test.ts` now changes the recorded content, not only the generation, to simulate unconfirmed content.
+
+### Verification
+
+- `npm run check`: passed.
+- `npm test`: 46 files, 302 passed, 1 skipped.
+- `npm run test:e2e`: 150 passed in Chromium, Firefox and WebKit.
+
+### Follow-ups
+
+- Release to the server. The first scan after it records the content of each film; generations do not change for films whose checksum is unchanged.
+
 ## Raouf: 2026-11-15 (Australia/Sydney) — languages and pictures released
 
 **Scope:** publish and release the language, subtitle and picture work, as the owner asked. Record: the maintainer's private notes.

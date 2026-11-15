@@ -8,6 +8,7 @@ import { environmentConfig, startupReason } from "../../api/src/config.js";
 import { JobQueue, type Lane } from "./leases.js";
 import { prepareBrowser } from "./browser-prepare.js";
 import {
+  pruneStale,
   verifyBoundary,
   makeRoom,
   ASSET_ID,
@@ -71,6 +72,8 @@ export class MediaWorker {
       await sweepArtwork(this.db, artworkDirectory(this.storage.dataDir)).catch(
         () => 0,
       );
+      // Editions of content that has since changed can never play again.
+      await pruneStale(this.db, this.storage.directory).catch(() => 0);
     }
     // Pictures for each film once it has been inspected: one source per film,
     // made again when the file changes.

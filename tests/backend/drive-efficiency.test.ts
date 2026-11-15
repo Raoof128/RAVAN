@@ -159,9 +159,12 @@ it("does not reuse an answer for another generation, another folder or a failure
   await sync.syncLibrary("root", idle);
   await sync.verifySource("film");
   f.reset();
-  // The catalogue now expects a generation Drive has not confirmed.
+  // The catalogue now expects content Drive has not confirmed: another
+  // generation, recorded with another size.
   f.db
-    .prepare("UPDATE source_files SET generation='other' WHERE id='film'")
+    .prepare(
+      "UPDATE source_files SET generation='other',metadata=json_set(metadata,'$.size','999') WHERE id='film'",
+    )
     .run();
   await expect(sync.verifySource("film")).rejects.toThrow(/changed/);
   expect(f.calls.get).toBeGreaterThan(0);
