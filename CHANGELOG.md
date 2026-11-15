@@ -1,5 +1,34 @@
 # Changelog
 
+## Raouf: 2026-11-15 (Australia/Sydney) — released to production
+
+**Scope:** publish and deploy everything on `audit/frontend-2026-11-15`: the backend audit, the preparation work, the frontend audit and the UI/UX audit. The owner approved a full redeploy on the production server. Record: the maintainer's private notes.
+
+### What was done
+
+- **Published.** A sanitized snapshot of the branch was pushed to the public repository as a branch; its default branch was not touched and the private history stays local.
+- **Backend released.** Release `29d3e328524b-bdc52186` replaced `d16f9443377f` on the server. Migrations 005 and 006 ran; the schema is now 6. The hardened units are installed; the worker may use two CPUs at low priority.
+- **Nginx.** `Strict-Transport-Security` added to the RAVAN origin host. Nothing else in that file changed.
+- **Frontend released.** The same revision was deployed to Cloudflare (Worker version `5fb3f1aa-8987-4e4d-ab25-22b3b48fdb86`).
+- **Operations document.** the maintainer's private notes gains a Releasing section with the procedure followed, and the unit limits are corrected.
+
+### Verification
+
+- Before switching, on the server: the release's configuration loaded from the server's environment; the prepared-volume check passed; both migrations applied to a copy of the live database with `integrity_check` `ok`; FFmpeg wrote and FFprobe read an HLS edition inside the new sandbox.
+- The switch needed no rollback. Both services are active with no restarts.
+- Edge checks: 9 of 9 passed, version `29d3e328524b`.
+- The authorization fix is live: `/%61pi/movies` returns 404.
+- The sign-in page loaded in Chromium and WebKit against production with no errors.
+- The host's other health checks passed after the change: Nginx, SSH and the existing subscription service.
+- Before deploying: `npm run check`; 278 unit tests passed, 1 skipped; 132 browser tests in three engines; 12 release tests against this commit's production build.
+
+### Follow-ups
+
+- Sign in and use it: nothing behind the sign-in was exercised against production by this deployment.
+- Open the player once, so the server learns what this browser plays and stops preparing editions it does not need.
+- Rollback material is kept on the server (previous units, Nginx file and the pre-migration database). Remove it once the release has been used for a while.
+- The TV package was not rebuilt.
+
 ## Raouf: 2026-11-15 (Australia/Sydney) — UI and UX audit against the rule set
 
 **Scope:** check the interface rule by rule against the UI/UX Pro Max rule set and the frontend-design guidance, measure what can be measured, and fix what is found. Same branch, `audit/frontend-2026-11-15`. Nothing was pushed or deployed. Report: the maintainer's private notes.

@@ -7,6 +7,7 @@ RAVAN is a private, single-owner cinema: a Fastify API, a media worker, a Cloudf
 - Read `README.md`, `docs/backend-usage.md`, the maintainer's private notes and the maintainer's private notes. For the web or TV client, also read `docs/visual-design.md`, the maintainer's private notes and the maintainer's private notes.
 - Run `npm run check` and `npm test` first and note anything already failing.
 - Work on a branch. Do not push to `main`, deploy, or touch the server without the owner's say-so.
+- Publishing goes to the public repository as a sanitized snapshot on a branch, never the private branch. Releasing follows the Releasing section of the maintainer's private notes and needs the owner's approval each time.
 
 ## Rules the code depends on
 
@@ -114,3 +115,11 @@ Raouf: 2026-11-15 (Australia/Sydney), fifth entry
 - Files changed: see `CHANGELOG.md`.
 - Verification: 43 files, 278 passed, 1 skipped, 0 failed; `npm run check` and all four builds pass; `npm run test:e2e` 132 passed (one of two final runs had 1 Chromium playback timeout under load); release suite 12 passed.
 - Follow-ups: real iPhone and LG C1 checks; TV colour tokens; font preloading.
+
+Raouf: 2026-11-15 (Australia/Sydney), sixth entry
+
+- Scope: publish and release `audit/frontend-2026-11-15`, with the owner's approval for a full redeploy.
+- Summary: sanitized snapshot pushed to the public repository as a branch; backend release `29d3e328524b-bdc52186` and the same frontend revision are live; migrations 005 and 006 applied; hardened units and an HSTS header installed. See the maintainer's private notes.
+- Files changed: the maintainer's private notes, the maintainer's private notes, `CHANGELOG.md`, this file.
+- Verification: rehearsal on the server before switching (configuration, volume check, migrations on a database copy, FFmpeg in the new sandbox); 9 of 9 edge checks; host health checks; sign-in page in two browsers. No rollback was needed.
+- Follow-ups: exercise the signed-in screens on production; remove the rollback material from the server later; rebuild the TV package.
