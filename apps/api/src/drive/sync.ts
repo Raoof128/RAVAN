@@ -39,8 +39,11 @@ type Stage = {
   page?: string;
   pages: string[];
   files: DriveFile[];
+  /** Every folder found below the root, so the library can be browsed by folder. */
+  folders: LibraryFolder[];
   start: string;
 };
+type LibraryFolder = { id: string; name: string; parent: string };
 type Checkpoint = {
   folder_id: string;
   state: string;
@@ -212,6 +215,10 @@ export class LibrarySync {
       const saved = this.checkpoint();
       if (saved?.folder_id === root) {
         stage = (JSON.parse(saved.counts) as { stage?: Stage }).stage;
+        // A scan saved before folders were recorded has lost the names of the
+        // folders it already passed: start it again rather than publish a
+        // library whose folders cannot be opened.
+        if (stage && !stage.folders) stage = undefined;
         if (
           stage &&
           (
@@ -235,6 +242,7 @@ export class LibrarySync {
           seen: [],
           pages: [],
           files: [],
+          folders: [],
           start: await this.client.startToken(signal),
         };
         while (stage.queue.length) {
@@ -251,6 +259,11 @@ export class LibrarySync {
             if (file.mimeType === folderMime) {
               if (!next.seen.includes(file.id) && !next.queue.includes(file.id))
                 next.queue.push(file.id);
+              if (
+                file.id !== root &&
+                !next.folders.some((f) => f.id === file.id)
+              )
+                next.folders.push({ id: file.id, name: file.name, parent });
             } else if (
               isVideoFile(file) &&
               file.capabilities?.canDownload !== false
@@ -285,7 +298,13 @@ export class LibrarySync {
           stage = undefined;
           continue;
         }
-        const result = this.publish(root, stage.files, end.token, stage.seen);
+        const result = this.publish(
+          { id: root, name: folder.name, parent: "" },
+          stage.files,
+          end.token,
+          stage.seen,
+          stage.folders,
+        );
         return result;
       }
       throw new Error("Library changed during scan; retry");
@@ -349,7 +368,13 @@ export class LibrarySync {
       scannedAt?: number;
       folders?: string[];
     };
+    // A library published before folders were recorded is scanned once in full,
+    // so that it can be browsed by folder without waiting for the hourly scan.
+    const recorded = this.db
+      .prepare("SELECT 1 FROM library_folders WHERE id=? AND parent_id IS NULL")
+      .get(root);
     if (
+      !recorded ||
       !last.result ||
       last.scannedAt === undefined ||
       this.now() - last.scannedAt >= FULL_SCAN_INTERVAL_MS
@@ -381,13 +406,24 @@ export class LibrarySync {
     }
   }
   private publish(
-    root: string,
+    top: LibraryFolder,
     files: DriveFile[],
     token: string,
     folders: string[],
+    named: LibraryFolder[],
   ): Result {
+    const root = top.id;
     return this.db.transaction(() => {
       this.db.prepare("UPDATE source_files SET available=0").run();
+      // The folder tree is replaced whole, like the catalogue: a folder that
+      // was removed or renamed in Drive is shown as Drive has it now.
+      this.db.prepare("DELETE FROM library_folders").run();
+      const addFolder = this.db.prepare(
+        "INSERT OR IGNORE INTO library_folders(id,name,parent_id) VALUES(?,?,?)",
+      );
+      addFolder.run(root, top.name, null);
+      for (const folder of named)
+        addFolder.run(folder.id, folder.name, folder.parent);
       for (const file of files) {
         const previous = this.db
           .prepare(

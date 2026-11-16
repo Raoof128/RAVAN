@@ -58,6 +58,7 @@ RAVAN is a private, single-owner cinema: a Fastify API, a media worker, a Cloudf
 - **Icons come from `packages/ui/src/Icon.tsx`.** Do not type ▶, ↗ or similar characters as icons; devices draw them differently, some as emoji.
 - **Fields are 16 px where a finger is the pointer, and non-inline targets 44 px on a phone.** `tests/e2e/ux.spec.ts` measures both.
 - **Navigation goes through `apps/web/src/router.tsx`.** It numbers history entries and restores scroll on Back. Do not call `window.scrollTo` on route change elsewhere. A "back to…" link uses `returnTo` so it does not push a second copy of the screen.
+- **The library is browsed by folder through `GET /api/movies?folder=`.** The folder tree comes only from a scan (`library_folders`, replaced whole on publish). Without `folder`, `/api/movies` keeps its old flat answer: the television depends on it.
 - **Anything that changes what the library lists must call `forgetLibrary(api)`** (`apps/web/src/libraryCache.ts`): playing, saving, editing.
 - **Escape a hyphen in an HTML `pattern`.** Browsers compile it with the `v` flag and silently ignore a pattern that is invalid there.
 - **Track choices go through `TrackPanel` (`apps/web/src/player/TrackPanel.tsx`).** Radio groups, not native selects; labels pass through `readableChoices` so codes become language names. A choice must show at once and then follow what the player reports.

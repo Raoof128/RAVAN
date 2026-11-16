@@ -1,5 +1,28 @@
 # Changelog
 
+## Raouf: 2026-11-16 (Australia/Sydney) — folders release
+
+**Scope:** release `e72a31ab2fc8`, approved by the owner.
+
+- Live: backend `e72a31ab2fc8-02085f79` (schema 8), Cloudflare Worker version `4f94bda8-f4ac-4e75-bc9b-2ab66d307ff2`. Record: the maintainer's private notes.
+- The first scheduled check after the switch scanned Drive in full and recorded the folders.
+- Verification: rehearsal on a copy of the live database; 9 of 9 edge checks; 12 release tests; Sentinel host checks; no rollback; no failed requests in the journal.
+
+## Raouf: 2026-11-16 (Australia/Sydney) — browse the library by folder
+
+**Scope:** the owner asked for a folder such as a series ("Pluto") to show as one folder they can open, instead of every file at once. Branch `audit/backend-2026-11-16`. Released the same day (above).
+
+- The top of the library shows each folder of the Drive folder as one card ("Folder", with its film count and the first film's poster), followed by the films filed directly at the top. A card opens `#/folder/<id>`, which shows that folder's own folders and films by title, with a way back to the folder above it. Back from a film returns to its folder.
+- A search from the top still looks through every folder. A search inside a folder looks only in that folder. The watchlist is unchanged.
+- Films in progress anywhere, including inside a folder, still lead the top of the library.
+- A scan records each folder's name and parent (migration `008_folders.sql`, table `library_folders`). Until a scan has recorded them, the library is listed as before. The first scheduled check after upgrading does a full scan, so the folders appear without waiting for the hourly scan.
+- API: `GET /api/movies?folder=root|<id>` returns `folder`, `folders` and, at the top, `resume`, with films ordered by title and a checked cursor. Without `folder` it behaves as before, so the television is unchanged and still lists every film.
+- Verification: `npm run check` clean; `npm test` 341 passed, 1 skipped; Playwright 156 passed (Chromium, WebKit, TV); screenshots of the top and of a folder checked by eye.
+
+### Files changed
+
+`packages/db/migrations/008_folders.sql` (new), `packages/db/src/migrate.ts`; `apps/api/src/drive/sync.ts`, `apps/api/src/library/routes.ts`; `packages/contracts/src/index.ts`, `packages/client/src/api.ts`; `packages/ui/src/MovieCard.tsx`, `Icon.tsx`, `tokens.css`; `apps/web/src/pages/Library.tsx`, `Detail.tsx`, `main.tsx`, `libraryCache.ts`, `preview.ts`. Tests: `tests/backend/folders.test.ts`, `tests/e2e/folders.spec.ts` (new). Documentation: `docs/backend-usage.md`, `AGENT.md`.
+
 ## Raouf: 2026-11-16 (Australia/Sydney) — red-team release
 
 **Scope:** release `b0dab6b8d873`, approved by the owner.
@@ -7,6 +30,7 @@
 - Live: backend `b0dab6b8d873-c4619299`, Cloudflare Worker version `53ad7734-be82-476c-ba81-7483f5cf00f3`, and one rule added to the origin's Nginx. Record: the maintainer's private notes.
 - The crafted addresses that reached the API past the origin key now give `404` on the live origin, and the API refuses them itself when they come through the public site.
 - Verification: rehearsal on a copy of the live database; 9 of 9 edge checks; 12 release tests; sign-in page in Chromium and WebKit; Sentinel host checks; no rollback.
+- Published: the sanitized snapshot of `e38b0be` is on the public repository's branch as `6f4deda` (213 files; the reports and release records stay private; secret scan clean).
 - Follow-ups: sign in on production (the sign-in path changed); rebuild the television package; clear old rollback material.
 
 ## Raouf: 2026-11-16 (Australia/Sydney) — red-team exercise

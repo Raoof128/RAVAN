@@ -79,6 +79,32 @@ export type MovieCard = {
   resumeMs: number;
   available: boolean;
 };
+/** A folder of the library, shown as one card that opens to its films. */
+export type FolderCard = {
+  id: string;
+  name: string;
+  /** Films in the folder and the folders inside it. */
+  films: number;
+  posterUrl?: string;
+  posterTitled?: boolean;
+};
+/** One page of the library, or of a folder in it. */
+export type MovieList = {
+  items: MovieCard[];
+  nextCursor: string | null;
+  /** Set when a folder is browsed. The top of the library has id "root". */
+  folder?: {
+    id: string;
+    name: string;
+    /** The folder this one is in: "root" for the top, null at the top itself. */
+    parentId: string | null;
+    parentName?: string;
+  };
+  /** The folders inside it, with the first page. */
+  folders?: FolderCard[];
+  /** Films in progress anywhere in the library, with the top's first page. */
+  resume?: MovieCard[];
+};
 export type PlaybackState =
   "idle" | "loading" | "playing" | "paused" | "ended" | "error";
 export interface PlayerAdapter {

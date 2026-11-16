@@ -62,7 +62,8 @@ export function Detail({ id }: { id: string }) {
       className="back-link"
       href="#/library"
       onClick={(event) => {
-        if (returnTo(/^\/(library|watchlist)$/)) event.preventDefault();
+        if (returnTo(/^\/(library|watchlist|folder\/[A-Za-z0-9_-]+)$/))
+          event.preventDefault();
       }}
     >
       <Icon name="arrow-left" />

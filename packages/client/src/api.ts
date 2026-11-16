@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 import type {
-  MovieCard,
+  MovieList,
   MovieDetail,
   PictureChoice,
   SessionState,
@@ -84,15 +84,15 @@ export function createApiClient(baseUrl: string) {
     cancelMfa() {
       return request<void>("/auth/mfa/cancel", "POST", {});
     },
-    listMovies(cursor?: string, q = "", saved = false) {
+    /** `folder` browses one folder ("root" is the top); without it, the whole library. */
+    listMovies(cursor?: string, q = "", saved = false, folder?: string) {
       const params = new URLSearchParams({
         q,
         ...(cursor ? { cursor } : {}),
         ...(saved ? { saved: "true" } : {}),
+        ...(folder ? { folder } : {}),
       });
-      return request<{ items: MovieCard[]; nextCursor: string | null }>(
-        `/api/movies?${params}`,
-      );
+      return request<MovieList>(`/api/movies?${params}`);
     },
     /** A picture from /api/artwork, fetched with this client's credential. */
     async artwork(url: string, signal?: AbortSignal): Promise<Blob> {

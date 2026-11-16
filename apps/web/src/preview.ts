@@ -34,6 +34,7 @@ export function previewApi() {
     tracks: [],
   }));
   api.session = async () => ({ authenticated: true, configured: true });
+  // The sample collection has no folders: every view of it is the whole list.
   api.listMovies = async (_cursor, q = "", saved = false) => ({
     items: movies.filter(
       (m) =>

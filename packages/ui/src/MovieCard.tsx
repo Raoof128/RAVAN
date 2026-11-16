@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { artworkUrl, sampleArtwork } from "./artwork.js";
 import { Icon } from "./Icon.js";
-import type { MovieCard as Movie } from "../../contracts/src/index.js";
+import type {
+  FolderCard as Folder,
+  MovieCard as Movie,
+} from "../../contracts/src/index.js";
 export function Poster({
   movie,
   large = false,
@@ -51,6 +54,41 @@ export function Poster({
       </span>
       {movie.year ? <span className="poster-year">{movie.year}</span> : null}
     </div>
+  );
+}
+/**
+ * A folder of the library, such as a series with its episodes inside: one
+ * card, one link, opening to the folder's own screen.
+ */
+export function FolderCard({ folder }: { folder: Folder }) {
+  const count = `${folder.films} ${folder.films === 1 ? "film" : "films"}`;
+  return (
+    <article className="movie-card folder-card">
+      <a
+        href={`#/folder/${encodeURIComponent(folder.id)}`}
+        className="poster-link"
+        aria-label={`Open the folder ${folder.name}, ${count}`}
+      >
+        <Poster
+          movie={{
+            id: folder.id,
+            title: folder.name,
+            resumeMs: 0,
+            available: true,
+            ...(folder.posterUrl ? { posterUrl: folder.posterUrl } : {}),
+            ...(folder.posterTitled ? { posterTitled: true } : {}),
+          }}
+        />
+        <span className="folder-badge">
+          <Icon name="folder" size={14} />
+          Folder
+        </span>
+      </a>
+      <div className="movie-caption">
+        <h3>{folder.name}</h3>
+        <span>{count}</span>
+      </div>
+    </article>
   );
 }
 /**

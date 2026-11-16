@@ -1,7 +1,11 @@
 import { FilmStill } from "../../../../packages/ui/src/FilmStill.js";
 import { useEffect, useRef, useState } from "react";
 import { useApi } from "../../../../packages/client/src/api.js";
-import { MovieCard, Poster } from "../../../../packages/ui/src/MovieCard.js";
+import {
+  FolderCard,
+  MovieCard,
+  Poster,
+} from "../../../../packages/ui/src/MovieCard.js";
 import { StatusPanel } from "../../../../packages/ui/src/StatusPanel.js";
 import {
   ActionButton,
@@ -15,16 +19,35 @@ import {
   backdropUrl,
   cinematicArtwork,
 } from "../../../../packages/ui/src/artwork.js";
-import type { MovieCard as Movie } from "../../../../packages/contracts/src/index.js";
+import type {
+  MovieCard as Movie,
+  MovieList,
+} from "../../../../packages/contracts/src/index.js";
 import { Icon } from "../../../../packages/ui/src/Icon.js";
 import { recallLibrary, rememberLibrary } from "../libraryCache.js";
-import { useTitle } from "../router.js";
+import { returnTo, useTitle } from "../router.js";
 const minutes = (ms: number) => Math.floor(ms / 60000);
-export function Library({ saved = false }: { saved?: boolean }) {
+/**
+ * The collection, the watchlist, or one folder of the collection. The top of
+ * the collection shows its folders as cards and the films filed directly in
+ * it; a folder shows the same for itself. A search from the top looks through
+ * every folder; a search inside a folder looks only there.
+ */
+export function Library({
+  saved = false,
+  folder,
+}: {
+  saved?: boolean;
+  folder?: string;
+}) {
   const api = useApi();
+  const key = saved ? true : (folder ?? false);
   // Returning from a film finds the list as it was left.
-  const [recalled] = useState(() => recallLibrary(api, saved));
+  const [recalled] = useState(() => recallLibrary(api, key));
   const [items, setItems] = useState<Movie[]>(recalled?.items ?? []),
+    [place, setPlace] = useState<MovieList["folder"]>(recalled?.folder),
+    [folders, setFolders] = useState<MovieList["folders"]>(recalled?.folders),
+    [resuming, setResuming] = useState<MovieList["resume"]>(recalled?.resume),
     [query, setQuery] = useState(recalled?.query ?? ""),
     [shown, setShown] = useState(recalled?.query ?? ""),
     [cursor, setCursor] = useState<string | null>(recalled?.cursor ?? null),
@@ -39,7 +62,13 @@ export function Library({ saved = false }: { saved?: boolean }) {
   const request = useRef(0);
   const search = useRef<HTMLInputElement>(null);
   const kept = useRef(recalled ? recalled.query : null);
-  useTitle(saved ? "Watchlist" : undefined);
+  useTitle(
+    saved ? "Watchlist" : folder ? (place?.name ?? "Folder") : undefined,
+  );
+  // Which folder a request browses: none for the watchlist or a search from
+  // the top, which look through the whole collection.
+  const within = (q: string) =>
+    saved ? undefined : folder ? folder : q ? undefined : "root";
   useEffect(() => {
     // A recalled view is shown as it is. Asking starts with the first change.
     if (kept.current === query && retry === 0) return;
@@ -51,11 +80,15 @@ export function Library({ saved = false }: { saved?: boolean }) {
     const timer = setTimeout(
       () => {
         api
-          .listMovies(undefined, query, saved)
+          .listMovies(undefined, query, saved, within(query))
           .then((data) => {
             if (request.current !== id) return;
             setItems(data.items);
             setCursor(data.nextCursor);
+            // A folder keeps its name while it is searched.
+            if (data.folder) setPlace(data.folder);
+            setFolders(data.folders);
+            setResuming(data.resume);
             setShown(query);
             setLoaded(true);
           })
@@ -69,7 +102,7 @@ export function Library({ saved = false }: { saved?: boolean }) {
       query ? 200 : 0,
     );
     return () => clearTimeout(timer);
-  }, [api, query, retry, saved]);
+  }, [api, query, retry, saved, folder]);
   useEffect(
     () => () => {
       request.current = -1;
@@ -78,8 +111,15 @@ export function Library({ saved = false }: { saved?: boolean }) {
   );
   useEffect(() => {
     if (loaded && !error)
-      rememberLibrary(api, saved, { query: shown, items, cursor });
-  }, [api, saved, loaded, error, shown, items, cursor]);
+      rememberLibrary(api, key, {
+        query: shown,
+        items,
+        cursor,
+        folder: place,
+        folders,
+        resume: resuming,
+      });
+  }, [api, key, loaded, error, shown, items, cursor, place, folders, resuming]);
   // "/" reaches the search from anywhere on the page, as on most catalogues.
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -105,7 +145,7 @@ export function Library({ saved = false }: { saved?: boolean }) {
     void runMore(async () => {
       setMoreError(false);
       try {
-        const data = await api.listMovies(cursor, query, saved);
+        const data = await api.listMovies(cursor, query, saved, within(query));
         if (request.current !== id) return;
         setItems((old) => [
           ...old,
@@ -122,18 +162,42 @@ export function Library({ saved = false }: { saved?: boolean }) {
   const first = loading && !loaded;
   const placeholders = useDelayed(first);
   const refreshing = useDelayed(loading && loaded, 250);
-  const home = !saved && !shown;
-  const resume = items.filter((m) => m.available && m.resumeMs > 0);
+  const home = !saved && !folder && !shown;
+  const shelves = shown ? [] : (folders ?? []);
+  const resume = resuming ?? items.filter((m) => m.available && m.resumeMs > 0);
   const featured = home ? (resume[0] ?? items.find((m) => m.available)) : null;
   const others = home ? resume.filter((m) => m !== featured) : [];
   const backdrop = featured ? backdropUrl(featured) : undefined;
   const still = cinematicArtwork(backdrop);
   // The hero carries the page's first heading. Without one, the list's does.
   const hero = featured !== null && featured !== undefined;
-  const Heading = hero || (!saved && !query && first) ? "h2" : "h1";
+  const Heading = hero || (!saved && !folder && !query && first) ? "h2" : "h1";
+  const parentHref =
+    !place?.parentId || place.parentId === "root"
+      ? "#/library"
+      : `#/folder/${encodeURIComponent(place.parentId)}`;
   return (
     <main id="main" className="library-page">
-      {!saved && !query && first ? (
+      {folder && (
+        <a
+          className="back-link"
+          href={parentHref}
+          onClick={(event) => {
+            // Folder ids are letters, digits, "-" and "_": safe in a pattern.
+            const parent =
+              place?.parentId && place.parentId !== "root"
+                ? new RegExp(`^/folder/${place.parentId}$`)
+                : /^\/library$/;
+            if (returnTo(parent)) event.preventDefault();
+          }}
+        >
+          <Icon name="arrow-left" />
+          {place?.parentName
+            ? `Back to ${place.parentName}`
+            : "Back to the collection"}
+        </a>
+      )}
+      {!saved && !folder && !query && first ? (
         <Placeholder
           label="Opening your collection"
           className="feature feature-plain"
@@ -241,7 +305,9 @@ export function Library({ saved = false }: { saved?: boolean }) {
               ? "Your watchlist"
               : shown
                 ? "Search results"
-                : "The collection"}
+                : folder
+                  ? (place?.name ?? "Folder")
+                  : "The collection"}
             {loaded && items.length > 0 && (
               <span>
                 <span aria-hidden="true">
@@ -270,8 +336,10 @@ export function Library({ saved = false }: { saved?: boolean }) {
                   setQuery("");
                 }
               }}
-              placeholder="Find a film…"
-              aria-label="Search your movies"
+              placeholder={
+                folder ? "Find a film in this folder…" : "Find a film…"
+              }
+              aria-label={folder ? "Search this folder" : "Search your movies"}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -305,18 +373,24 @@ export function Library({ saved = false }: { saved?: boolean }) {
           >
             Your collection is safe. Check the connection and try again.
           </StatusPanel>
-        ) : !items.length ? (
+        ) : !items.length && !shelves.length ? (
           <StatusPanel
             title={
               shown
                 ? "No films found."
                 : saved
                   ? "A good film is worth saving."
-                  : "Your next favourite starts here."
+                  : folder
+                    ? "This folder is empty."
+                    : "Your next favourite starts here."
             }
             action={
               shown ? (
                 <button onClick={() => setQuery("")}>Clear search</button>
+              ) : folder ? (
+                <a className="button" href="#/library">
+                  Browse the collection
+                </a>
               ) : !saved ? (
                 <a className="button primary" href="#/settings">
                   Choose a Drive folder
@@ -332,7 +406,9 @@ export function Library({ saved = false }: { saved?: boolean }) {
               ? `Nothing in your collection matches “${shown}”. Try a different title.`
               : saved
                 ? "Open a film and add it to your watchlist."
-                : "Connect your movie folder to make this space your own."}
+                : folder
+                  ? "There are no films in this folder in Google Drive."
+                  : "Connect your movie folder to make this space your own."}
           </StatusPanel>
         ) : (
           <>
@@ -340,6 +416,9 @@ export function Library({ saved = false }: { saved?: boolean }) {
               className={`poster-grid${refreshing ? " is-refreshing" : ""}`}
               aria-busy={loading || undefined}
             >
+              {shelves.map((f) => (
+                <FolderCard folder={f} key={`folder-${f.id}`} />
+              ))}
               {items.map((movie) => (
                 <MovieCard movie={movie} key={movie.id} />
               ))}

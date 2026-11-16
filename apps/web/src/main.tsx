@@ -135,6 +135,7 @@ function App({ api }: { api: ApiClient }) {
   const route = useRoute();
   const movieId = routeParam(route, "/movie/");
   const playerId = routeParam(route, "/player/");
+  const folderId = routeParam(route, "/folder/");
   const [session, setSession] = useState<SessionState>(),
     [error, setError] = useState(false),
     [retry, setRetry] = useState(0),
@@ -250,7 +251,11 @@ function App({ api }: { api: ApiClient }) {
             <nav aria-label="Main navigation">
               <a
                 href="#/library"
-                aria-current={route === "/library" ? "page" : undefined}
+                aria-current={
+                  route === "/library" || folderId !== undefined
+                    ? "page"
+                    : undefined
+                }
               >
                 Library
               </a>
@@ -344,6 +349,9 @@ function App({ api }: { api: ApiClient }) {
                 <Detail id={movieId} />
               ) : playerId !== undefined ? (
                 <Player id={playerId} startOver={route.includes("?start=0")} />
+              ) : folderId !== undefined ? (
+                // A screen of its own per folder: nothing carries over from the last.
+                <Library folder={folderId} key={folderId} />
               ) : (
                 <Library />
               )}

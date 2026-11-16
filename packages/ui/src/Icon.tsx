@@ -7,6 +7,9 @@ const shapes = {
   play: <path d="M8 5.2v13.6L19.2 12z" fill="currentColor" stroke="none" />,
   "arrow-left": <path d="M19 12H5m6-6-6 6 6 6" />,
   "arrow-up-right": <path d="M7 17 17 7M9 7h8v8" />,
+  folder: (
+    <path d="M3.5 7.5a2 2 0 0 1 2-2h3.7l2 2.2h7.3a2 2 0 0 1 2 2v6.8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" />
+  ),
   search: (
     <>
       <circle cx="11" cy="11" r="6.5" />

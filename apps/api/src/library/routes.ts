@@ -6,7 +6,7 @@ import {
   trackLanguage,
   trackName,
 } from "../../../worker/src/tracks.js";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import type { Database } from "../../../../packages/db/src/open.js";
 import {
@@ -15,8 +15,10 @@ import {
   preferencesSchema,
 } from "../../../../packages/contracts/src/schemas.js";
 import type {
+  FolderCard,
   MovieCard,
   MovieDetail,
+  MovieList,
 } from "../../../../packages/contracts/src/index.js";
 type MovieRow = {
   id: string;
@@ -52,6 +54,16 @@ function card(row: MovieRow): MovieCard {
     ...(row.still_id ? { stillUrl: `/api/artwork/${row.still_id}` } : {}),
   };
 }
+type FolderRow = { id: string; name: string; parent_id: string | null };
+/** A folder of the library as the browser names it: its top is "root". */
+const ROOT = "root";
+const folderParam = z
+  .string()
+  .max(160)
+  .regex(/^[A-Za-z0-9_-]+$/)
+  .optional();
+/** Every folder at or below `id`, as a recursive query's opening clause. */
+const subtree = `WITH RECURSIVE tree(id) AS (SELECT ? UNION SELECT f.id FROM library_folders f JOIN tree ON f.parent_id=tree.id)`;
 export function registerCatalogue(
   app: FastifyInstance,
   db: Database,
@@ -105,15 +117,79 @@ export function registerCatalogue(
         .all(id) as MovieDetail["tracks"],
     };
   }
+  /**
+   * The folder being browsed, or undefined to list the whole library at once.
+   * Until a scan has recorded the folder tree, the top of the library is the
+   * whole library, as it was before folders could be browsed.
+   */
+  function place(folder: string): FolderRow | null | undefined {
+    const root = (
+      db
+        .prepare("SELECT folder_id FROM sync_checkpoints WHERE id='library'")
+        .get() as { folder_id: string | null } | undefined
+    )?.folder_id;
+    const top = root
+      ? (db
+          .prepare(
+            "SELECT id,name,parent_id FROM library_folders WHERE id=? AND parent_id IS NULL",
+          )
+          .get(root) as FolderRow | undefined)
+      : undefined;
+    if (!top) return folder === ROOT ? undefined : null;
+    if (folder === ROOT || folder === top.id) return top;
+    const row = db
+      .prepare("SELECT id,name,parent_id FROM library_folders WHERE id=?")
+      .get(folder) as FolderRow | undefined;
+    return row && row.parent_id !== null ? row : null;
+  }
+  function folderCards(parent: string): FolderCard[] {
+    const children = db
+      .prepare(
+        "SELECT id,name FROM library_folders WHERE parent_id=? ORDER BY name COLLATE NOCASE,id LIMIT 500",
+      )
+      .all(parent) as Array<{ id: string; name: string }>;
+    const count = db.prepare(
+      `${subtree} SELECT COUNT(DISTINCT s.movie_id) n FROM source_files s JOIN tree ON s.parent_id=tree.id WHERE s.available=1`,
+    );
+    // The folder's picture is the first of its films, by title, that has one.
+    const cover = db.prepare(
+      `${subtree} SELECT a.id,a.provider FROM source_files s JOIN tree ON s.parent_id=tree.id JOIN movies m ON m.id=s.movie_id JOIN artwork a ON a.movie_id=m.id AND a.kind='poster' WHERE s.available=1 ORDER BY m.title COLLATE NOCASE,m.id,CASE a.provider WHEN 'tmdb' THEN 0 WHEN 'cover' THEN 1 ELSE 2 END LIMIT 1`,
+    );
+    const cards: FolderCard[] = [];
+    for (const child of children) {
+      const films = (count.get(child.id) as { n: number }).n;
+      // A folder of subtitles or extras with no film in it is not shown.
+      if (!films) continue;
+      const art = cover.get(child.id) as
+        { id: string; provider: string } | undefined;
+      cards.push({
+        id: child.id,
+        name: child.name,
+        films,
+        ...(art
+          ? {
+              posterUrl: `/api/artwork/${art.id}`,
+              ...(art.provider === "frame" ? { posterTitled: true } : {}),
+            }
+          : {}),
+      });
+    }
+    return cards;
+  }
   app.get("/api/movies", async (request, reply) => {
     const query = z
       .strictObject({
         q: z.string().max(200).default(""),
-        cursor: z.string().max(300).optional(),
+        cursor: z.string().max(1200).optional(),
         saved: z.enum(["true", "false"]).optional(),
+        folder: folderParam,
       })
       .safeParse(request.query);
     if (!query.success) return reply.code(400).send({ error: "invalid_query" });
+    const browsing = query.data.folder ? place(query.data.folder) : undefined;
+    if (browsing === null)
+      return reply.code(404).send({ error: "folder_not_found" });
+    if (browsing) return browse(browsing, query.data, reply);
     let after = "";
     if (query.data.cursor) {
       try {
@@ -142,6 +218,84 @@ export function registerCatalogue(
         : null,
     };
   });
+  /**
+   * One folder: the folders in it, then its films by title. Films are paged;
+   * the folders, and the films in progress at the top, come with the first page.
+   */
+  function browse(
+    folder: FolderRow,
+    query: { q: string; cursor?: string; saved?: string },
+    reply: FastifyReply,
+  ) {
+    let after: [string, string] | undefined;
+    if (query.cursor) {
+      try {
+        const text = Buffer.from(query.cursor, "base64url").toString("utf8");
+        const value = z
+          .tuple([z.string().max(600), idSchema])
+          .parse(JSON.parse(text));
+        if (Buffer.from(text).toString("base64url") !== query.cursor)
+          throw new Error();
+        after = value;
+      } catch {
+        return reply.code(400).send({ error: "invalid_cursor" });
+      }
+    }
+    const escaped = query.q.replace(/[\\%_]/g, "\\$&");
+    const rows = db
+      .prepare(
+        `${selection} WHERE EXISTS(SELECT 1 FROM source_files s WHERE s.movie_id=m.id AND s.parent_id=?) AND m.title LIKE ? ESCAPE '\\' ${query.saved === "true" ? "AND EXISTS(SELECT 1 FROM watchlist w WHERE w.movie_id=m.id)" : ""} ${after ? "AND (m.title>? COLLATE NOCASE OR (m.title=? COLLATE NOCASE AND m.id>?))" : ""} ORDER BY m.title COLLATE NOCASE,m.id LIMIT 41`,
+      )
+      .all(
+        folder.id,
+        `%${escaped}%`,
+        ...(after ? [after[0], after[0], after[1]] : []),
+      ) as MovieRow[];
+    const more = rows.length > 40;
+    const items = rows.slice(0, 40).map(card);
+    const last = items.at(-1);
+    const top = folder.parent_id === null;
+    const parent =
+      folder.parent_id === null
+        ? undefined
+        : (db
+            .prepare("SELECT id,name,parent_id FROM library_folders WHERE id=?")
+            .get(folder.parent_id) as FolderRow | undefined);
+    const list: MovieList = {
+      items,
+      nextCursor:
+        more && last
+          ? Buffer.from(JSON.stringify([last.title, last.id])).toString(
+              "base64url",
+            )
+          : null,
+      folder: {
+        id: top ? ROOT : folder.id,
+        name: folder.name,
+        parentId: top
+          ? null
+          : !parent || parent.parent_id === null
+            ? ROOT
+            : parent.id,
+        ...(parent && parent.parent_id !== null
+          ? { parentName: parent.name }
+          : {}),
+      },
+    };
+    if (!query.cursor && !query.q) {
+      list.folders = folderCards(folder.id);
+      // Films being watched, wherever they are filed, lead the top of the library.
+      if (top)
+        list.resume = (
+          db
+            .prepare(
+              `${selection} JOIN progress p ON p.movie_id=m.id WHERE p.ended=0 AND p.position_ms>0 AND EXISTS(SELECT 1 FROM source_files s WHERE s.movie_id=m.id AND s.available=1) ORDER BY p.updated_at DESC LIMIT 5`,
+            )
+            .all() as MovieRow[]
+        ).map(card);
+    }
+    return list;
+  }
   app.get<{ Params: { id: string } }>(
     "/api/movies/:id",
     async (request, reply) =>
