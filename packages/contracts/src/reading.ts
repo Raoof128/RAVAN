@@ -10,8 +10,21 @@ export type ReadingItem = {
   sizeBytes: string;
   position: ReadingPosition;
 };
-export function readingFormat(name: string): ReadingFormat | undefined {
-  const extension = name.split(".").pop()?.toLowerCase();
+export function readingFormat(
+  name: string,
+  mimeType: string,
+): ReadingFormat | undefined {
+  // Workspace documents require an export. Only binary Drive files have reader bytes.
+  if (mimeType.startsWith("application/vnd.google-apps.")) return;
+  if (mimeType === "application/pdf") return "pdf";
+  if (mimeType === "application/epub+zip") return "epub";
+  if (
+    mimeType === "application/vnd.comicbook+zip" ||
+    mimeType === "application/x-cbz"
+  )
+    return "cbz";
+  if (mimeType.startsWith("video/")) return;
+  const extension = /\.(epub|pdf|cbz)$/i.exec(name)?.[1]?.toLowerCase();
   if (extension === "epub" || extension === "pdf" || extension === "cbz")
     return extension;
 }

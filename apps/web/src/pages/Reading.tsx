@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useApi } from "../../../../packages/client/src/api.js";
+import { ApiError, useApi } from "../../../../packages/client/src/api.js";
 import {
   MAX_READING_BYTES,
   type ReadingItem,
@@ -23,6 +23,16 @@ export function Reading() {
   const [selection, setSelection] = useState<Selection>();
   const [revision, setRevision] = useState(0);
   const controller = useRef<AbortController | undefined>(undefined);
+  const openedId = useRef("");
+  const shelf = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (selection || !openedId.current) return;
+    const card = shelf.current?.querySelector<HTMLButtonElement>(
+      `[data-book-id="${CSS.escape(openedId.current)}"]`,
+    );
+    card?.focus();
+    openedId.current = "";
+  }, [selection]);
   const generation = useRef(0);
   useTitle(selection?.source.title ?? "Reading room");
   useEffect(() => () => controller.current?.abort(), []);
@@ -55,7 +65,6 @@ export function Reading() {
   }, [api, query, revision]);
   const close = useCallback(() => {
     setSelection(undefined);
-    setRevision((n) => n + 1);
   }, []);
   const begin = () => {
     controller.current?.abort();
@@ -72,6 +81,7 @@ export function Reading() {
         throw new Error("Choose a book up to 100 MB.");
       const blob = await api.readingFile(item, job.signal);
       if (job.signal.aborted) return;
+      openedId.current = item.id;
       setSelection({
         source: {
           title: item.title,
@@ -79,7 +89,16 @@ export function Reading() {
           blob,
           position: item.position,
         },
-        save: (position) => api.saveReading(item, position),
+        save: async (position) => {
+          await api.saveReading(item, position);
+          setItems((rows) =>
+            rows.map((row) =>
+              row.id === item.id && row.generation === item.generation
+                ? { ...row, position }
+                : row,
+            ),
+          );
+        },
       });
     } catch (error) {
       if (!job.signal.aborted)
@@ -87,7 +106,11 @@ export function Reading() {
           error instanceof Error &&
             error.message === "Choose a book up to 100 MB."
             ? error.message
-            : "This book could not be downloaded. Refresh the library and try again.",
+            : error instanceof ApiError && [409, 410].includes(error.status)
+              ? "This file changed or moved. Sync your Drive folder in Your cinema, then refresh the shelf."
+              : error instanceof ApiError && error.status === 429
+                ? "Other downloads are in progress. Try again shortly."
+                : "This book could not be downloaded. Check your connection and try again.",
         );
     } finally {
       if (!job.signal.aborted) setOpening("");
@@ -105,11 +128,10 @@ export function Reading() {
     <main id="main" className="reading-room">
       <header className="reading-intro">
         <div>
-          <p className="eyebrow">A QUIETER KIND OF STORY</p>
           <h1>
             Reading room<span>.</span>
           </h1>
-          <p>Your books, your manga, a little time to yourself.</p>
+          <p>Books and manga from your connected Google Drive folder.</p>
         </div>
         <div className="reading-drive">
           <a className="button primary" href="#/settings">
@@ -140,7 +162,6 @@ export function Reading() {
         <div className="reading-shelf-heading">
           <div>
             <h2>On your shelf</h2>
-            <p>Books and manga from your connected Drive folder.</p>
           </div>
           <div className="reading-search">
             <label htmlFor="reading-search">Search your books</label>
@@ -163,27 +184,28 @@ export function Reading() {
         {loading && !items.length ? (
           <p role="status">Loading your shelf…</p>
         ) : items.length ? (
-          <div className="reading-shelf">
+          <div className="reading-shelf" ref={shelf}>
             {items.map((item, index) => (
               <button
                 className={`reading-book reading-cover-${index % 4}`}
+                data-book-id={item.id}
                 key={item.id}
                 disabled={Boolean(opening)}
                 onClick={() => void openDrive(item)}
               >
-                <span className="reading-cover">
+                <span className="reading-cover" aria-hidden="true">
                   <span className="reading-format">
                     {item.format.toUpperCase()}
                   </span>
                   <strong>{item.title}</strong>
                   <span className="reading-cover-rule" />
-                  <span className="reading-cover-bottom">
-                    RAVĀN / READING ROOM
-                  </span>
                 </span>
                 <span className="reading-book-caption">
                   <strong>{item.title}</strong>
                   <small>
+                    <span className="reading-accessible-text">
+                      {item.format.toUpperCase()} ·{" "}
+                    </span>
                     {item.position.section || item.position.fraction
                       ? `Continue · ${item.format === "epub" ? "Chapter" : "Page"} ${item.position.section + 1}`
                       : item.format === "cbz"
@@ -220,6 +242,7 @@ export function Reading() {
             disabled={loading}
             onClick={() => {
               const mine = generation.current;
+              setError("");
               setLoading(true);
               void api
                 .reading(query, next)

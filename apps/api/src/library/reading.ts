@@ -48,7 +48,7 @@ export function registerReading(
       items: rows.slice(0, 60).map((r): ReadingItem => ({
         id: r.id,
         name: r.name,
-        title: r.name.replace(/\.[^.]+$/, ""),
+        title: r.name.replace(/\.(epub|pdf|cbz)$/i, "") || r.name,
         format: r.format,
         generation: r.generation,
         sizeBytes: r.size_bytes,

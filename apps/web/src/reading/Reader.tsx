@@ -41,24 +41,46 @@ export function Reader({
   const [fontSize, setFontSize] = useState(20);
   const [theme, setTheme] = useState("paper");
   const viewport = useRef<HTMLDivElement>(null);
+  const preferences = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const narrow = window.matchMedia("(max-width: 560px)");
+    const fit = () => {
+      if (preferences.current) preferences.current.open = !narrow.matches;
+    };
+    fit();
+    narrow.addEventListener("change", fit);
+    return () => narrow.removeEventListener("change", fit);
+  }, []);
   const position = useRef(source.position);
-  const saving = useRef(Promise.resolve());
+  const saving = useRef<Promise<boolean> | null>(null);
   const pending = useRef(false);
-  const save = useCallback(() => {
-    if (!pending.current) return;
-    pending.current = false;
-    const snapshot = { ...position.current };
-    // Keep requests ordered within this reader so a slow previous save cannot rewind it.
-    saving.current = saving.current
-      .then(() => onProgress(snapshot))
-      .then(
-        () => setSaveError(false),
-        () => {
+  const abandon = useRef(false);
+  const save = useCallback((): Promise<boolean> => {
+    if (saving.current) return saving.current;
+    if (!pending.current || abandon.current) return Promise.resolve(true);
+    // A slow request only needs the latest position that arrived while it was in flight.
+    const flush = async () => {
+      while (pending.current && !abandon.current) {
+        pending.current = false;
+        try {
+          await onProgress({ ...position.current });
+          setSaveError(false);
+        } catch {
           pending.current = true;
           setSaveError(true);
-        },
-      );
+          return false;
+        }
+      }
+      return true;
+    };
+    saving.current = flush().finally(() => {
+      saving.current = null;
+    });
+    return saving.current;
   }, [onProgress]);
+  useEffect(() => {
+    viewport.current?.focus();
+  }, []);
   useEffect(() => {
     const timer = setInterval(save, 2000);
     const hidden = () => {
@@ -115,7 +137,6 @@ export function Reader({
           return;
         }
         setPage(value);
-        if (value.html !== undefined) setReady(true);
       })
       .catch((e: unknown) => {
         if (alive)
@@ -127,6 +148,22 @@ export function Reader({
       result?.release();
     };
   }, [book, section]);
+  useEffect(() => {
+    if (page?.html === undefined || !viewport.current) return;
+    let current = true;
+    // Restore a saved fraction only after illustrations have their final dimensions.
+    const images = Array.from(
+      viewport.current.querySelectorAll("article img[src]"),
+    );
+    void Promise.allSettled(
+      images.map((img) => (img as HTMLImageElement).decode()),
+    ).then(() => {
+      if (current) setReady(true);
+    });
+    return () => {
+      current = false;
+    };
+  }, [page]);
   useEffect(() => {
     if (!ready || !viewport.current) return;
     const element = viewport.current;
@@ -154,30 +191,15 @@ export function Reader({
     },
     [count, section],
   );
-  useEffect(() => {
-    const key = (event: KeyboardEvent) => {
-      if (
-        event.target instanceof HTMLElement &&
-        (event.target.matches("input,select,textarea,button") ||
-          event.target.isContentEditable)
-      )
-        return;
-      if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
-        event.preventDefault();
-        turn(section + ((event.key === "ArrowRight") !== rtl ? 1 : -1));
-      }
-    };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
-  }, [rtl, section, turn]);
   const unit = source.format === "epub" ? "Chapter" : "Page";
   return (
     <main id="main" className={`reading-reader reading-theme-${theme}`}>
       <header className="reading-topbar">
         <button
           onClick={() => {
-            save();
-            void saving.current.then(onClose);
+            void save().then((saved) => {
+              if (saved) onClose();
+            });
           }}
         >
           Back to reading room
@@ -187,54 +209,70 @@ export function Reader({
           <h1>{source.title}</h1>
         </div>
       </header>
-      <div className="reading-tools" aria-label="Reading preferences">
-        <label>
-          Appearance
-          <select value={theme} onChange={(e) => setTheme(e.target.value)}>
-            <option value="paper">Paper</option>
-            <option value="night">Night</option>
-            <option value="sepia">Sepia</option>
-          </select>
-        </label>
-        {source.format === "epub" && (
+      <details className="reading-preferences" ref={preferences}>
+        <summary>Reading settings</summary>
+        <div className="reading-tools">
           <label>
-            Text size
-            <select
-              value={fontSize}
-              onChange={(e) => setFontSize(Number(e.target.value))}
-            >
-              {[16, 18, 20, 24, 28, 32].map((n) => (
-                <option value={n} key={n}>
-                  {n} px
-                </option>
-              ))}
+            Appearance
+            <select value={theme} onChange={(e) => setTheme(e.target.value)}>
+              <option value="paper">Paper</option>
+              <option value="night">Night</option>
+              <option value="sepia">Sepia</option>
             </select>
           </label>
-        )}
-        <label>
-          Reading direction
-          <select
-            value={rtl ? "rtl" : "ltr"}
-            onChange={(e) => setRtl(e.target.value === "rtl")}
-          >
-            <option value="ltr">Left to right</option>
-            <option value="rtl">Right to left</option>
-          </select>
-        </label>
-      </div>
+          {source.format === "epub" && (
+            <label>
+              Text size
+              <select
+                value={fontSize}
+                onChange={(e) => setFontSize(Number(e.target.value))}
+              >
+                {[16, 18, 20, 24, 28, 32].map((n) => (
+                  <option value={n} key={n}>
+                    {n} px
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <label>
+            Reading direction
+            <select
+              value={rtl ? "rtl" : "ltr"}
+              onChange={(e) => setRtl(e.target.value === "rtl")}
+            >
+              <option value="ltr">Left to right</option>
+              <option value="rtl">Right to left</option>
+            </select>
+          </label>
+        </div>
+      </details>
       <div
         className="reading-viewport"
         ref={viewport}
         tabIndex={0}
+        role="region"
+        onKeyDown={(event) => {
+          if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
+            return;
+          if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+          event.preventDefault();
+          turn(section + ((event.key === "ArrowRight") !== rtl ? 1 : -1));
+        }}
         aria-label={`${unit} ${section + 1}`}
         onScroll={() => {
           const element = viewport.current;
           if (!ready || !element) return;
           position.current = {
             section,
-            fraction:
-              element.scrollTop /
-              Math.max(1, element.scrollHeight - element.clientHeight),
+            fraction: Math.max(
+              0,
+              Math.min(
+                1,
+                element.scrollTop /
+                  Math.max(1, element.scrollHeight - element.clientHeight),
+              ),
+            ),
           };
           pending.current = true;
         }}
@@ -274,7 +312,8 @@ export function Reader({
             ) : page?.html !== undefined ? (
               <article
                 className="reading-prose"
-                dir="auto"
+                lang={page.language}
+                dir={page.direction ?? "auto"}
                 style={{ fontSize }}
                 dangerouslySetInnerHTML={{ __html: page.html }}
               />
@@ -318,6 +357,16 @@ export function Reader({
               ? "Your chapter and scroll position are saved as you read."
               : "Your place is saved as you read."}
         </p>
+        {saveError && (
+          <button
+            onClick={() => {
+              abandon.current = true;
+              onClose();
+            }}
+          >
+            Leave without saving
+          </button>
+        )}
       </footer>
     </main>
   );

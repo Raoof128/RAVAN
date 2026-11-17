@@ -158,12 +158,6 @@
   border-top: 1px solid #ffffff60;
   margin-top: 20px;
 }
-.reading-cover-bottom {
-  font-size: 0.55rem;
-  letter-spacing: 0.13em;
-  margin-top: auto;
-  padding-top: 16px;
-}
 .reading-book-caption {
   display: block;
   padding-top: 16px;
@@ -211,6 +205,16 @@
   font: 400 2rem var(--serif);
   margin: 5px 0;
   overflow-wrap: anywhere;
+}
+.reading-preferences {
+  margin-bottom: 12px;
+}
+.reading-preferences summary {
+  width: fit-content;
+  max-width: 100%;
+  cursor: pointer;
+  padding: 12px 0;
+  line-height: 1.4;
 }
 .reading-tools {
   display: flex;
@@ -386,9 +390,6 @@
   .reading-cover strong {
     font-size: 1.6rem;
   }
-  .reading-cover-bottom {
-    font-size: 0.45rem;
-  }
   .reading-reader {
     padding: 20px 16px;
   }
@@ -409,7 +410,7 @@
     padding: 28px 20px 60px;
   }
   .reading-viewport {
-    height: calc(100dvh - 520px);
+    height: 62dvh;
     min-height: 240px;
   }
   .reading-pagination {

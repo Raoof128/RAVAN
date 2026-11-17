@@ -113,7 +113,25 @@ it("discovers books separately, preserves renamed progress, resets replacements 
     get: async (id) => ({
       ...[root, book, video, shortcut].find((f) => f.id === id)!,
     }),
-    list: async () => ({ files: [book, video, shortcut] }),
+    list: async () => ({
+      files: [
+        book,
+        video,
+        shortcut,
+        {
+          id: "doc",
+          name: "Draft.pdf",
+          mimeType: "application/vnd.google-apps.document",
+          parents: ["root"],
+        },
+        {
+          ...book,
+          id: "unnamed",
+          name: "Volume 1.5",
+          mimeType: "application/pdf",
+        },
+      ],
+    }),
     startToken: async () => "token",
     changes: async () => ({ changed: false, newStartPageToken: "token" }),
   };
@@ -122,6 +140,7 @@ it("discovers books separately, preserves renamed progress, resets replacements 
     await sync.syncLibrary("root", new AbortController().signal);
     expect(h.db.prepare("SELECT name FROM reading_items").all()).toEqual([
       { name: "Story.epub" },
+      { name: "Volume 1.5" },
     ]);
     expect(h.db.prepare("SELECT title FROM movies").all()).toEqual([
       { title: "Film" },

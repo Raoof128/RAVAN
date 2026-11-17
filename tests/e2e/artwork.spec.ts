@@ -80,7 +80,7 @@ test("missing artwork keeps readable titles and usable navigation", async ({
 test("narrow brand header and setup remain usable", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 700 });
   await page.goto("/?preview=1");
-  await expect(page.getByRole("link", { name: "RAVAN home" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "RAVĀN home" })).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Your cinema", exact: true }),
   ).toBeVisible();

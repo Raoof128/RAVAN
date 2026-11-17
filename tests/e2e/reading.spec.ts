@@ -145,6 +145,9 @@ test("reads Drive CBZ pages with right-to-left keyboard navigation on mobile", a
   await expect(
     page.getByRole("img", { name: "Page 1 of Manga" }),
   ).toBeVisible();
+  await expect(page.getByLabel("Reading direction")).toBeHidden();
+  await page.getByText("Reading settings", { exact: true }).click();
+  await expect(page.getByLabel("Reading direction")).toBeVisible();
   await expect(page.getByLabel("Reading direction")).toHaveValue("rtl");
   await page.locator(".reading-viewport").focus();
   await page.keyboard.press("ArrowLeft");
@@ -157,6 +160,10 @@ test("reads Drive CBZ pages with right-to-left keyboard navigation on mobile", a
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+  await page.getByRole("button", { name: "Back to reading room" }).click();
+  await expect(
+    page.getByRole("button", { name: /Continue · Page 2/ }),
+  ).toBeFocused();
 });
 
 test("renders Drive PDFs with a local worker and rejects malformed Drive archives", async ({
@@ -225,4 +232,67 @@ test("empty preview directs the owner to Drive settings and offers no device imp
   ).toHaveAttribute("href", "#/settings");
   await expect(page.locator('input[type="file"]')).toHaveCount(0);
   await expect(page.getByText("Open a file", { exact: true })).toHaveCount(0);
+});
+
+test("keeps a book open when saving fails and restores shelf focus after retry", async ({
+  page,
+}) => {
+  await driveShelf(page, [
+    {
+      id: "book",
+      title: "Notebook",
+      format: "epub",
+      buffer: await epubFixture(),
+    },
+  ]);
+  const block = "**/api/reading/book/progress";
+  await page.route(block, (route) =>
+    route.fulfill({ status: 503, json: { error: "unavailable" } }),
+  );
+  await page.goto("/#/reading");
+  const card = page.getByRole("button", { name: /Notebook/ });
+  await card.click();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await page.getByRole("button", { name: "Back to reading room" }).click();
+  await expect(page.getByText(/Your place could not be saved/)).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "A second morning" }),
+  ).toBeVisible();
+  await page.unroute(block);
+  await page.getByRole("button", { name: "Back to reading room" }).click();
+  await expect(card).toBeFocused();
+  await expect(card).toContainText("Continue · Chapter 2");
+});
+
+test("keeps the chapter language and resumes a long EPUB at the saved scroll position", async ({
+  page,
+}) => {
+  const saves = await driveShelf(page, [
+    {
+      id: "long",
+      title: "Long chapter",
+      format: "epub",
+      buffer: await epubFixture("<p>یک پاراگراف از کتاب</p>".repeat(90), "fa"),
+    },
+  ]);
+  await page.goto("/#/reading");
+  const card = page.getByRole("button", { name: /Long chapter/ });
+  await card.click();
+  const prose = page.locator(".reading-prose");
+  await expect(prose).toHaveAttribute("lang", "fa");
+  const viewport = page.getByRole("region", { name: "Chapter 1" });
+  await expect(page.getByText("Opening chapter…")).toHaveCount(0);
+  await viewport.evaluate((el) => {
+    el.scrollTop = (el.scrollHeight - el.clientHeight) * 0.6;
+  });
+  await expect.poll(() => saves.at(-1)?.fraction ?? 0).toBeCloseTo(0.6, 2);
+  await page.getByRole("button", { name: "Back to reading room" }).click();
+  await card.click();
+  await expect
+    .poll(() =>
+      viewport.evaluate(
+        (el) => el.scrollTop / (el.scrollHeight - el.clientHeight),
+      ),
+    )
+    .toBeCloseTo(0.6, 2);
 });

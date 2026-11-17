@@ -9,7 +9,13 @@ import {
   type ReadingArchive,
 } from "./archive.js";
 
-export type BookPage = { html?: string; image?: string; release: () => void };
+export type BookPage = {
+  html?: string;
+  image?: string;
+  language?: string;
+  direction?: "ltr" | "rtl";
+  release: () => void;
+};
 export type OpenBook = {
   format: ReadingFormat;
   sections: string[];
@@ -198,14 +204,27 @@ export async function openBook(
             urls.add(url);
             img.setAttribute("src", url);
           }
+          const root = doc.documentElement;
+          const body = elements(doc, "body")[0] ?? root;
+          // The sanitizer unwraps the document and body. Preserve their inherited language for assistive technology.
+          const language =
+            body.getAttribute("lang") ||
+            body.getAttribute("xml:lang") ||
+            root.getAttribute("lang") ||
+            root.getAttribute("xml:lang");
+          const direction =
+            body.getAttribute("dir") || root.getAttribute("dir");
           const html = sanitizeChapter(
-            new XMLSerializer().serializeToString(
-              elements(doc, "body")[0] ?? doc.documentElement,
-            ),
+            new XMLSerializer().serializeToString(body),
             urls,
           );
           return {
             html,
+            language: language || undefined,
+            direction:
+              direction === "ltr" || direction === "rtl"
+                ? direction
+                : undefined,
             release: () => {
               for (const url of urls) URL.revokeObjectURL(url);
             },

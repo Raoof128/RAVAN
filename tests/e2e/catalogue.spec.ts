@@ -68,7 +68,7 @@ test("keyboard navigation and reduced motion remain usable", async ({
   ).toBeFocused();
   // macOS WebKit uses Option-Tab for links unless full keyboard access is enabled.
   await page.keyboard.press(browserName === "webkit" ? "Alt+Tab" : "Tab");
-  await expect(page.getByRole("link", { name: "RAVAN home" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "RAVĀN home" })).toBeFocused();
   await page.getByRole("link", { name: "Your cinema", exact: true }).click();
   await expect(page.getByLabel("Drive folder ID")).toBeVisible();
 });

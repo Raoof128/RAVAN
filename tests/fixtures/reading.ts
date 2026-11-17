@@ -12,14 +12,14 @@ export async function readingZip(files: Record<string, string | Uint8Array>) {
     );
   return Buffer.from(await zip.close());
 }
-export function epubFixture(extra = "") {
+export function epubFixture(extra = "", language = "en") {
   return readingZip({
     mimetype: "application/epub+zip",
     "META-INF/container.xml":
       '<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OPS/book.opf"/></rootfiles></container>',
     "OPS/book.opf":
       '<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="one" href="one.xhtml" media-type="application/xhtml+xml"/><item id="two" href="two.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="one"/><itemref idref="two"/></spine></package>',
-    "OPS/one.xhtml": `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><body><h1>The quiet chapter</h1><p>A small story, ready to read.</p>${extra}</body></html>`,
+    "OPS/one.xhtml": `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" xml:lang="${language}"><body><h1>The quiet chapter</h1><p>A small story, ready to read.</p>${extra}</body></html>`,
     "OPS/two.xhtml":
       '<html xmlns="http://www.w3.org/1999/xhtml"><body><h1>A second morning</h1><p>The story continues.</p></body></html>',
   });

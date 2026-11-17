@@ -243,7 +243,7 @@ function App({ api }: { api: ApiClient }) {
       <header
         className={`site-header${authenticated ? " site-header-browse" : ""}`}
       >
-        <a href="#/library" className="wordmark" aria-label="RAVAN home">
+        <a href="#/library" className="wordmark" aria-label="RAVĀN home">
           RAVĀN
         </a>
         <span className="brand-caption">

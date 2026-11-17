@@ -270,7 +270,7 @@ export class LibrarySync {
               )
                 next.folders.push({ id: file.id, name: file.name, parent });
             } else if (
-              (isVideoFile(file) || readingFormat(file.name)) &&
+              (isVideoFile(file) || readingFormat(file.name, file.mimeType)) &&
               file.mimeType !== "application/vnd.google-apps.shortcut" &&
               file.capabilities?.canDownload !== false
             ) {
@@ -433,7 +433,7 @@ export class LibrarySync {
       for (const folder of named)
         addFolder.run(folder.id, folder.name, folder.parent);
       for (const file of files) {
-        const format = readingFormat(file.name);
+        const format = readingFormat(file.name, file.mimeType);
         if (format) {
           const previous = this.db
             .prepare("SELECT generation,metadata FROM reading_items WHERE id=?")

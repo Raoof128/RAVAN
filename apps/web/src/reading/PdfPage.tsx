@@ -84,14 +84,15 @@ export function PdfReader({
         await render.promise;
         if (!alive) return;
         host.current?.replaceChildren(canvas);
-        const content = await page.getTextContent();
-        if (alive) {
+        onReady();
+        // Some image-only or damaged PDFs render even when the text layer fails.
+        const content = await page.getTextContent().catch(() => undefined);
+        if (alive && content) {
           setText(
             content.items
               .map((item) => ("str" in item ? item.str : ""))
               .join(" "),
           );
-          onReady();
         }
       })
       .catch(() => {
@@ -107,7 +108,7 @@ export function PdfReader({
     <>
       <div className="reading-pdf" ref={host} />
       <p className="reading-accessible-text">
-        {text || "Scanned PDF page; text may not be available."}
+        {text || "No text is available for this PDF page."}
       </p>
     </>
   );
