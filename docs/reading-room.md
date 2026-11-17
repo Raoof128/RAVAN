@@ -1,14 +1,15 @@
 # Reading room
 
-RAVĀN's browser client reads DRM-free EPUB books, PDFs and CBZ manga exclusively from the connected Google Drive folder. The reader was released on 17 November 2026. The owner's signed-in live Drive reading workflow still requires verification.
+RAVĀN's browser client reads DRM-free EPUB books, PDFs and CBZ manga exclusively from the connected Google Drive folder.
 
 ## Use it
 
 Run the API and web client as described in the README. Sign in, then choose **Reading room** in the navigation.
 
 - **Google Drive:** put EPUB, PDF or CBZ files anywhere below the existing connected library folder. Sync in **Your cinema**. Search the shelf by title or filename and open a book. Reading positions are saved on the server and available when opening the same book on another browser. Simultaneous readers use the last saved position.
-- Use **Next**, **Previous**, or the chapter/page selector. Arrow keys work while focus is in the reading area; right-to-left mode reverses their direction and the page controls. CBZ starts in right-to-left mode.
-- EPUB text size is adjustable. Paper, night and sepia change the reading surface; PDF and manga artwork keep their original colors.
+- Use **Next** or **Previous** to turn. Select the page counter to browse six pages at a time or type a page number. PDF and CBZ previews appear on demand. Closing the index keeps your place. Arrow keys work while focus is in the reading area; right-to-left mode reverses their direction and the page controls. CBZ starts in right-to-left mode.
+- PDFs and manga open in **Whole page**, which fits the complete page in the space between the title and navigation controls. Choose **Fit width** to enlarge the artwork and scroll through a page.
+- Open **Reading settings** for appearance, direction, and EPUB text size. Close the panel with its close button or Escape. Paper, night and sepia change the reading surface; PDF and manga artwork keep their original colors.
 
 The development preview at `http://127.0.0.1:5173/?preview=1#/reading` shows an empty reading shelf. Reading requires an authenticated Drive connection; the preview never accesses the production API.
 

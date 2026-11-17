@@ -100,7 +100,9 @@ test("opens Drive EPUB, blocks active content, adjusts text and resumes server-s
   await expect(
     page.getByRole("heading", { name: "The quiet chapter" }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Reading settings" }).click();
   await page.getByLabel("Text size").selectOption("28");
+  await page.keyboard.press("Escape");
   await expect(page.locator(".reading-prose")).toHaveCSS("font-size", "28px");
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await expect(
@@ -146,15 +148,18 @@ test("reads Drive CBZ pages with right-to-left keyboard navigation on mobile", a
     page.getByRole("img", { name: "Page 1 of Manga" }),
   ).toBeVisible();
   await expect(page.getByLabel("Reading direction")).toBeHidden();
-  await page.getByText("Reading settings", { exact: true }).click();
+  await page.getByRole("button", { name: "Reading settings" }).click();
   await expect(page.getByLabel("Reading direction")).toBeVisible();
   await expect(page.getByLabel("Reading direction")).toHaveValue("rtl");
+  await page.getByRole("button", { name: "Close panel" }).click();
   await page.locator(".reading-viewport").focus();
   await page.keyboard.press("ArrowLeft");
   await expect(
     page.getByRole("img", { name: "Page 2 of Manga" }),
   ).toBeVisible();
-  await expect(page.getByLabel("Go to page")).toHaveValue("1");
+  await expect(
+    page.getByRole("button", { name: "Browse page index, page 2 of 3" }),
+  ).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -295,4 +300,77 @@ test("keeps the chapter language and resumes a long EPUB at the saved scroll pos
       ),
     )
     .toBeCloseTo(0.6, 2);
+});
+
+test("fits a portrait PDF inside the reader and offers a larger width view", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 680 });
+  await driveShelf(page, [
+    {
+      id: "portrait",
+      title: "Portrait scan",
+      format: "pdf",
+      buffer: pdfFixture(),
+    },
+  ]);
+  await page.goto("/#/reading");
+  await page.getByRole("button", { name: /Portrait scan/ }).click();
+  const canvas = page.locator(".reading-pdf canvas");
+  await expect(canvas).toBeVisible();
+  const region = page.getByRole("region", { name: "Page 1", exact: true });
+  const fits = () =>
+    region.evaluate(
+      (el) =>
+        el.scrollHeight <= el.clientHeight + 1 &&
+        el.scrollWidth <= el.clientWidth + 1,
+    );
+  await expect.poll(fits).toBe(true);
+  const size = page.getByLabel("Page size");
+  await size.selectOption("width");
+  await expect.poll(fits).toBe(false);
+  await size.selectOption("page");
+  await page.setViewportSize({ width: 320, height: 640 });
+  await expect.poll(fits).toBe(true);
+  const ratio = await canvas.evaluate((el) => el.clientWidth / el.clientHeight);
+  expect(ratio).toBeCloseTo(0.75, 2);
+});
+
+test("browses manga previews without moving the bookmark until a page is chosen", async ({
+  page,
+}) => {
+  const image = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aB9sAAAAASUVORK5CYII=",
+    "base64",
+  );
+  const saves = await driveShelf(page, [
+    {
+      id: "pages",
+      title: "Volume",
+      format: "cbz",
+      buffer: await readingZip(
+        Object.fromEntries(
+          Array.from({ length: 8 }, (_, i) => [`${i + 1}.png`, image]),
+        ),
+      ),
+    },
+  ]);
+  await page.goto("/#/reading");
+  await page.getByRole("button", { name: /Volume.*Open manga/ }).click();
+  const index = page.getByRole("button", { name: /Browse page index/ });
+  await index.click();
+  const dialog = page.getByRole("dialog", { name: "Page index" });
+  await expect(dialog.locator("canvas")).toHaveCount(6);
+  await dialog.getByRole("button", { name: "Next group" }).click();
+  await expect(dialog.locator("canvas")).toHaveCount(2);
+  await page.keyboard.press("Escape");
+  await expect(index).toBeFocused();
+  expect(saves).toHaveLength(0);
+  await index.click();
+  await dialog.getByLabel("Go to page").fill("8");
+  await dialog.getByRole("button", { name: "Go", exact: true }).click();
+  await expect(
+    page.getByRole("img", { name: "Page 8 of Volume" }),
+  ).toBeVisible();
+  await expect(index).toBeFocused();
 });

@@ -10,6 +10,10 @@ import type {
   ReadingFormat,
   ReadingPosition,
 } from "../../../../packages/contracts/src/reading.js";
+import type { PDFDocumentProxy } from "pdfjs-dist";
+import { PageIndex } from "./PageIndex.js";
+import { ReaderPanel } from "./ReaderPanel.js";
+import { Icon } from "../../../../packages/ui/src/Icon.js";
 import { openBook, type BookPage, type OpenBook } from "./book.js";
 const PdfReader = lazy(() =>
   import("./PdfPage.js").then((m) => ({ default: m.PdfReader })),
@@ -39,18 +43,27 @@ export function Reader({
   const [saveError, setSaveError] = useState(false);
   const [rtl, setRtl] = useState(source.format === "cbz");
   const [fontSize, setFontSize] = useState(20);
-  const [theme, setTheme] = useState("paper");
+  const [theme, setTheme] = useState(
+    source.format === "epub" ? "paper" : "night",
+  );
   const viewport = useRef<HTMLDivElement>(null);
-  const preferences = useRef<HTMLDetailsElement>(null);
+  const [panel, setPanel] = useState<"settings" | "index">();
+  const opener = useRef<HTMLButtonElement>(null);
+  const openPanel = (
+    name: "index" | "settings",
+    trigger: HTMLButtonElement,
+  ) => {
+    opener.current = trigger;
+    setPanel(name);
+  };
   useEffect(() => {
-    const narrow = window.matchMedia("(max-width: 560px)");
-    const fit = () => {
-      if (preferences.current) preferences.current.open = !narrow.matches;
-    };
-    fit();
-    narrow.addEventListener("change", fit);
-    return () => narrow.removeEventListener("change", fit);
-  }, []);
+    if (!panel && opener.current) {
+      opener.current.focus({ preventScroll: true });
+      opener.current = null;
+    }
+  }, [panel]);
+  const [pdf, setPdf] = useState<PDFDocumentProxy>();
+  const [fit, setFit] = useState("page");
   const position = useRef(source.position);
   const saving = useRef<Promise<boolean> | null>(null);
   const pending = useRef(false);
@@ -196,59 +209,103 @@ export function Reader({
     <main id="main" className={`reading-reader reading-theme-${theme}`}>
       <header className="reading-topbar">
         <button
+          className="reading-back"
+          aria-label="Back to reading room shelf"
           onClick={() => {
             void save().then((saved) => {
               if (saved) onClose();
             });
           }}
         >
-          Back to reading room
+          <Icon name="arrow-left" /> Shelf
         </button>
         <div className="reading-title">
-          <span>{source.format.toUpperCase()}</span>
+          <span>
+            <b>RAVĀN</b> / {source.format.toUpperCase()}
+          </span>
           <h1>{source.title}</h1>
         </div>
-      </header>
-      <details className="reading-preferences" ref={preferences}>
-        <summary>Reading settings</summary>
-        <div className="reading-tools">
-          <label>
-            Appearance
-            <select value={theme} onChange={(e) => setTheme(e.target.value)}>
-              <option value="paper">Paper</option>
-              <option value="night">Night</option>
-              <option value="sepia">Sepia</option>
+        <div className="reading-actions">
+          {source.format !== "epub" && (
+            <select
+              aria-label="Page size"
+              value={fit}
+              onChange={(e) => setFit(e.target.value)}
+            >
+              <option value="page">Whole page</option>
+              <option value="width">Fit width</option>
             </select>
-          </label>
-          {source.format === "epub" && (
+          )}
+          <button
+            className="reading-settings-button"
+            aria-label="Reading settings"
+            aria-haspopup="dialog"
+            onClick={(e) => openPanel("settings", e.currentTarget)}
+          >
+            <Icon name="settings" /> <span>Reading settings</span>
+          </button>
+        </div>
+      </header>
+      {panel === "settings" && (
+        <ReaderPanel
+          title="Reading settings"
+          onDismiss={() => setPanel(undefined)}
+        >
+          <div className="reading-tools">
             <label>
-              Text size
-              <select
-                value={fontSize}
-                onChange={(e) => setFontSize(Number(e.target.value))}
-              >
-                {[16, 18, 20, 24, 28, 32].map((n) => (
-                  <option value={n} key={n}>
-                    {n} px
-                  </option>
-                ))}
+              Appearance
+              <select value={theme} onChange={(e) => setTheme(e.target.value)}>
+                <option value="paper">Paper</option>
+                <option value="night">Night</option>
+                <option value="sepia">Sepia</option>
               </select>
             </label>
-          )}
-          <label>
-            Reading direction
-            <select
-              value={rtl ? "rtl" : "ltr"}
-              onChange={(e) => setRtl(e.target.value === "rtl")}
-            >
-              <option value="ltr">Left to right</option>
-              <option value="rtl">Right to left</option>
-            </select>
-          </label>
-        </div>
-      </details>
+            {source.format === "epub" && (
+              <label>
+                Text size
+                <select
+                  value={fontSize}
+                  onChange={(e) => setFontSize(Number(e.target.value))}
+                >
+                  {[16, 18, 20, 24, 28, 32].map((n) => (
+                    <option value={n} key={n}>
+                      {n} px
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <label>
+              Reading direction
+              <select
+                value={rtl ? "rtl" : "ltr"}
+                onChange={(e) => setRtl(e.target.value === "rtl")}
+              >
+                <option value="ltr">Left to right</option>
+                <option value="rtl">Right to left</option>
+              </select>
+            </label>
+          </div>
+        </ReaderPanel>
+      )}
+      {panel === "index" && (
+        <PageIndex
+          count={count}
+          section={section}
+          unit={unit}
+          rtl={rtl}
+          pdf={pdf}
+          book={book}
+          onDismiss={() => setPanel(undefined)}
+          onSelect={(next) => {
+            setPanel(undefined);
+            turn(next);
+          }}
+        />
+      )}
       <div
         className="reading-viewport"
+        data-fit={source.format === "epub" ? undefined : fit}
         ref={viewport}
         tabIndex={0}
         role="region"
@@ -294,6 +351,7 @@ export function Reader({
                 <PdfReader
                   blob={source.blob}
                   section={section}
+                  onDocument={setPdf}
                   onCount={counted}
                   onReady={loaded}
                   onError={failed}
@@ -322,41 +380,45 @@ export function Reader({
         )}
       </div>
       <footer className="reading-bottom">
+        {count > 0 && (
+          <progress
+            aria-label="Reading progress"
+            value={section + 1}
+            max={count}
+          />
+        )}
         <div className="reading-pagination" dir={rtl ? "rtl" : "ltr"}>
           <button
             disabled={section === 0 || !count}
             onClick={() => turn(section - 1)}
           >
-            Previous
+            <Icon name={rtl ? "arrow-right" : "arrow-left"} /> Previous
           </button>
-          <label>
-            {unit}
-            <select
-              aria-label={`Go to ${unit.toLowerCase()}`}
-              value={section}
-              onChange={(e) => turn(Number(e.target.value))}
-            >
-              {Array.from({ length: count }, (_, i) => (
-                <option value={i} key={i}>
-                  {i + 1} of {count}
-                </option>
-              ))}
-            </select>
-          </label>
+          <button
+            className="reading-index-trigger"
+            dir="ltr"
+            aria-haspopup="dialog"
+            aria-label={`Browse ${unit.toLowerCase()} index, ${unit.toLowerCase()} ${section + 1} of ${count}`}
+            disabled={!count}
+            onClick={(e) => openPanel("index", e.currentTarget)}
+          >
+            <Icon name="index" />
+            <span>
+              {unit} <strong>{section + 1}</strong> of {count || "…"}
+            </span>
+          </button>
           <button
             disabled={!count || section >= count - 1}
             onClick={() => turn(section + 1)}
           >
-            Next
+            Next <Icon name={rtl ? "arrow-left" : "arrow-right"} />
           </button>
         </div>
-        <p role="status">
-          {saveError
-            ? "Your place could not be saved. Keep this reader open to retry."
-            : source.format === "epub"
-              ? "Your chapter and scroll position are saved as you read."
-              : "Your place is saved as you read."}
-        </p>
+        {saveError && (
+          <p role="alert">
+            Your place could not be saved. Keep this reader open to retry.
+          </p>
+        )}
         {saveError && (
           <button
             onClick={() => {

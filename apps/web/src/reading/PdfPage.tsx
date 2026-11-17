@@ -10,12 +10,14 @@ GlobalWorkerOptions.workerSrc = workerUrl;
 export function PdfReader({
   blob,
   section,
+  onDocument,
   onCount,
   onReady,
   onError,
 }: {
   blob: Blob;
   section: number;
+  onDocument: (doc: PDFDocumentProxy | undefined) => void;
   onCount: (n: number) => void;
   onReady: () => void;
   onError: (message: string) => void;
@@ -48,6 +50,7 @@ export function PdfReader({
         }
         if (alive) {
           setPdf(doc);
+          onDocument(doc);
           onCount(doc.numPages);
         }
       })
@@ -59,9 +62,10 @@ export function PdfReader({
       });
     return () => {
       alive = false;
+      onDocument(undefined);
       if (task) void task.destroy().catch(() => {});
     };
-  }, [blob, onCount, onError]);
+  }, [blob, onCount, onDocument, onError]);
   useEffect(() => {
     if (!pdf) return;
     let alive = true;

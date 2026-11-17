@@ -1,5 +1,11 @@
 # Changelog
 
+## 18 November 2026 · Reader layout and page navigation
+
+- Whole page fits an entire PDF or manga page between the title and navigation. Fit width enlarges the artwork for scrolling. Opening settings preserves the page dimensions.
+- The page counter opens an index with six previews at a time for PDF and CBZ, a chapter list for EPUB and a direct jump by number. Browsing the index preserves the bookmark until a page is chosen. Closing either panel returns keyboard focus to its opener.
+- All 183 end-to-end tests passed in Chromium, Firefox and WebKit. All 12 release tests passed. The unit and integration suite finished with 348 passes and one conditional skip. A 223-page PDF was checked locally at 1440, 390 and 320 pixels, including the wide cover, portrait artwork, final page and saved position.
+
 ## Raouf: 2026-11-17 (Australia/Sydney) · Google Drive reading room
 
 **Scope:** the owner requested a book and manga reader, selected Google Drive only, then authorized commit, publication and redeployment.

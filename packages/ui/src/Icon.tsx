@@ -7,6 +7,15 @@ const shapes = {
   play: <path d="M8 5.2v13.6L19.2 12z" fill="currentColor" stroke="none" />,
   "arrow-left": <path d="M19 12H5m6-6-6 6 6 6" />,
   "arrow-up-right": <path d="M7 17 17 7M9 7h8v8" />,
+  "arrow-right": <path d="M5 12h14m-6-6 6 6-6 6" />,
+  close: <path d="m6 6 12 12M18 6 6 18" />,
+  settings: <path d="M3 7h7m4 0h7M3 17h11m4 0h3M10 4v6m4 4v6" />,
+  index: (
+    <>
+      <rect x="3" y="4" width="7" height="16" rx="1" />
+      <path d="M14 5h7m-7 7h7m-7 7h7" />
+    </>
+  ),
   folder: (
     <path d="M3.5 7.5a2 2 0 0 1 2-2h3.7l2 2.2h7.3a2 2 0 0 1 2 2v6.8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" />
   ),
