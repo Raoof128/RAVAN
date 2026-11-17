@@ -66,7 +66,7 @@ it("refuses alternate origin mutations and canonicalizes alternate reads", async
   expect(
     (
       await worker.fetch(
-        new Request("https://ravan.raoof-r12.workers.dev/api/movies"),
+        new Request("https://ravan.example.workers.dev/api/movies"),
         env,
       )
     ).status,
@@ -74,7 +74,7 @@ it("refuses alternate origin mutations and canonicalizes alternate reads", async
   expect(
     (
       await worker.fetch(
-        new Request("https://ravan.raoof-r12.workers.dev/api/library", {
+        new Request("https://ravan.example.workers.dev/api/library", {
           method: "POST",
         }),
         env,

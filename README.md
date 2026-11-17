@@ -2,6 +2,8 @@
 
 **Every Story Flows.** A private cinema for your own Google Drive movies, with a custom TypeScript backend, a React browser client, and an experimental LG C1 client.
 
+**Status:** a personal project, built to be self-hosted by one owner for their own files. It is not a hosted service and there is no public demo. No licence has been chosen yet, so the source is published for reading only. The repository contains no films, title lists, playlists or Drive identifiers; the screenshots show generated, fictional artwork.
+
 ## What works
 
 - Google sign-in restricted to one owner, authenticator MFA, recovery codes, and revocable device pairing.
