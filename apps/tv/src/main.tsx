@@ -268,7 +268,7 @@ function TV({ api }: { api: ApiClient }) {
                 </span>
               </>
             ) : message ? (
-              <span className="pair-code-empty">— — — —</span>
+              <span className="pair-code-empty">· · · ·</span>
             ) : (
               <span className="pair-code-wait">
                 <Flow />

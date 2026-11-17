@@ -9,6 +9,7 @@ const files = [
   "006_streaming.sql",
   "007_artwork.sql",
   "008_folders.sql",
+  "009_reading.sql",
 ];
 function current(db: Database): number {
   return (

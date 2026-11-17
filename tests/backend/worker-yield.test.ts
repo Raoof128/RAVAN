@@ -116,8 +116,17 @@ it("a running background conversion makes way for the film a viewer asks for", a
     { directory: prepared, dataDir: dir, production: false },
     40,
   );
-  const running = worker.runNextJob(new AbortController().signal, "prepare");
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  const controller = new AbortController();
+  const running = worker.runNextJob(controller.signal, "prepare");
+  cleanup.push(async () => {
+    controller.abort();
+    await running.catch(() => {});
+  });
+  // Wait for the event this test is about: FFmpeg reading its source. A fixed
+  // 400 ms delay interrupts startup instead on a busy host, testing no yield.
+  await expect
+    .poll(() => credentials.length, { timeout: 5000 })
+    .toBeGreaterThan(0);
   expect(
     db.prepare("SELECT state FROM jobs WHERE id=?").get(background),
   ).toEqual({ state: "running" });

@@ -14,7 +14,7 @@ test("RAVAN artwork loads locally and details retain the cinematic identity", as
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/?preview=1");
-  await expect(page).toHaveTitle("RAVAN — Every Story Flows.");
+  await expect(page).toHaveTitle("RAVAN. Every Story Flows.");
   const hero = page.locator(".feature > img");
   await expect(hero).toHaveAttribute("fetchpriority", "high");
   await expect

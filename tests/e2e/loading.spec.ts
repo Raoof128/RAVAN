@@ -199,7 +199,7 @@ test("preparation shows the server's own steps and percentage, and nothing it di
   await expect(page.locator(".stage")).not.toContainText(
     /remaining|left|fps|speed|about \d/i,
   );
-  await expect(page).toHaveTitle("The Long Way Home — RAVAN");
+  await expect(page).toHaveTitle("The Long Way Home · RAVAN");
   const wide = capture("player-preparing-1440");
   if (wide) await page.screenshot(wide);
   await page.setViewportSize({ width: 390, height: 844 });
@@ -336,12 +336,12 @@ test("a new screen takes focus, names the tab, and Tab continues from its top", 
   ).toBeVisible();
   await page.getByRole("link", { name: "Your cinema", exact: true }).click();
   await expect(page.getByLabel("Drive folder ID")).toBeVisible();
-  await expect(page).toHaveTitle("Your cinema — RAVAN");
+  await expect(page).toHaveTitle("Your cinema · RAVAN");
   await expect(page.locator(".view")).toBeFocused();
   await page.getByRole("link", { name: "Library", exact: true }).click();
-  await expect(page).toHaveTitle("RAVAN — Every Story Flows.");
+  await expect(page).toHaveTitle("RAVAN. Every Story Flows.");
   await page.getByRole("link", { name: "View Harbour Lights" }).first().click();
-  await expect(page).toHaveTitle("The Long Way Home — RAVAN");
+  await expect(page).toHaveTitle("The Long Way Home · RAVAN");
   await expect(page.locator(".view")).toBeFocused();
 });
 

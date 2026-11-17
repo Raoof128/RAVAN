@@ -39,6 +39,9 @@ const pages = {
 };
 const Detail = lazy(() => pages.detail().then((m) => ({ default: m.Detail })));
 const Player = lazy(() => pages.player().then((m) => ({ default: m.Player })));
+const Reading = lazy(() =>
+  import("./pages/Reading.js").then((m) => ({ default: m.Reading })),
+);
 const Settings = lazy(() =>
   pages.settings().then((m) => ({ default: m.Settings })),
 );
@@ -237,7 +240,9 @@ function App({ api }: { api: ApiClient }) {
           )}
         </div>
       )}
-      <header className="site-header">
+      <header
+        className={`site-header${authenticated ? " site-header-browse" : ""}`}
+      >
         <a href="#/library" className="wordmark" aria-label="RAVAN home">
           RAVĀN
         </a>
@@ -264,6 +269,12 @@ function App({ api }: { api: ApiClient }) {
                 aria-current={route === "/watchlist" ? "page" : undefined}
               >
                 Watchlist
+              </a>
+              <a
+                href="#/reading"
+                aria-current={route === "/reading" ? "page" : undefined}
+              >
+                Reading room
               </a>
               <a
                 href="#/settings"
@@ -345,6 +356,8 @@ function App({ api }: { api: ApiClient }) {
                 <Settings />
               ) : route === "/watchlist" ? (
                 <Watchlist />
+              ) : route === "/reading" ? (
+                <Reading />
               ) : movieId !== undefined ? (
                 <Detail id={movieId} />
               ) : playerId !== undefined ? (

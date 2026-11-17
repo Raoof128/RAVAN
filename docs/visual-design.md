@@ -1,6 +1,6 @@
 # RAVAN visual direction
 
-**RAVAN — Every Story Flows.** The display wordmark uses **RAVĀN**. A private picture house: deep blue-green black, warm ivory, restrained copper accents, cinematic photographic compositions, Cormorant Garamond display typography and DM Sans interface text. Fonts and images are bundled locally.
+**RAVAN. Every Story Flows.** The display wordmark uses **RAVĀN**. A private picture house: deep blue-green black, warm ivory, restrained copper accents, cinematic photographic compositions, Cormorant Garamond display typography and DM Sans interface text. Fonts and images are bundled locally.
 
 The library opens with a full-width film still, readable text scrims, one primary action and a compact resume shortcut. The collection uses original photographic sample posters with live typography. Film details borrow the selected artwork as a quiet backdrop. The Google setup screen has a sunlit architectural illustration. TV shares the identity with generous type and a highly visible remote-focus ring.
 

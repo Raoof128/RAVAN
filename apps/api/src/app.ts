@@ -19,6 +19,7 @@ import { equal, hash, secret } from "./auth/sessions.js";
 import { z } from "zod";
 import { registerSessions } from "./sessions/routes.js";
 import { registerCatalogue } from "./library/routes.js";
+import { registerReading } from "./library/reading.js";
 
 export async function buildApp(
   config: AppConfig,
@@ -233,6 +234,7 @@ export async function buildApp(
   await cache.init();
   registerSessions(app, db, config, library, cache);
   registerCatalogue(app, db, config.dataDir);
+  registerReading(app, db, library, options.sourceFetch);
   if (config.workerKey) {
     const workerAuth = async (
       request: import("fastify").FastifyRequest,

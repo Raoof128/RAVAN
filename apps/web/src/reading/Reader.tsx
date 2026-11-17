@@ -1,0 +1,324 @@
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import type {
+  ReadingFormat,
+  ReadingPosition,
+} from "../../../../packages/contracts/src/reading.js";
+import { openBook, type BookPage, type OpenBook } from "./book.js";
+const PdfReader = lazy(() =>
+  import("./PdfPage.js").then((m) => ({ default: m.PdfReader })),
+);
+export type ReadingSource = {
+  title: string;
+  format: ReadingFormat;
+  blob: Blob;
+  position: ReadingPosition;
+};
+
+export function Reader({
+  source,
+  onClose,
+  onProgress,
+}: {
+  source: ReadingSource;
+  onClose: () => void;
+  onProgress: (position: ReadingPosition) => Promise<void>;
+}) {
+  const [book, setBook] = useState<OpenBook>();
+  const [section, setSection] = useState(source.position.section);
+  const [count, setCount] = useState(0);
+  const [page, setPage] = useState<BookPage>();
+  const [error, setError] = useState("");
+  const [ready, setReady] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const [rtl, setRtl] = useState(source.format === "cbz");
+  const [fontSize, setFontSize] = useState(20);
+  const [theme, setTheme] = useState("paper");
+  const viewport = useRef<HTMLDivElement>(null);
+  const position = useRef(source.position);
+  const saving = useRef(Promise.resolve());
+  const pending = useRef(false);
+  const save = useCallback(() => {
+    if (!pending.current) return;
+    pending.current = false;
+    const snapshot = { ...position.current };
+    // Keep requests ordered within this reader so a slow previous save cannot rewind it.
+    saving.current = saving.current
+      .then(() => onProgress(snapshot))
+      .then(
+        () => setSaveError(false),
+        () => {
+          pending.current = true;
+          setSaveError(true);
+        },
+      );
+  }, [onProgress]);
+  useEffect(() => {
+    const timer = setInterval(save, 2000);
+    const hidden = () => {
+      if (document.visibilityState === "hidden") save();
+    };
+    document.addEventListener("visibilitychange", hidden);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", hidden);
+      save();
+    };
+  }, [save]);
+  useEffect(() => {
+    if (source.format === "pdf") return;
+    const controller = new AbortController();
+    let opened: OpenBook | undefined;
+    void openBook(source.blob, source.format, controller.signal)
+      .then(async (value) => {
+        if (controller.signal.aborted) {
+          await value.close();
+          return;
+        }
+        opened = value;
+        setBook(value);
+        setCount(value.sections.length);
+        setRtl(value.rtl);
+        setSection((old) => Math.min(old, value.sections.length - 1));
+      })
+      .catch((e: unknown) => {
+        if (!controller.signal.aborted)
+          setError(
+            e instanceof Error ? e.message : "This book could not be opened.",
+          );
+      });
+    return () => {
+      controller.abort();
+      if (opened) void opened.close().catch(() => {});
+    };
+  }, [source]);
+  useEffect(() => {
+    if (!book) return;
+    const controller = new AbortController();
+    let alive = true;
+    let result: BookPage | undefined;
+    setReady(false);
+    setError("");
+    setPage(undefined);
+    void book
+      .page(section, controller.signal)
+      .then((value) => {
+        result = value;
+        if (!alive) {
+          value.release();
+          return;
+        }
+        setPage(value);
+        if (value.html !== undefined) setReady(true);
+      })
+      .catch((e: unknown) => {
+        if (alive)
+          setError(e instanceof Error ? e.message : "Page unavailable.");
+      });
+    return () => {
+      alive = false;
+      controller.abort();
+      result?.release();
+    };
+  }, [book, section]);
+  useEffect(() => {
+    if (!ready || !viewport.current) return;
+    const element = viewport.current;
+    element.scrollTop =
+      position.current.fraction *
+      Math.max(0, element.scrollHeight - element.clientHeight);
+  }, [ready, section]);
+  const loaded = useCallback(() => setReady(true), []);
+  const failed = useCallback((message: string) => {
+    setError(message);
+    setReady(false);
+  }, []);
+  const counted = useCallback((n: number) => {
+    setCount(n);
+    setSection((old) => Math.min(old, n - 1));
+  }, []);
+  const turn = useCallback(
+    (next: number) => {
+      if (!count || next < 0 || next >= count || next === section) return;
+      position.current = { section: next, fraction: 0 };
+      pending.current = true;
+      setSection(next);
+      setReady(false);
+      setError("");
+    },
+    [count, section],
+  );
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      if (
+        event.target instanceof HTMLElement &&
+        (event.target.matches("input,select,textarea,button") ||
+          event.target.isContentEditable)
+      )
+        return;
+      if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+        event.preventDefault();
+        turn(section + ((event.key === "ArrowRight") !== rtl ? 1 : -1));
+      }
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [rtl, section, turn]);
+  const unit = source.format === "epub" ? "Chapter" : "Page";
+  return (
+    <main id="main" className={`reading-reader reading-theme-${theme}`}>
+      <header className="reading-topbar">
+        <button
+          onClick={() => {
+            save();
+            void saving.current.then(onClose);
+          }}
+        >
+          Back to reading room
+        </button>
+        <div className="reading-title">
+          <span>{source.format.toUpperCase()}</span>
+          <h1>{source.title}</h1>
+        </div>
+      </header>
+      <div className="reading-tools" aria-label="Reading preferences">
+        <label>
+          Appearance
+          <select value={theme} onChange={(e) => setTheme(e.target.value)}>
+            <option value="paper">Paper</option>
+            <option value="night">Night</option>
+            <option value="sepia">Sepia</option>
+          </select>
+        </label>
+        {source.format === "epub" && (
+          <label>
+            Text size
+            <select
+              value={fontSize}
+              onChange={(e) => setFontSize(Number(e.target.value))}
+            >
+              {[16, 18, 20, 24, 28, 32].map((n) => (
+                <option value={n} key={n}>
+                  {n} px
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <label>
+          Reading direction
+          <select
+            value={rtl ? "rtl" : "ltr"}
+            onChange={(e) => setRtl(e.target.value === "rtl")}
+          >
+            <option value="ltr">Left to right</option>
+            <option value="rtl">Right to left</option>
+          </select>
+        </label>
+      </div>
+      <div
+        className="reading-viewport"
+        ref={viewport}
+        tabIndex={0}
+        aria-label={`${unit} ${section + 1}`}
+        onScroll={() => {
+          const element = viewport.current;
+          if (!ready || !element) return;
+          position.current = {
+            section,
+            fraction:
+              element.scrollTop /
+              Math.max(1, element.scrollHeight - element.clientHeight),
+          };
+          pending.current = true;
+        }}
+      >
+        {error ? (
+          <div className="reading-message" role="alert">
+            <h2>Unable to read this {unit.toLowerCase()}.</h2>
+            <p>{error}</p>
+          </div>
+        ) : (
+          <>
+            {!ready && (
+              <p role="status" className="reading-loading">
+                Opening {unit.toLowerCase()}…
+              </p>
+            )}
+            {source.format === "pdf" ? (
+              <Suspense fallback={<p role="status">Loading PDF reader…</p>}>
+                <PdfReader
+                  blob={source.blob}
+                  section={section}
+                  onCount={counted}
+                  onReady={loaded}
+                  onError={failed}
+                />
+              </Suspense>
+            ) : page?.image ? (
+              <img
+                className="reading-manga"
+                src={page.image}
+                alt={`Page ${section + 1} of ${source.title}`}
+                onLoad={loaded}
+                onError={() =>
+                  failed("This image format could not be decoded.")
+                }
+              />
+            ) : page?.html !== undefined ? (
+              <article
+                className="reading-prose"
+                dir="auto"
+                style={{ fontSize }}
+                dangerouslySetInnerHTML={{ __html: page.html }}
+              />
+            ) : null}
+          </>
+        )}
+      </div>
+      <footer className="reading-bottom">
+        <div className="reading-pagination" dir={rtl ? "rtl" : "ltr"}>
+          <button
+            disabled={section === 0 || !count}
+            onClick={() => turn(section - 1)}
+          >
+            Previous
+          </button>
+          <label>
+            {unit}
+            <select
+              aria-label={`Go to ${unit.toLowerCase()}`}
+              value={section}
+              onChange={(e) => turn(Number(e.target.value))}
+            >
+              {Array.from({ length: count }, (_, i) => (
+                <option value={i} key={i}>
+                  {i + 1} of {count}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            disabled={!count || section >= count - 1}
+            onClick={() => turn(section + 1)}
+          >
+            Next
+          </button>
+        </div>
+        <p role="status">
+          {saveError
+            ? "Your place could not be saved. Keep this reader open to retry."
+            : source.format === "epub"
+              ? "Your chapter and scroll position are saved as you read."
+              : "Your place is saved as you read."}
+        </p>
+      </footer>
+    </main>
+  );
+}

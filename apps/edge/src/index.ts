@@ -132,7 +132,11 @@ export default {
               headers: outgoing,
               body,
               redirect: "manual",
-              signal: AbortSignal.timeout(20000),
+              signal: AbortSignal.timeout(
+                /^\/api\/reading\/[A-Za-z0-9_-]+\/content$/.test(path) && read
+                  ? 300000
+                  : 20000,
+              ),
             },
           ),
         );

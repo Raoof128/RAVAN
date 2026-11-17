@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readingFormat } from "../../../../packages/contracts/src/reading.js";
 import { z } from "zod";
 import type { Database } from "../../../../packages/db/src/open.js";
 import type { SourceRef } from "../../../../packages/contracts/src/index.js";
@@ -167,6 +168,10 @@ export class LibrarySync {
       id: string;
     }[])
       known.add(row.id);
+    for (const row of this.db.prepare("SELECT id FROM reading_items").all() as {
+      id: string;
+    }[])
+      known.add(row.id);
     return (item: { fileId: string; parents?: string[] }) =>
       !item.fileId ||
       known.has(item.fileId) ||
@@ -265,7 +270,8 @@ export class LibrarySync {
               )
                 next.folders.push({ id: file.id, name: file.name, parent });
             } else if (
-              isVideoFile(file) &&
+              (isVideoFile(file) || readingFormat(file.name)) &&
+              file.mimeType !== "application/vnd.google-apps.shortcut" &&
               file.capabilities?.canDownload !== false
             ) {
               generation(file);
@@ -328,6 +334,7 @@ export class LibrarySync {
         if (rootLost)
           this.db.transaction(() => {
             this.db.prepare("UPDATE source_files SET available=0").run();
+            this.db.prepare("UPDATE reading_items SET available=0").run();
             this.db
               .prepare(
                 "UPDATE playback_sessions SET revoked_at=? WHERE revoked_at IS NULL",
@@ -415,6 +422,7 @@ export class LibrarySync {
     const root = top.id;
     return this.db.transaction(() => {
       this.db.prepare("UPDATE source_files SET available=0").run();
+      this.db.prepare("UPDATE reading_items SET available=0").run();
       // The folder tree is replaced whole, like the catalogue: a folder that
       // was removed or renamed in Drive is shown as Drive has it now.
       this.db.prepare("DELETE FROM library_folders").run();
@@ -425,6 +433,36 @@ export class LibrarySync {
       for (const folder of named)
         addFolder.run(folder.id, folder.name, folder.parent);
       for (const file of files) {
+        const format = readingFormat(file.name);
+        if (format) {
+          const previous = this.db
+            .prepare("SELECT generation,metadata FROM reading_items WHERE id=?")
+            .get(file.id) as
+            { generation: string; metadata: string } | undefined;
+          const gen =
+            previous && sameContent(previous.metadata, file)
+              ? previous.generation
+              : generation(file);
+          this.db
+            .prepare(
+              `INSERT INTO reading_items(id,name,format,generation,size_bytes,metadata)
+            VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+            name=excluded.name,format=excluded.format,size_bytes=excluded.size_bytes,
+            metadata=excluded.metadata,available=1,
+            section=CASE WHEN generation=excluded.generation THEN section ELSE 0 END,
+            fraction=CASE WHEN generation=excluded.generation THEN fraction ELSE 0 END,
+            generation=excluded.generation`,
+            )
+            .run(
+              file.id,
+              file.name,
+              format,
+              gen,
+              file.size!,
+              JSON.stringify(file),
+            );
+          continue;
+        }
         const previous = this.db
           .prepare(
             "SELECT movie_id,generation,metadata FROM source_files WHERE id=?",
@@ -521,6 +559,42 @@ export class LibrarySync {
       if (this.verified.get(fileId) === entry) this.verified.delete(fileId);
       throw error;
     }
+  }
+  /** Books use the same live folder/access boundary, but never enter video jobs. */
+  async verifyReading(fileId: string): Promise<SourceRef> {
+    driveId.parse(fileId);
+    const row = this.db
+      .prepare(
+        "SELECT generation,metadata,available FROM reading_items WHERE id=?",
+      )
+      .get(fileId) as
+      { generation: string; metadata: string; available: number } | undefined;
+    const root = this.checkpoint()?.folder_id;
+    if (!row?.available || !root) throw new Error("Source unavailable");
+    const signal = AbortSignal.timeout(30000);
+    const [file, folder] = await Promise.all([
+      this.client.get(fileId, signal),
+      this.client.get(root, signal),
+    ]);
+    if (
+      folder.trashed ||
+      folder.mimeType !== folderMime ||
+      file.capabilities?.canDownload === false ||
+      !sameContent(row.metadata, file) ||
+      !(await belongsTo(this.client, file, root, signal))
+    )
+      throw new Error("Source changed or unavailable");
+    // A folder switch or sync can finish while the remote checks are in flight.
+    const current = this.db
+      .prepare("SELECT generation,available FROM reading_items WHERE id=?")
+      .get(fileId) as { generation: string; available: number } | undefined;
+    if (
+      this.checkpoint()?.folder_id !== root ||
+      !current?.available ||
+      current.generation !== row.generation
+    )
+      throw new Error("Source changed or unavailable");
+    return { fileId, generation: row.generation, sizeBytes: file.size! };
   }
   /** Whether Drive's answer is still the content catalogued as `expected`. */
   private sameGeneration(fileId: string, expected: string, file: DriveFile) {

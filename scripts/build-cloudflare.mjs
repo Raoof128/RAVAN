@@ -48,7 +48,7 @@ try {
   Referrer-Policy: no-referrer
   X-Robots-Tag: noindex, nofollow
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; media-src 'self' blob: https://media.example.com; connect-src 'self' https://media.example.com; worker-src 'self' blob:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: https://media.example.com; connect-src 'self' https://media.example.com; worker-src 'self' blob:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
 `,
   );
   await writeFile(
@@ -64,6 +64,11 @@ try {
     ".png",
     ".woff",
     ".woff2",
+    ".mjs",
+    ".bcmap",
+    ".ttf",
+    ".pfb",
+    ".wasm",
     ".txt",
   ]);
   const files = [];
@@ -76,14 +81,16 @@ try {
       }
       if (
         !entry.isFile() ||
-        (entry.name !== "_headers" && !allowed.has(extname(path)))
+        (entry.name !== "_headers" &&
+          !/^LICENSE(?:_[A-Z0-9_]+)?$/.test(entry.name) &&
+          !allowed.has(extname(path)))
       )
         throw new Error(
           "Unexpected release file: " + relative(publicDir, path),
         );
       const data = await readFile(path);
       if (
-        [".html", ".js", ".css", ".txt"].includes(extname(path)) &&
+        [".html", ".js", ".mjs", ".css", ".txt"].includes(extname(path)) &&
         /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|GOCSPX-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{35}/.test(
           data.toString(),
         )

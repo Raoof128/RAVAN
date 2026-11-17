@@ -1,6 +1,36 @@
 # Changelog
 
-## Raouf: 2026-11-16 (Australia/Sydney) — folders release
+## Raouf: 2026-11-17 (Australia/Sydney) · Google Drive reading room
+
+**Scope:** the owner requested a book and manga reader, selected Google Drive only, then authorized commit, publication and redeployment.
+
+- EPUB, PDF and CBZ files are discovered below the connected Drive folder and shown in a separate searchable reading room. The browser supports chapter/page navigation, saved server positions, text sizing, appearance choices and right-to-left manga navigation. There is no device-file import or local reading history.
+- Migration 9 adds the reading catalogue and requests a fresh scan. Downloads require authentication and live source checks, are capped at 100 MiB, and do not enter the video worker queue. EPUB content is sanitized and archive extraction is bounded. PDF assets are bundled locally.
+- Mobile navigation makes room for the reader. The existing worker-yield test now waits for the first source read instead of assuming FFmpeg starts within 400 ms.
+- Verification: type checks and builds pass; 348 unit/integration tests pass with one conditional HDR skip; the final Drive-only reader suite passes 15 tests across Chromium, Firefox and WebKit. The broader browser pass had 166 passes and two WebKit video timing failures; all five WebKit track tests passed on focused rerun. Production-shaped rendering and desktop/mobile interactions were checked with fixture data, with no console errors.
+- Release status and live verification are recorded separately after activation. Format limitations are in the reader usage guide.
+
+## Raouf: 2026-11-17 (Australia/Sydney) · web title release
+
+**Scope:** commit `9fe667d593e1`, approved by the owner. Web client only.
+
+- Live: Cloudflare Worker version `3991d07d-25de-448b-9785-7e9fa05d728d`. The backend stays at `e72a31ab2fc8-02085f79`: no API, worker or schema change since then, so the server was not touched. Record: the maintainer's private notes.
+- Verification: 12 release tests on a local Worker; live title `RAVAN. Every Story Flows.` with no em dash in the page or its scripts; 9 of 9 edge checks.
+
+## Raouf: 2026-11-17 (Australia/Sydney) · no em dashes
+
+**Scope:** the owner asked for a stop-slop pass over the repository and the live site, with no em dashes. Branch `audit/backend-2026-11-16`. Released the same day (above).
+
+- The browser title is `RAVAN. Every Story Flows.`, matching the page description, and a page adds its own name as `Pluto · RAVAN`. The empty TV pairing code shows `· · · ·`.
+- Every em dash in tracked text is gone: changelog headings use `·`, plan tasks use `B1:`, release records use `, 16 November 2026`. En dashes in number ranges stay.
+- A scan for stock phrases (delve, robust, seamless, moreover and similar) found none in the docs or on screen. The on-screen taglines stay as the owner wrote them.
+- Verification: `npm run check` clean; Playwright `artwork`, `folders` and `loading` specs 69 passed.
+
+### Files changed
+
+`apps/web/index.html`, `apps/web/src/router.tsx`, `apps/tv/src/main.tsx`; `tests/e2e/artwork.spec.ts`, `folders.spec.ts`, `loading.spec.ts`, `tests/release/frontend.spec.ts`; `CHANGELOG.md`, `docs/implementation-status.md`, `docs/visual-design.md`, `docs/superpowers/plans/2026-11-15-0{1,2,3}-*.md`, `docs/testing/*-2026-11-1{5,6}.md`.
+
+## Raouf: 2026-11-16 (Australia/Sydney) · folders release
 
 **Scope:** release `e72a31ab2fc8`, approved by the owner.
 
@@ -8,7 +38,7 @@
 - The first scheduled check after the switch scanned Drive in full and recorded the folders.
 - Verification: rehearsal on a copy of the live database; 9 of 9 edge checks; 12 release tests; Sentinel host checks; no rollback; no failed requests in the journal.
 
-## Raouf: 2026-11-16 (Australia/Sydney) — browse the library by folder
+## Raouf: 2026-11-16 (Australia/Sydney) · browse the library by folder
 
 **Scope:** the owner asked for a folder such as a series ("Pluto") to show as one folder they can open, instead of every file at once. Branch `audit/backend-2026-11-16`. Released the same day (above).
 
@@ -21,9 +51,9 @@
 
 ### Files changed
 
-`packages/db/migrations/008_folders.sql` (new), `packages/db/src/migrate.ts`; `apps/api/src/drive/sync.ts`, `apps/api/src/library/routes.ts`; `packages/contracts/src/index.ts`, `packages/client/src/api.ts`; `packages/ui/src/MovieCard.tsx`, `Icon.tsx`, `tokens.css`; `apps/web/src/pages/Library.tsx`, `Detail.tsx`, `main.tsx`, `libraryCache.ts`, `preview.ts`. Tests: `tests/backend/folders.test.ts`, `tests/e2e/folders.spec.ts` (new). Documentation: `docs/backend-usage.md`, `AGENT.md`.
+`packages/db/migrations/008_folders.sql` (new), `packages/db/src/migrate.ts`; `apps/api/src/drive/sync.ts`, `apps/api/src/library/routes.ts`; `packages/contracts/src/index.ts`, `packages/client/src/api.ts`; `packages/ui/src/MovieCard.tsx`, `Icon.tsx`, `tokens.css`; `apps/web/src/pages/Library.tsx`, `Detail.tsx`, `main.tsx`, `libraryCache.ts`, `preview.ts`. Tests: `tests/backend/folders.test.ts`, `tests/e2e/folders.spec.ts` (new). Documentation: `docs/backend-usage.md`, `AGENT.md`, `README.md`; release record the maintainer's private notes, the maintainer's private notes.
 
-## Raouf: 2026-11-16 (Australia/Sydney) — red-team release
+## Raouf: 2026-11-16 (Australia/Sydney) · red-team release
 
 **Scope:** release `b0dab6b8d873`, approved by the owner.
 
@@ -33,7 +63,7 @@
 - Published: the sanitized snapshot of `e38b0be` is on the public repository's branch as `6f4deda` (213 files; the reports and release records stay private; secret scan clean).
 - Follow-ups: sign in on production (the sign-in path changed); rebuild the television package; clear old rollback material.
 
-## Raouf: 2026-11-16 (Australia/Sydney) — red-team exercise
+## Raouf: 2026-11-16 (Australia/Sydney) · red-team exercise
 
 **Scope:** the owner asked for the whole project to be attacked. Branch `audit/backend-2026-11-16`, from the released `905086c`. Report: the maintainer's private notes.
 
@@ -68,7 +98,7 @@ Nobody without the owner's sign-in reached a film, a title or any private data, 
 - Each attack was run against the code as it was and worked; each test failed before its fix.
 - On the live site: about sixty harmless unauthenticated requests, which is how the origin-key finding was confirmed. No sign-in or pairing attempt, and nothing that could lock out or load the server.
 
-## Raouf: 2026-11-16 (Australia/Sydney) — second-audit release
+## Raouf: 2026-11-16 (Australia/Sydney) · second-audit release
 
 **Scope:** release `89ed78bc12ad`, approved by the owner.
 
@@ -77,7 +107,7 @@ Nobody without the owner's sign-in reached a film, a title or any private data, 
 - Verification: 9 of 9 edge checks; 12 release tests; sign-in page in Chromium and WebKit; Sentinel host checks; all five films inspected again under probe version 4; no rollback.
 - Follow-ups: play a two-language film signed in; the 4K film is prepared again when next played; clear old rollback material; the public repository has not received this revision.
 
-## Raouf: 2026-11-16 (Australia/Sydney) — second backend audit
+## Raouf: 2026-11-16 (Australia/Sydney) · second backend audit
 
 **Scope:** the owner asked for a full audit of the backend, with fixes and improvements. Branch `audit/backend-2026-11-16`, from `b6067e7`. Report: the maintainer's private notes.
 
@@ -111,7 +141,7 @@ Nobody without the owner's sign-in reached a film, a title or any private data, 
 - Nothing is committed, released or changed on the server. The main finding is in the release that is live; releasing needs the owner's approval. After release: remove queued forced re-encodes of multi-language films from the job queue, and play a two-language film signed in.
 - Left open, with reasons, in section 6 of the report: the web player asks for a full re-encode after any failed start (R-20); the packaged television app may be unable to load media because of its `null` origin (R-26, needs a physical television); no continuous integration (R-25).
 
-## Raouf: 2026-11-16 (Australia/Sydney) — logs and long-term memory
+## Raouf: 2026-11-16 (Australia/Sydney) · logs and long-term memory
 
 **Scope:** the owner asked for every log and Zurvan to be brought up to date.
 
@@ -119,7 +149,7 @@ Nobody without the owner's sign-in reached a film, a title or any private data, 
 - Zurvan: the five release records of 15–16 November and the operations guide are ingested; five evidence-backed claims, a release decision and a decision on shared editions are recorded under `mov`; the earlier open question on eviction is marked answered.
 - No code changed.
 
-## Raouf: 2026-11-16 (Australia/Sydney) — same-copy and room release
+## Raouf: 2026-11-16 (Australia/Sydney) · same-copy and room release
 
 **Scope:** release `e49e0c964e69`, approved by the owner.
 
@@ -127,7 +157,7 @@ Nobody without the owner's sign-in reached a film, a title or any private data, 
 - Rehearsed on a copy of the live database: 2160p, Original and Auto on the 4K film all play its one existing copy; the Picture list's figures match each film's state.
 - Verification: 9 of 9 edge checks; the new route refuses visitors who are not signed in; 12 release tests; sign-in page in Chromium and WebKit; Sentinel host checks; no rollback.
 
-## Raouf: 2026-11-16 (Australia/Sydney) — no copy made twice; room checked before films are removed
+## Raouf: 2026-11-16 (Australia/Sydney) · no copy made twice; room checked before films are removed
 
 **Scope:** the owner asked for the two follow-ups from the panel release, and for faster preparation. Same branch.
 
@@ -156,7 +186,7 @@ Nobody without the owner's sign-in reached a film, a title or any private data, 
 - Copies (most films) take one to two minutes and run in the background before anyone presses play. Duplicate work was the real waste, and it is removed.
 - A true encode (a smaller picture, or a format no browser plays) is limited by the server's two shared CPUs; the encoder already uses its fastest measured setting. Making those faster needs a larger server; nothing in the code would.
 
-## Raouf: 2026-11-15 (Australia/Sydney) — panel release
+## Raouf: 2026-11-15 (Australia/Sydney) · panel release
 
 **Scope:** release the Audio & subtitles panel and background all-languages editions, approved by the owner.
 
@@ -165,7 +195,7 @@ Nobody without the owner's sign-in reached a film, a title or any private data, 
 - Verification: rehearsal on a copy of the live database; 9 of 9 edge checks; 12 release tests; sign-in page in Chromium and WebKit; Sentinel host checks; the first all-languages edition finished after the switch.
 - Follow-ups: check the room that can be freed before evicting; say in the Picture list that a 4K encode replaces other prepared films; signed-in check on production; clear old rollback material.
 
-## Raouf: 2026-11-15 (Australia/Sydney) — Audio & subtitles panel
+## Raouf: 2026-11-15 (Australia/Sydney) · Audio & subtitles panel
 
 **Scope:** the owner asked for the language picker to be audited and made to look like the rest of the site. Same branch.
 
@@ -192,7 +222,7 @@ Nobody without the owner's sign-in reached a film, a title or any private data, 
 
 - `npm run check`: passed. `npm test`: 47 files, 304 passed, 1 skipped. `npm run test:e2e`: 150 passed in Chromium, Firefox and WebKit, under a load average between 35 and 50. In an earlier run under a load average of 108, two tests timed out; both passed 18 of 18 when repeated.
 
-## Raouf: 2026-11-15 (Australia/Sydney) — every language ready before it is needed
+## Raouf: 2026-11-15 (Australia/Sydney) · every language ready before it is needed
 
 **Scope:** the owner reported the audio option was locked. Same branch.
 
@@ -210,7 +240,7 @@ Nobody without the owner's sign-in reached a film, a title or any private data, 
 
 - `npm run check`: passed. `npm test`: 301 of 302 passed, 1 skipped; the failure was `tests/backend/cache.test.ts` under a load average near 16, which passed 5 of 5 when repeated and is untouched by this change. `npm run test:e2e`: 150 passed.
 
-## Raouf: 2026-11-15 (Australia/Sydney) — prepared films kept; audio menu always shown
+## Raouf: 2026-11-15 (Australia/Sydney) · prepared films kept; audio menu always shown
 
 **Scope:** two problems the owner reported on the live site: the audio choice was missing, and films the server had already prepared were prepared again. Same branch. Not yet released.
 
@@ -239,7 +269,7 @@ Nobody without the owner's sign-in reached a film, a title or any private data, 
 
 - Released the same evening as `e58d8f59578d` (record: the maintainer's private notes). Six editions of content that had since changed were removed on start; every remaining edition matches its film.
 
-## Raouf: 2026-11-15 (Australia/Sydney) — languages and pictures released
+## Raouf: 2026-11-15 (Australia/Sydney) · languages and pictures released
 
 **Scope:** publish and release the language, subtitle and picture work, as the owner asked. Record: the maintainer's private notes.
 
@@ -266,7 +296,7 @@ Nobody without the owner's sign-in reached a film, a title or any private data, 
 - Optional TMDB: needs a token on the server and TMDB's logo in the credits first.
 - Remove the older rollback material when satisfied.
 
-## Raouf: 2026-11-15 (Australia/Sydney) — switch language and subtitles; automatic film pictures
+## Raouf: 2026-11-15 (Australia/Sydney) · switch language and subtitles; automatic film pictures
 
 **Scope:** two owner requests: change audio and subtitles in films that have several, and show good pictures for films automatically. Same branch, `audit/frontend-2026-11-15`. Nothing was pushed or deployed.
 
@@ -320,7 +350,7 @@ Docs: the maintainer's private notes (Languages and subtitles, Pictures), `AGENT
 - To use TMDB: get an API Read Access Token at themoviedb.org and add `MOV_TMDB_TOKEN` to the server's environment. TMDB's terms also ask for its logo in the credits, which is not added yet.
 - Pictures are not cached by browsers until the edge and Nginx pass the API's cache header for `/api/artwork/`.
 
-## Raouf: 2026-11-15 (Australia/Sydney) — released to production
+## Raouf: 2026-11-15 (Australia/Sydney) · released to production
 
 **Scope:** publish and deploy everything on `audit/frontend-2026-11-15`: the backend audit, the preparation work, the frontend audit and the UI/UX audit. The owner approved a full redeploy on the production server. Record: the maintainer's private notes.
 
@@ -349,7 +379,7 @@ Docs: the maintainer's private notes (Languages and subtitles, Pictures), `AGENT
 - Rollback material is kept on the server (previous units, Nginx file and the pre-migration database). Remove it once the release has been used for a while.
 - The TV package was not rebuilt.
 
-## Raouf: 2026-11-15 (Australia/Sydney) — UI and UX audit against the rule set
+## Raouf: 2026-11-15 (Australia/Sydney) · UI and UX audit against the rule set
 
 **Scope:** check the interface rule by rule against the UI/UX Pro Max rule set and the frontend-design guidance, measure what can be measured, and fix what is found. Same branch, `audit/frontend-2026-11-15`. Nothing was pushed or deployed. Report: the maintainer's private notes.
 
@@ -387,7 +417,7 @@ Docs: the maintainer's private notes with screens in the maintainer's private no
 - The TV stylesheet still carries its own raw colours.
 - Preload the two display fonts once the build can write their hashed names into `index.html`.
 
-## Raouf: 2026-11-15 (Australia/Sydney) — frontend audit: loading, preparation states, accessibility
+## Raouf: 2026-11-15 (Australia/Sydney) · frontend audit: loading, preparation states, accessibility
 
 **Scope:** audit every frontend file and fix what was found, on `audit/frontend-2026-11-15` (created from `audit/backend-2026-11-15`). The visual identity is kept. Nothing was pushed or deployed. Report: the maintainer's private notes.
 
@@ -436,7 +466,7 @@ Docs: the maintainer's private notes with before and after screenshots in the ma
 - The API and the web client should ship together: an older API simply sends no `phase`, and the panel then shows the server's sentence and a moving line.
 - Film cards cannot show progress through a film until the catalogue returns each film's length.
 
-## Raouf: 2026-11-15 (Australia/Sydney) — watch a film while it is prepared
+## Raouf: 2026-11-15 (Australia/Sydney) · watch a film while it is prepared
 
 **Scope:** remove the last large wait, finish the remaining improvements, and check current documentation for what the tools support. Same branch, `audit/backend-2026-11-15`. Nothing was pushed or deployed. Report: the maintainer's private notes.
 
@@ -481,7 +511,7 @@ Tests added: `tests/backend/streaming-edition.test.ts`, `streaming-playback.test
 - A 4K HDR conversion for a browser without HEVC is slower than playback, so it starts part-way through.
 - Enlarging the prepared volume on the server, and the deployment itself, are the owner's steps.
 
-## Raouf: 2026-11-15 (Australia/Sydney) — faster preparation and the remaining audit findings
+## Raouf: 2026-11-15 (Australia/Sydney) · faster preparation and the remaining audit findings
 
 **Scope:** make films playable sooner, accept more formats, and close what the backend audit left open. Same branch, `audit/backend-2026-11-15`. Nothing was pushed or deployed. Reports: the maintainer's private notes and the maintainer's private notes.
 
@@ -536,7 +566,7 @@ Tests added: `tests/backend/job-priority.test.ts`, `worker-yield.test.ts`, `capa
 - The 20 GiB prepared volume cannot hold a repackaged 4K original over 16 GiB.
 - Not measured: Drive read speed on the server, and the new defaults on the production host.
 
-## Raouf: 2026-11-15 (Australia/Sydney) — backend audit and remediation
+## Raouf: 2026-11-15 (Australia/Sydney) · backend audit and remediation
 
 **Scope:** every backend file (API, worker, edge, database, contracts, client API, scripts, deploy templates, tests). Branch `audit/backend-2026-11-15`, from `17dfa23`. Nothing was pushed or deployed. Full report: the maintainer's private notes.
 

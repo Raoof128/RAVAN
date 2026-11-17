@@ -1,4 +1,9 @@
 import { createContext, useContext } from "react";
+import {
+  MAX_READING_BYTES,
+  type ReadingItem,
+  type ReadingPosition,
+} from "../../contracts/src/reading.js";
 import type {
   MovieList,
   MovieDetail,
@@ -59,6 +64,47 @@ export function createApiClient(baseUrl: string) {
     }
   }
   return {
+    reading(q = "", offset = 0) {
+      return request<{ items: ReadingItem[]; nextOffset: number | null }>(
+        `/api/reading?${new URLSearchParams({ q, offset: String(offset) })}`,
+      );
+    },
+    saveReading(item: ReadingItem, position: ReadingPosition) {
+      return request<void>(
+        `/api/reading/${encodeURIComponent(item.id)}/progress`,
+        "PUT",
+        { generation: item.generation, ...position },
+      );
+    },
+    async readingFile(item: ReadingItem, signal: AbortSignal): Promise<Blob> {
+      const response = await fetch(
+        `${baseUrl}/api/reading/${encodeURIComponent(item.id)}/content?generation=${encodeURIComponent(item.generation)}`,
+        {
+          credentials: "same-origin",
+          signal,
+          headers: credential ? { Authorization: `Bearer ${credential}` } : {},
+        },
+      );
+      if (!response.ok)
+        throw new ApiError(response.status, "reading_unavailable");
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("Empty book");
+      const chunks: Uint8Array<ArrayBuffer>[] = [];
+      let size = 0;
+      try {
+        for (;;) {
+          const chunk = await reader.read();
+          if (chunk.done) break;
+          size += chunk.value.byteLength;
+          if (size > MAX_READING_BYTES) throw new Error("Book too large");
+          chunks.push(new Uint8Array(chunk.value));
+        }
+      } finally {
+        await reader.cancel();
+      }
+      if (String(size) !== item.sizeBytes) throw new Error("Incomplete book");
+      return new Blob(chunks);
+    },
     setDeviceCredential(value: string | undefined) {
       credential = value;
     },

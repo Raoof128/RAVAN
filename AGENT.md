@@ -46,7 +46,8 @@ RAVAN is a private, single-owner cinema: a Fastify API, a media worker, a Cloudf
 - **Never hold a screen back for an animation.** The opening screen in `apps/web/index.html` goes when the session answers. Placeholders appear only after `useDelayed`.
 - **Loading uses the primitives in `packages/ui/src/Loading.tsx`.** Do not add another spinner, shimmer or skeleton. Animate `opacity` and `transform` only.
 - **Every animation needs a still form.** Both `prefers-reduced-motion` and `:root[data-motion="reduce"]` set `animation: none`; an element whose base style is invisible until its animation runs will stay invisible. Write keyframes from the hidden state, not to the visible one, or add an explicit reset.
-- **`index.html` may carry inline CSS but no inline script.** The content security policy is `script-src 'self'`.
+- **`index.html` may carry inline CSS but no inline script.** The content security policy permits self-hosted scripts and WebAssembly compilation for local PDF decoders, never general JavaScript eval.
+- **The reading room is Google Drive only.** Books have their own catalogue and server progress. Do not add device imports or browser-local reading history. Serve bytes only after live folder/access/generation checks; never serve book HTML as a same-origin document.
 - **Browser storage holds the motion flag (`ravan:motion`) and the TV's device credential, nothing else.** Never an MFA secret, a session token or library data.
 - **A control whose action is running stays focusable.** Use `ActionButton` and `usePending`; do not set `disabled` on it. When an action removes the focused control, move focus somewhere deliberate.
 - **Anything the TV loads must run on Chromium 79.** The build lowers script syntax and `inset`; it does not lower flex `gap`, `aspect-ratio`, `:focus-visible`, `:is()` or `:where()`. `tv.css` and `loading.css` avoid them; shared rules in `tokens.css` that use them are overridden in `tv.css`.

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-const base = "RAVAN — Every Story Flows.";
+const base = "RAVAN. Every Story Flows.";
 const current = () => location.hash.slice(1) || "/library";
 /*
  * Back and Forward return to where the reader was. Each history entry is
@@ -103,7 +103,7 @@ export function returnTo(pattern: RegExp) {
  */
 export function useTitle(title?: string) {
   useEffect(() => {
-    document.title = title ? `${title} — RAVAN` : base;
+    document.title = title ? `${title} · RAVAN` : base;
     return () => {
       document.title = base;
     };

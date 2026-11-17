@@ -46,6 +46,33 @@ body {
   bottom: 23px;
   height: 1px;
 }
+/* Four destinations need a full row on phones, with the brand above them. */
+@media (max-width: 560px) {
+  .site-header.site-header-browse {
+    height: auto;
+    min-height: 104px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding-top: 18px;
+    padding-bottom: 8px;
+  }
+  .site-header.site-header-browse nav {
+    width: 100%;
+    margin-left: 0;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+  .site-header.site-header-browse nav a {
+    min-height: 44px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+  .site-header.site-header-browse nav a[aria-current]:after {
+    bottom: 2px;
+  }
+}
 .library-page {
   padding-bottom: 0;
 }

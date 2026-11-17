@@ -86,7 +86,7 @@ test("a folder is one card that opens to its films, and back returns to it", asy
     page.getByRole("heading", { level: 1, name: /Pluto/ }),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: /^View Pluto/ })).toHaveCount(3);
-  await expect(page).toHaveTitle(/^Pluto — RAVAN/);
+  await expect(page).toHaveTitle(/^Pluto · RAVAN/);
 
   // A search inside the folder asks about that folder only.
   await page.getByRole("searchbox", { name: "Search this folder" }).fill("02");

@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "packages/ui/src/loading.css"
+        ],
+        "createdAt": "2026-11-17T08:55:32.401Z",
+        "reason": "Agent: the sole finding is the native progress::-webkit-progress-value fill tracking measured progress inside a fixed-size 3px progress element; intentional domain-appropriate feedback introduced in commit 068d42f before the reader changes. Preserve this existing motion."
+      }
+    ]
+  }
+}

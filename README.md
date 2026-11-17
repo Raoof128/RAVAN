@@ -6,9 +6,11 @@
 
 - Google sign-in restricted to one owner, authenticator MFA, recovery codes, and revocable device pairing.
 - Folder-scoped library discovery over read-only Google Drive access.
+- Browsing by folder: each folder in the Drive folder, such as a series with its episodes, shows as one card that opens to its own films. A search from the top looks through every folder.
 - Automatic browser compatibility, by what your browser reports it can play: the original directly (MP4, WebM or Matroska; H.264, HEVC including HDR, AV1, VP9), a repackaged copy with the picture untouched, or H.264/AAC conversion. HDR10/HLG sources become SDR editions only for browsers that cannot decode them.
 - Quality choices from 480p to 4K without upscaling, multiple audio choices, up to 64 text-subtitle tracks, seeking, watchlists, and saved playback position.
 - Private media tickets, byte-range delivery, encrypted metadata backups, and bounded background processing on a CPU-only server.
+- A browser reading room for EPUB books, PDF documents and CBZ manga from the connected Google Drive folder, with search, saved position, text sizing and right-to-left navigation. See [reader usage and format limits](docs/reading-room.md).
 
 The browser is the primary supported client. A film your browser can decode plays at once, or within the first segments of a repackaging pass. A film it cannot decode is converted, and can be watched while it is converted as soon as the converter is sure to stay ahead of you; a slow 4K HDR conversion starts part-way through rather than at once. Conversion targets up to 1080p unless the picture is kept as it is; cinematic aspect ratios can produce a lower output height. This is not adaptive bitrate streaming. Encrypted files, damaged sources, unavailable decoders, image subtitles, and Dolby Vision-only files remain limitations. Physical LG C1 playback is not yet verified.
 

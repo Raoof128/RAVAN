@@ -4,7 +4,7 @@ test("production setup does not enable preview through a query parameter", async
   page,
 }) => {
   await page.goto("/?preview=1");
-  await expect(page).toHaveTitle("RAVAN — Every Story Flows.");
+  await expect(page).toHaveTitle("RAVAN. Every Story Flows.");
   await expect(
     page.getByRole("heading", { name: "Your cinema. Only yours." }),
   ).toBeVisible();
