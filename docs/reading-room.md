@@ -1,6 +1,6 @@
 # Reading room
 
-RAVĀN's browser client reads DRM-free EPUB books, PDFs and CBZ manga exclusively from the connected Google Drive folder. This feature is implemented locally; it has not been deployed or checked against the owner's live Drive collection.
+RAVĀN's browser client reads DRM-free EPUB books, PDFs and CBZ manga exclusively from the connected Google Drive folder. The reader was released on 17 November 2026. The owner's signed-in live Drive reading workflow still requires verification.
 
 ## Use it
 

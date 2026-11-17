@@ -8,7 +8,7 @@
 - Migration 9 adds the reading catalogue and requests a fresh scan. Downloads require authentication and live source checks, are capped at 100 MiB, and do not enter the video worker queue. EPUB content is sanitized and archive extraction is bounded. PDF assets are bundled locally.
 - Mobile navigation makes room for the reader. The existing worker-yield test now waits for the first source read instead of assuming FFmpeg starts within 400 ms.
 - Verification: type checks and builds pass; 348 unit/integration tests pass with one conditional HDR skip; the final Drive-only reader suite passes 15 tests across Chromium, Firefox and WebKit. The broader browser pass had 166 passes and two WebKit video timing failures; all five WebKit track tests passed on focused rerun. Production-shaped rendering and desktop/mobile interactions were checked with fixture data, with no console errors.
-- Release status and live verification are recorded separately after activation. Format limitations are in the reader usage guide.
+- Released application `96ff90bb4a16` with migration 9, API, worker and frontend together. Nine edge checks, anonymous reader access denials, 252 asset checksums and three host checks pass. Record: the maintainer's private notes. Format limitations are in the reader usage guide.
 
 ## Raouf: 2026-11-17 (Australia/Sydney) · web title release
 
