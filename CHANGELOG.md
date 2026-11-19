@@ -1,5 +1,38 @@
 # Changelog
 
+## Raouf: 2026-11-19 (Australia/Sydney) · reading documentation audit release
+
+**Scope:** release `92019068e456` and publish it, approved by the owner.
+
+- Live: backend `92019068e456-84496e2c` (schema 10), Cloudflare Worker version `eafcdd9d-e2f8-4b74-9f03-e92c417d7448`. Record: the maintainer's private notes.
+- Verification: rehearsal on a copy of the live database; 12 release tests; 9 of 9 edge checks; Sentinel host checks; clean journal; no rollback.
+- No book has been downloaded on production since the parallel-parts release, so that gain is still unmeasured there.
+
+## Raouf: 2026-11-19 (Australia/Sydney) · reading room checked against current documentation
+
+**Scope:** the owner asked for the reading room to be checked against current 2026 documentation, audited, polished and improved. Branch `audit/backend-2026-11-16`. Not released.
+
+- **Bug, EPUB:** DOMPurify removed `lang`, `dir`, `colspan` and `rowspan`. A custom `ALLOWED_URI_REGEXP` is applied to every attribute outside DOMPurify's URI-safe list. Right-to-left runs and table cell spans were lost. They are now marked URI-safe, with a regression test.
+- **Drive rate limits:** they used to be retried three times within about 1.3 seconds. They now follow Google's backoff (1 second, doubling, up to 32 seconds, five attempts), and one limited download pauses the others. Server errors keep the short retry, so film playback recovers quickly. Metadata requests follow the same rule. Google's newer `RESOURCE_EXHAUSTED` error shape is read as a limit, so it can never be mistaken for a removed file.
+- **Drive quota:** a download costs 200 units of 325,000 per user per minute. Book downloads are capped at 24 in flight, in priority order: the open reader, then the warming of a book just opened, then the worker. The local benchmark keeps its 3.2 second first page at this cap; at 16 it was 4.2 seconds.
+- **PDF.js:** dropped pages are released with `page.cleanup()`, and their canvases are emptied. Previews release their pages. A range answer that arrives after PDF.js stopped waiting no longer fails the whole document.
+- **zip.js:** a read past the end is truncated instead of failing. `checkCrc32` replaces the deprecated `checkSignature`. A chapter's images are extracted four at a time.
+- **Docs:** `docs/reading-room.md` has new Preparation and "How it stays fast" sections and refreshed references. `docs/2026-source-register.md` lists the reading-room sources checked today.
+- Not adopted: PDF.js worker rendering (`rendererSrc`, new in 6.5) and `enableHWA`. Page turns already take 30 to 50 ms, and both are untested in WebKit and Firefox. zip.js `checkOverlappingEntry` is also left off until real EPUBs are tested with it. Resource keys are not needed for the owner's own files.
+- Verification: `npm run check` clean; 59 files, 364 passed, 1 skipped; `npm run build` and `npm run build:web` pass; reader browser suite 30 passed in three engines.
+
+### Files changed
+
+`apps/api/src/media/source-stream.ts`, `apps/api/src/media/cache.ts`, `apps/api/src/drive/client.ts`, `apps/api/src/library/reading.ts`, `apps/api/src/app.ts`, `apps/web/src/reading/book.ts`, `apps/web/src/reading/archive.ts`, `apps/web/src/reading/PdfPage.tsx`, `apps/web/src/reading/PageIndex.tsx`; `tests/backend/reading-speed.test.ts`, `tests/backend/second-audit.test.ts`, `tests/backend/sync.test.ts`, `tests/clients/reading-security.test.ts`; `docs/reading-room.md`, `docs/2026-source-register.md`, `CHANGELOG.md`, `AGENT.md`.
+
+## Raouf: 2026-11-19 (Australia/Sydney) · public snapshot
+
+**Scope:** push, approved by the owner with the parallel book downloads release.
+
+- A sanitized snapshot of private `7e3be95` is on the public repository as branch `public/fast-reader-2026-11-19`, commit `9cd19a8`, on top of `public/google-drive-reader-2026-11-17` (`ee9202c`). It has 245 files; 78 private records are excluded, and the private branch was not pushed.
+- Before the push, the secret scan found nothing. One rule in `AGENT.md` named a file outside the repository; it now describes the timing harness without its path.
+- The documentation audit that followed (`63f4d30`) is not in this snapshot.
+
 ## Raouf: 2026-11-19 (Australia/Sydney) · parallel book downloads release
 
 **Scope:** release `ff6678f01250`, approved by the owner.

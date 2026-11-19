@@ -60,7 +60,13 @@ export function PdfReader({
           void ranges.pdfSlices
             .read(begin, end)
             .then((bytes) => {
-              if (alive) transport.onDataRange(begin, bytes);
+              if (!alive) return;
+              try {
+                transport.onDataRange(begin, bytes);
+              } catch {
+                // PDF.js asserts on a range it no longer waits for (its reader
+                // was cancelled); a late answer is not a broken document.
+              }
             })
             .catch(() => {
               if (alive) {
@@ -137,7 +143,9 @@ export function PdfReader({
       if (existing) return existing.canvas;
       let task: { cancel: () => void } | undefined;
       let cancelled = false;
+      let proxy: { cleanup: () => boolean } | undefined;
       const canvas = pdf.getPage(index + 1).then(async (page) => {
+        proxy = page;
         if (cancelled) throw new Error("Cancelled");
         const natural = page.getViewport({ scale: 1 });
         const scale = Math.min(2, 1600 / natural.width, 2200 / natural.height);
@@ -153,9 +161,20 @@ export function PdfReader({
       });
       const entry = {
         canvas,
+        // Dropping a page frees what PDF.js keeps for it (its operator list
+        // and images stay on the page until cleanup) and the canvas memory.
         cancel: () => {
           cancelled = true;
           task?.cancel();
+          void canvas
+            .then(
+              (element) => {
+                element.width = 0;
+                element.height = 0;
+              },
+              () => {},
+            )
+            .finally(() => proxy?.cleanup());
         },
       };
       pages.set(index, entry);

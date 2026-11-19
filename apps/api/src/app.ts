@@ -21,6 +21,7 @@ import { registerSessions } from "./sessions/routes.js";
 import { registerCatalogue } from "./library/routes.js";
 import {
   BOOK_BLOCK_PARTS,
+  BOOK_DRIVE_IN_FLIGHT,
   registerReading,
   warmReadingBlock,
 } from "./library/reading.js";
@@ -231,6 +232,7 @@ export async function buildApp(
     options.sourceFetch,
     undefined,
     BOOK_BLOCK_PARTS,
+    BOOK_DRIVE_IN_FLIGHT,
   );
   const cache = new BlockCache(
     db,

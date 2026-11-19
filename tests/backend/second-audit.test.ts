@@ -11,6 +11,7 @@ import { PairingService } from "../../apps/api/src/sessions/pairing.js";
 import {
   createDriveClient,
   DriveError,
+  DRIVE_RATE_LIMIT_ATTEMPTS,
 } from "../../apps/api/src/drive/client.js";
 import { sourceGone } from "../../apps/api/src/drive/sync.js";
 import { DriveSourceReader } from "../../apps/api/src/media/source-stream.js";
@@ -459,6 +460,7 @@ it("reads a Drive usage limit as a request to slow down, not as a refusal", asyn
   const recovering = createDriveClient(
     async () => "private",
     async () => (calls++ === 0 ? limited() : Response.json(file)),
+    1,
   );
   expect(await recovering.get("film")).toMatchObject({ id: "film" });
   expect(calls).toBe(2);
@@ -470,11 +472,12 @@ it("reads a Drive usage limit as a request to slow down, not as a refusal", asyn
       calls++;
       return limited();
     },
+    1,
   );
   const slow = await throttled.get("film").catch((error: unknown) => error);
   expect(slow).toBeInstanceOf(DriveError);
   expect((slow as DriveError).status).toBe(429);
-  expect(calls).toBe(3);
+  expect(calls).toBe(DRIVE_RATE_LIMIT_ATTEMPTS);
   expect(sourceGone(slow)).toBe(false);
   // A real refusal is still final, at once.
   calls = 0;

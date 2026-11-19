@@ -25,6 +25,11 @@ import {
 export const OPEN_WARM_CONCURRENCY = 4;
 /** Parallel Drive requests per book block (see `DriveSourceReader`). */
 export const BOOK_BLOCK_PARTS = 4;
+/**
+ * Book downloads from Drive in flight at once, across readers, warming and the
+ * worker. Each costs 200 quota units of 325,000 per user per minute.
+ */
+export const BOOK_DRIVE_IN_FLIGHT = 24;
 /** Books warmed at once. Opening another cancels the oldest. */
 const OPEN_WARM_BOOKS = 2;
 
@@ -89,7 +94,7 @@ export class OpenWarmer {
         const end = Math.min(start + SOURCE_BLOCK_BYTES, size) - 1;
         let read = 0;
         for await (const chunk of this.cache.readSource(
-          { ...ref, reading: "background" },
+          { ...ref, reading: "open" },
           BigInt(start),
           BigInt(end),
           AbortSignal.any([signal, AbortSignal.timeout(90000)]),

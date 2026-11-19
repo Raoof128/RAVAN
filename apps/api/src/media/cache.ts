@@ -26,7 +26,13 @@ type Options = {
    */
   readAhead?: number;
 };
-type CachedSource = SourceRef & { reading?: "foreground" | "background" };
+/**
+ * Who a book read is for: an open reader, the warming of a book just opened,
+ * or the worker. Only an open reader may bypass a full cache.
+ */
+type CachedSource = SourceRef & {
+  reading?: "foreground" | "open" | "background";
+};
 type ReadBlock = (
   ref: CachedSource,
   start: bigint,

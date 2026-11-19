@@ -182,9 +182,14 @@ it.each([401, 403, 429, 503])(
       calls++;
       return new Response("{}", { status });
     };
-    const client = createDriveClient(async () => "private", fake);
+    const { DRIVE_RATE_LIMIT_ATTEMPTS } =
+      await import("../../apps/api/src/drive/client.js");
+    const client = createDriveClient(async () => "private", fake, 1);
     await expect(client.get("root")).rejects.toThrow();
-    expect(calls).toBe(status >= 429 ? 3 : 1);
+    // A rate limit gets Google's longer backoff; a server error a short one.
+    expect(calls).toBe(
+      status === 429 ? DRIVE_RATE_LIMIT_ATTEMPTS : status > 429 ? 3 : 1,
+    );
   },
 );
 it("does not publish a snapshot when changes continue during enumeration", async () => {

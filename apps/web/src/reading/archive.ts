@@ -19,7 +19,11 @@ class RangeArchiveReader extends Reader<ReadingRanges> {
     this.size = ranges.size;
   }
   readUint8Array(offset: number, length: number) {
-    return this.ranges.read(offset, Math.min(length, this.size - offset));
+    // zip.js may ask past the end; the answer is truncated, never negative.
+    return this.ranges.read(
+      Math.min(offset, this.size),
+      Math.max(0, Math.min(length, this.size - offset)),
+    );
   }
 }
 export async function openArchive(
@@ -93,7 +97,7 @@ export async function openArchive(
             chunks.push(new Uint8Array(chunk));
           },
         }),
-        { signal: readingSignal, checkSignature: true },
+        { signal: readingSignal, checkCrc32: true },
       );
       if (size !== entry.uncompressedSize)
         throw new Error("Incomplete archive entry.");

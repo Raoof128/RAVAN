@@ -12,9 +12,10 @@ import {
 import { readSlices } from "../../apps/api/src/library/reading-slices.js";
 import { PDF_SLICE_BYTES } from "../../packages/contracts/src/reading.js";
 import { LibrarySync, VERIFY_REUSE_MS } from "../../apps/api/src/drive/sync.js";
-import type {
-  DriveClient,
-  DriveFile,
+import {
+  usageLimited,
+  type DriveClient,
+  type DriveFile,
 } from "../../apps/api/src/drive/client.js";
 import { JobQueue } from "../../apps/worker/src/leases.js";
 import { prepareReading } from "../../apps/worker/src/reading.js";
@@ -371,4 +372,131 @@ it("reads the slices of different cache blocks side by side", async () => {
   expect([...ids.keys()].map((k) => data[k * PDF_SLICE_BYTES])).toEqual([
     1, 1, 2, 2, 3,
   ]);
+});
+
+it("backs off a rate-limited download, pauses the others, and serves readers first", async () => {
+  const size = 1000;
+  const source = { fileId: "book", generation: "g", sizeBytes: String(size) };
+  const answer = (range: string) => {
+    const [, a, b] = /bytes=(\d+)-(\d+)/.exec(range)!;
+    return new Response(new Uint8Array(Number(b) - Number(a) + 1), {
+      status: 206,
+      headers: { "content-range": `bytes ${a}-${b}/${size}` },
+    });
+  };
+  // Four limits, then an answer: five attempts in all, each wait at least
+  // doubling from the base.
+  const times: number[] = [];
+  let limitsLeft = 4;
+  const limited = new DriveSourceReader(
+    async () => "token",
+    async () => source,
+    async (_url, init) => {
+      times.push(Date.now());
+      if (limitsLeft-- > 0) return new Response("{}", { status: 429 });
+      return answer(new Headers(init?.headers).get("range")!);
+    },
+    0,
+    1,
+    Infinity,
+    10,
+  );
+  await limited.block(source, 0n, 99n, new AbortController().signal);
+  expect(times).toHaveLength(5);
+  const gaps = times.slice(1).map((t, i) => t - times[i]!);
+  gaps.forEach((gap, i) => expect(gap).toBeGreaterThanOrEqual(10 * 2 ** i - 2));
+  // A fifth limit is given up as a limit, not as a refusal of the file.
+  limitsLeft = 5;
+  times.length = 0;
+  await expect(
+    limited.block(source, 0n, 99n, new AbortController().signal),
+  ).rejects.toThrow("Upstream range mismatch");
+  expect(times).toHaveLength(5);
+
+  // One request told to slow down makes a request started meanwhile wait too.
+  let first = true;
+  const starts: Array<[string, number]> = [];
+  const shared = new DriveSourceReader(
+    async () => "token",
+    async () => source,
+    async (_url, init) => {
+      const range = new Headers(init?.headers).get("range")!;
+      starts.push([range, Date.now()]);
+      if (first) {
+        first = false;
+        return new Response("{}", { status: 429 });
+      }
+      return answer(range);
+    },
+    0,
+    1,
+    Infinity,
+    200,
+  );
+  const a = shared.block(source, 0n, 9n, new AbortController().signal);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const b = shared.block(source, 10n, 19n, new AbortController().signal);
+  await Promise.all([a, b]);
+  const limitedAt = starts[0]![1];
+  const other = starts.find(([range]) => range === "bytes=10-19")!;
+  expect(other[1] - limitedAt).toBeGreaterThanOrEqual(190);
+
+  // At most two in flight; a reader's request jumps the worker's queue.
+  const order: string[] = [];
+  const release: Array<() => void> = [];
+  const capped = new DriveSourceReader(
+    async () => "token",
+    async () => source,
+    async (_url, init) => {
+      const range = new Headers(init?.headers).get("range")!;
+      order.push(range);
+      await new Promise<void>((resolve) => release.push(resolve));
+      return answer(range);
+    },
+    0,
+    1,
+    2,
+  );
+  const read = (from: number, reading?: string) =>
+    capped.block(
+      { ...source, reading } as typeof source,
+      BigInt(from),
+      BigInt(from + 9),
+      new AbortController().signal,
+    );
+  const reads = [
+    read(0, "background"),
+    read(10, "background"),
+    read(20, "background"),
+    read(30, "open"),
+    read(40, "foreground"),
+  ];
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  expect(order).toEqual(["bytes=0-9", "bytes=10-19"]);
+  for (let i = 0; i < 20 && order.length < 5; i++) {
+    release.shift()?.();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  release.splice(0).forEach((go) => go());
+  await Promise.all(reads);
+  expect(order.slice(2)).toEqual(["bytes=40-49", "bytes=30-39", "bytes=20-29"]);
+});
+
+it("reads Google's RESOURCE_EXHAUSTED status as a usage limit", async () => {
+  expect(
+    await usageLimited(
+      Response.json(
+        { error: { code: 403, status: "RESOURCE_EXHAUSTED" } },
+        { status: 403 },
+      ),
+    ),
+  ).toBe(true);
+  expect(
+    await usageLimited(
+      Response.json(
+        { error: { code: 403, status: "PERMISSION_DENIED" } },
+        { status: 403 },
+      ),
+    ),
+  ).toBe(false);
 });

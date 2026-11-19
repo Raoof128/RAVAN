@@ -6,6 +6,21 @@ import {
 import { driveId, usageLimited } from "../drive/client.js";
 /** A Drive read that failed for a reason another attempt cannot change. */
 class PermanentSourceError extends Error {}
+/** Drive asked us to slow down (429, or a 403 usage limit). */
+class RateLimitedSource extends Error {}
+/**
+ * Google's backoff for rate limits: min(2^n s + up to 1 s, 32 s), several
+ * times ("Resolve time-based quota errors", Drive API usage limits). Other
+ * failures keep the short retry, so a dropped connection mid-film recovers fast.
+ */
+const RATE_LIMIT_ATTEMPTS = 5;
+const RATE_LIMIT_MAX_MS = 32000;
+type Priority = 0 | 1 | 2;
+/** The reader's own requests first, then an opened book's warming, then the worker. */
+function priority(source: SourceRef): Priority {
+  const reading = (source as { reading?: string }).reading;
+  return reading === "background" ? 2 : reading === "open" ? 1 : 0;
+}
 export class DriveSourceReader {
   constructor(
     private token: () => Promise<string>,
@@ -18,7 +33,43 @@ export class DriveSourceReader {
      * one request took about four seconds; parts arrive side by side.
      */
     private parts = 1,
+    /**
+     * Downloads in flight at once. Each costs 200 Drive quota units against
+     * 325,000 per user per minute; at about a second each, 24 stay under it.
+     */
+    private maxInFlight = Infinity,
+    private rateLimitDelayMs = 1000,
   ) {}
+  private inFlight = 0;
+  private waiting: Array<{ priority: Priority; start: () => void }> = [];
+  private coolUntil = 0;
+  private async slot(source: SourceRef, signal: AbortSignal) {
+    if (this.inFlight < this.maxInFlight) {
+      this.inFlight++;
+      return;
+    }
+    const entry = { priority: priority(source), start: () => {} };
+    await new Promise<void>((resolve, reject) => {
+      const abort = () => {
+        this.waiting = this.waiting.filter((w) => w !== entry);
+        reject(signal.reason ?? new Error("Cancelled"));
+      };
+      entry.start = () => {
+        signal.removeEventListener("abort", abort);
+        resolve();
+      };
+      signal.addEventListener("abort", abort, { once: true });
+      // Stable by arrival within a priority.
+      const at = this.waiting.findIndex((w) => w.priority > entry.priority);
+      if (at < 0) this.waiting.push(entry);
+      else this.waiting.splice(at, 0, entry);
+    });
+  }
+  private release() {
+    const next = this.waiting.shift();
+    if (next) next.start();
+    else this.inFlight--;
+  }
   async block(
     source: SourceRef,
     start: bigint,
@@ -86,22 +137,40 @@ export class DriveSourceReader {
     end: bigint,
     signal: AbortSignal,
   ): Promise<Uint8Array> {
-    for (let attempt = 0; ; attempt++) {
+    let failures = 0,
+      limits = 0;
+    for (;;) {
+      // After one request is told to slow down, the others wait it out too.
+      const cooling = this.coolUntil - Date.now();
+      if (cooling > 0) await delay(cooling, undefined, { signal });
+      await this.slot(source, signal);
+      let outcome: { bytes: Uint8Array } | { error: unknown };
       try {
-        return await this.attempt(source, start, end, signal);
+        outcome = { bytes: await this.attempt(source, start, end, signal) };
       } catch (error) {
-        if (
-          signal.aborted ||
-          attempt >= 2 ||
-          error instanceof PermanentSourceError
-        )
-          throw error;
-        await delay(
-          this.retryDelayMs * 2 ** attempt + Math.random() * this.retryDelayMs,
-          undefined,
-          { signal },
-        );
+        outcome = { error };
+      } finally {
+        this.release();
       }
+      if ("bytes" in outcome) return outcome.bytes;
+      const { error } = outcome;
+      if (signal.aborted || error instanceof PermanentSourceError) throw error;
+      let wait: number;
+      if (error instanceof RateLimitedSource) {
+        if (++limits >= RATE_LIMIT_ATTEMPTS) throw error;
+        wait = Math.min(
+          this.rateLimitDelayMs * 2 ** (limits - 1) +
+            Math.random() * this.rateLimitDelayMs,
+          RATE_LIMIT_MAX_MS,
+        );
+        this.coolUntil = Math.max(this.coolUntil, Date.now() + wait);
+      } else {
+        if (++failures >= 3) throw error;
+        wait =
+          this.retryDelayMs * 2 ** (failures - 1) +
+          Math.random() * this.retryDelayMs;
+      }
+      await delay(wait, undefined, { signal });
     }
   }
   private async attempt(
@@ -140,9 +209,11 @@ export class DriveSourceReader {
       const limited = await usageLimited(response);
       if (response.status !== 403) await response.body?.cancel();
       const message = "Upstream range mismatch";
-      throw limited || response.status === 429 || response.status >= 500
-        ? new Error(message)
-        : new PermanentSourceError(message);
+      throw limited || response.status === 429
+        ? new RateLimitedSource(message)
+        : response.status >= 500
+          ? new Error(message)
+          : new PermanentSourceError(message);
     }
     const reader = response.body?.getReader();
     if (!reader) throw new Error("Empty source");

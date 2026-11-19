@@ -104,6 +104,9 @@ export function sanitizeChapter(
     ALLOW_DATA_ATTR: false,
     ALLOW_ARIA_ATTR: false,
     ALLOWED_URI_REGEXP: /^blob:/,
+    // DOMPurify tests every allowed attribute outside its URI-safe list
+    // against ALLOWED_URI_REGEXP, so these plain-text ones were being removed.
+    ADD_URI_SAFE_ATTR: ["lang", "dir", "colspan", "rowspan"],
     RETURN_DOM_FRAGMENT: true,
   });
   for (const image of fragment.querySelectorAll("img")) {
@@ -211,10 +214,22 @@ export async function openBook(
           }
           // Extract a chapter's illustrations together; one at a time cost a
           // round trip each on a book read in ranges.
-          const loaded = await Promise.allSettled(
-            [...wanted.keys()].map((local) =>
-              imageUrl(archive, local, pageSignal),
-            ),
+          // A few at a time: they share the range window, and zip.js advises
+          // against extracting many entries of an untrusted archive at once.
+          const queue = [...wanted.keys()];
+          const loaded: PromiseSettledResult<string>[] = [];
+          let next = 0;
+          await Promise.all(
+            Array.from({ length: Math.min(4, queue.length) }, async () => {
+              while (next < queue.length) {
+                const i = next++;
+                loaded[i] = await imageUrl(archive, queue[i]!, pageSignal).then(
+                  (value) => ({ status: "fulfilled", value }) as const,
+                  (reason: unknown) =>
+                    ({ status: "rejected", reason }) as const,
+                );
+              }
+            }),
           );
           for (const result of loaded)
             if (result.status === "fulfilled") urls.add(result.value);

@@ -288,3 +288,28 @@ Raouf: 2026-11-19 (Australia/Sydney), twenty-third entry
 - Files changed: the maintainer's private notes, the maintainer's private notes, `CHANGELOG.md`, this file.
 - Verification: rehearsal on a copy of the live database, 12 release tests, 9 of 9 edge checks, Sentinel host checks; no rollback needed.
 - Rule: book jobs may run during activation. They resume from stored blocks, so the activation guard counts only viewers and film jobs (`kind<>'reading'`).
+
+Raouf: 2026-11-19 (Australia/Sydney), twenty-third entry, continued
+
+- Scope: push, approved by the owner.
+- Summary: sanitized snapshot of `7e3be95` pushed as `public/fast-reader-2026-11-19` (`9cd19a8`); the private branch stays local.
+- Verification: export assertions passed; secret scan clean.
+- Rule: before exporting, search `AGENT.md` and `CHANGELOG.md` for `.local/`. The export's forbidden list does not catch paths outside the repository.
+
+Raouf: 2026-11-19 (Australia/Sydney), twenty-fourth entry
+
+- Scope: check the reading room against current documentation (PDF.js 6.5, zip.js 2.25, DOMPurify 3.4, Drive API), audit and polish, at the owner's request.
+- Summary: fixed EPUB attributes removed by DOMPurify; Drive rate limits use Google's backoff with a shared pause; book downloads are capped at 24 with reader-first priority; dropped PDF pages are released; zip.js reads past the end are truncated.
+- Files changed: see `CHANGELOG.md`.
+- Verification: 59 files, 364 passed, 1 skipped; `npm run check`; both builds; 30 reader browser tests.
+- Follow-ups: release (owner's approval); measure per-block Drive times on production; try PDF.js worker rendering behind a test in all three engines.
+- Rule: a custom DOMPurify `ALLOWED_URI_REGEXP` applies to every allowed attribute outside the URI-safe list. Add plain-text attributes to `ADD_URI_SAFE_ATTR`, and test that they survive.
+- Rule: retry a Drive rate limit (429, `usageLimits`, `RESOURCE_EXHAUSTED`) with Google's backoff, and a server error with the short retry. Never treat either as a verdict on the file.
+
+Raouf: 2026-11-19 (Australia/Sydney), twenty-fifth entry
+
+- Scope: release and publish the reading documentation audit, approved by the owner.
+- Summary: backend `92019068e456-84496e2c` and Worker version `eafcdd9d` are live. See the maintainer's private notes.
+- Files changed: the maintainer's private notes, the maintainer's private notes, `CHANGELOG.md`, this file.
+- Verification: rehearsal on a copy of the live database, 12 release tests, 9 of 9 edge checks, Sentinel host checks; no rollback needed.
+- Follow-ups: when the owner opens a book that is not stored, read its per-block times in `cache_blocks` (before parallel parts: 3.5 to 4 s per block); signed-in timing of the first page and page turns; clear old rollback material.

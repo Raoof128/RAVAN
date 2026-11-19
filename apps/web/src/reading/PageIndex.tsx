@@ -24,6 +24,8 @@ async function preview({ pdf, book }: Art, index: number, signal: AbortSignal) {
       await task.promise;
     } finally {
       signal.removeEventListener("abort", cancel);
+      // A preview should not keep the page's full-size resources alive.
+      void task.promise.catch(() => {}).finally(() => page.cleanup());
     }
   } else if (book?.format === "cbz") {
     const page = await book.page(index, signal);

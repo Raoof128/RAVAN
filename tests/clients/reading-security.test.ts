@@ -34,3 +34,19 @@ it("resolves only archive-local EPUB references and rejects ambiguous archive pa
   for (const path of ["../file", "/absolute", "C:\\file", "a/../b", "a\u0000b"])
     expect(safeArchivePath(path), path).toBe(false);
 });
+
+it("keeps a chapter's language, direction and table spans", () => {
+  const safe = sanitizeChapter(
+    `<p lang="ar" dir="rtl">مرحبا</p><table><tr><td colspan="2" rowspan="3">Cell</td></tr></table><p dir="javascript:alert(1)">x</p>`,
+    new Set(),
+  );
+  const doc = new DOMParser().parseFromString(safe, "text/html");
+  const p = doc.querySelector("p")!;
+  expect(p.getAttribute("lang")).toBe("ar");
+  expect(p.getAttribute("dir")).toBe("rtl");
+  const td = doc.querySelector("td")!;
+  expect(td.getAttribute("colspan")).toBe("2");
+  expect(td.getAttribute("rowspan")).toBe("3");
+  // Attribute values stay text; nothing becomes a link or script.
+  expect(safe).not.toMatch(/<a|<script|href|on\w+=/i);
+});

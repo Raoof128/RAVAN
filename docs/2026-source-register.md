@@ -25,6 +25,18 @@ Checked 15 November 2026. These are current official pages, including living sta
 
 Earlier sources for HTTP semantics, FFprobe, security, metadata, and storage remain linked in the [research report](2026-research-and-gap-analysis.md). No private account entitlement, throughput, codec result or cloud billing allowance was verified by reading these pages.
 
+## Reading room, checked 19 November 2026
+
+| Area              | Official reference                                                                      | Consequence                                                                                                                                 |
+| ----------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Drive quota units | [Usage limits](https://developers.google.com/workspace/drive/api/guides/limits)         | A download (`files.get` with `alt=media`) costs 200 units of 325,000 per user per minute; book downloads are capped at 24 in flight         |
+| Drive backoff     | [Usage limits](https://developers.google.com/workspace/drive/api/guides/limits)         | Rate limits wait `min(2^n s + up to 1 s, 32 s)`; one limited request pauses the others                                                      |
+| Drive errors      | [Handle errors](https://developers.google.com/workspace/drive/api/guides/handle-errors) | `userRateLimitExceeded`, `rateLimitExceeded` and 429 are retried; no `Retry-After` is documented                                            |
+| Drive 2026 limits | [Release notes](https://developers.google.com/workspace/drive/release-notes)            | Quota units from 1 May 2026, with a 1 TB per project per day egress limit; projects active before then keep their earlier quotas            |
+| PDF.js 6.5        | [API](https://mozilla.github.io/pdf.js/api/draft/module-pdfjsLib.html)                  | `render({ canvas })` is the current form; `page.cleanup()` releases a dropped page; worker rendering (`rendererSrc`) is available, not used |
+| zip.js 2.25       | [Reader](https://gildas-lormeau.github.io/zip.js/api/classes/Reader.html)               | Reads past the end are truncated; `checkSignature` is deprecated for `checkCrc32`                                                           |
+| DOMPurify 3.4     | [README](https://github.com/cure53/DOMPurify)                                           | A custom `ALLOWED_URI_REGEXP` applies to non-URI attributes too; `ADD_URI_SAFE_ATTR` keeps `lang`, `dir` and table spans                    |
+
 ## LG C1 target refinement
 
 Owner confirmed LG C1 during implementation. LG lists its 2021 OLED lineup, including C1, with webOS 6.0. The current developer engine table maps webOS 6.x to Chromium 79. Build the separate TV bundle for Chrome 79; do not assume the modern browser bundle or CSS feature set works on the TV. Installed firmware remains unverified.

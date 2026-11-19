@@ -64,13 +64,18 @@ export async function usageLimited(response: Response): Promise<boolean> {
     const body = z
       .object({
         error: z.object({
-          errors: z.array(z.object({ domain: z.string().optional() })),
+          errors: z
+            .array(z.object({ domain: z.string().optional() }))
+            .optional(),
+          status: z.string().optional(),
         }),
       })
       .safeParse(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+    // Google's newer error shape names a limit by status, not domain.
     return (
       body.success &&
-      body.data.error.errors.some((e) => e.domain === "usageLimits")
+      (body.data.error.status === "RESOURCE_EXHAUSTED" ||
+        (body.data.error.errors ?? []).some((e) => e.domain === "usageLimits"))
     );
   } catch {
     return false;
@@ -81,9 +86,12 @@ export async function usageLimited(response: Response): Promise<boolean> {
 const fields =
   "id,name,mimeType,parents,size,version,md5Checksum,headRevisionId,trashed,capabilities(canDownload)";
 export const driveId = z.string().regex(/^[A-Za-z0-9_-]{1,160}$/);
+/** Attempts for a rate-limited Drive request, with Google's backoff. */
+export const DRIVE_RATE_LIMIT_ATTEMPTS = 5;
 export function createDriveClient(
   token: () => Promise<string>,
   fetcher: typeof fetch = fetch,
+  rateLimitDelayMs = 1000,
 ): DriveClient {
   async function request(
     path: string,
@@ -93,7 +101,9 @@ export function createDriveClient(
     const url = new URL(`https://www.googleapis.com/drive/v3/${path}`);
     for (const [key, value] of Object.entries(params))
       url.searchParams.set(key, value);
-    for (let attempt = 0; attempt < 3; attempt++) {
+    let failures = 0,
+      limits = 0;
+    for (;;) {
       signal?.throwIfAborted();
       const timeout = AbortSignal.timeout(15000);
       const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
@@ -105,10 +115,28 @@ export function createDriveClient(
       if (!response.ok) {
         const status = (await usageLimited(response)) ? 429 : response.status;
         if (response.status !== 403) await response.body?.cancel();
-        if ((status === 429 || status >= 500) && attempt < 2) {
-          await delay(250 * 2 ** attempt + Math.random() * 100, undefined, {
-            signal,
-          });
+        // Rate limits: min(2^n s + up to 1 s, 32 s), as Google recommends.
+        // Server errors keep a short retry so playback checks stay quick.
+        if (status === 429 && ++limits < DRIVE_RATE_LIMIT_ATTEMPTS) {
+          await delay(
+            Math.min(
+              rateLimitDelayMs * 2 ** (limits - 1) +
+                Math.random() * rateLimitDelayMs,
+              32000,
+            ),
+            undefined,
+            { signal },
+          );
+          continue;
+        }
+        if (status >= 500 && ++failures < 3) {
+          await delay(
+            250 * 2 ** (failures - 1) + Math.random() * 100,
+            undefined,
+            {
+              signal,
+            },
+          );
           continue;
         }
         throw new DriveError(status);
@@ -132,7 +160,6 @@ export function createDriveClient(
       }
       return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
     }
-    throw new Error("Drive retry limit");
   }
   return {
     async get(id, signal) {
