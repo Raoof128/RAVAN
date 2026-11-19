@@ -252,3 +252,39 @@ Raouf: 2026-11-16 (Australia/Sydney), nineteenth entry
 - Verification: rehearsal on a copy of the live database, the crafted addresses retried on the server and from outside, 9 of 9 edge checks, 12 release tests, sign-in page in two browsers, Sentinel host checks; no rollback needed.
 - Follow-ups: the owner signs in on production; rebuild the television package; clear old rollback material.
 - Rule: a private document named in a test comment or in the changelog stops the public export. Name the report in words, not by path, anywhere outside `docs/`.
+
+Raouf: 2026-11-19 (Australia/Sydney), twentieth entry
+
+- Scope: audit and speed pass on the reading room, at the owner's request, on `audit/backend-2026-11-16` over the uncommitted worker-backed reading work.
+- Summary: book verification reuses Drive's answer for five seconds (`verifyReading(id, fresh)`); the worker warms three blocks at once; the browser fetches ranges in parallel, prefetches whole archive entries, and keeps the neighbouring pages (`apps/web/src/reading/pages.ts`) and the next PDF page rendered.
+- Files changed: see `CHANGELOG.md`.
+- Verification: 59 files, 357 passed, 1 skipped; `npm run check`; `npm run build`, `npm run build:web`; 30 reader browser tests across three engines.
+- Follow-ups: commit, then release with the worker-backed reading work (owner's approval); time a first page and a page turn on production against a real Drive book.
+- Rule: books follow the films' verification rule. Pass `fresh` to `verifyReading` whenever the answer must postdate bytes just fetched, and test a change or revocation by moving the clock past `VERIFY_REUSE_MS`, not by asking again at once.
+- Rule: `PageCache` owns the pages it hands out. The reader never releases a page; `keep` and `dispose` do.
+
+Raouf: 2026-11-19 (Australia/Sydney), twenty-first entry
+
+- Scope: release the worker-backed and faster reading work, approved by the owner.
+- Summary: backend `3653ae1075d7-35f5e79f` (schema 10) and Worker version `a918a3ca` are live. See the maintainer's private notes.
+- Files changed: the maintainer's private notes, the maintainer's private notes, `CHANGELOG.md`, this file.
+- Verification: rehearsal on a copy of the live database, 12 release tests, 9 of 9 edge checks, Sentinel host checks; no rollback needed.
+- Follow-ups: the owner times a first page and page turns on production; clear old rollback material.
+- Rule: time reader changes with the maintainer's timing harness, kept outside the repository (real API and web client, simulated Drive latency), before and after; the unit tests count Drive calls but not milliseconds.
+
+Raouf: 2026-11-19 (Australia/Sydney), twenty-second entry
+
+- Scope: second speed pass on the reading room, at the owner's request.
+- Summary: book blocks are fetched from Drive as four parallel parts (`BOOK_BLOCK_PARTS`); opening a book warms its missing blocks in the API (`OpenWarmer`); slice spans and slice batches run four at a time. Cold first page in the local benchmark: 26.2 s to 3.2 s at production's per-connection Drive rate.
+- Files changed: see `CHANGELOG.md`.
+- Verification: 59 files, 361 passed, 1 skipped; `npm run check`; both builds; 30 reader browser tests.
+- Follow-ups: release (owner's approval); then compare per-block times in `cache_blocks` for newly prepared books against the 3.5 to 4 s seen on 19 November, which tests the per-connection assumption.
+- Rule: the benchmark simulator has no shared bandwidth limit, so more lanes always look faster there. Set `BENCH_BYTES_PER_MS` from production block timings, and keep Drive connections bounded (open warming 4 x 4 parts, worker 3 x 4).
+
+Raouf: 2026-11-19 (Australia/Sydney), twenty-third entry
+
+- Scope: release the second reading speed pass, approved by the owner.
+- Summary: backend `ff6678f01250-e3f57cff` and Worker version `17e64b55` are live. See the maintainer's private notes.
+- Files changed: the maintainer's private notes, the maintainer's private notes, `CHANGELOG.md`, this file.
+- Verification: rehearsal on a copy of the live database, 12 release tests, 9 of 9 edge checks, Sentinel host checks; no rollback needed.
+- Rule: book jobs may run during activation. They resume from stored blocks, so the activation guard counts only viewers and film jobs (`kind<>'reading'`).

@@ -5,6 +5,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { z } from "zod";
 import { openDatabase, type Database } from "../../../packages/db/src/open.js";
 import { environmentConfig, startupReason } from "../../api/src/config.js";
+import { planReading, prepareReading } from "./reading.js";
 import { JobQueue, type Lane } from "./leases.js";
 import { prepareBrowser } from "./browser-prepare.js";
 import {
@@ -66,6 +67,7 @@ export class MediaWorker {
   }
   private swept = 0;
   async queueLibrary() {
+    planReading(this.db, this.queue);
     if (!this.storage) return;
     // Once an hour, remove picture files that nothing refers to.
     if (Date.now() - this.swept > 3600000) {
@@ -183,6 +185,10 @@ export class MediaWorker {
       if (signal.aborted) throw error;
       throw new ApiUnavailable("API unreachable");
     }
+    if (response.status === 507) {
+      await response.body?.cancel();
+      throw new Error("Prepared storage full");
+    }
     if (response.status === 429 || response.status >= 500) {
       await response.body?.cancel();
       throw new ApiUnavailable("API unavailable");
@@ -251,6 +257,25 @@ export class MediaWorker {
     let granted: string | undefined;
     let preparing: { id: string; output: string } | undefined;
     try {
+      if (job.kind === "reading") {
+        const ref = sourceSchema.parse(JSON.parse(job.payload));
+        await prepareReading(
+          this.db,
+          this.queue,
+          job,
+          ref,
+          combined,
+          async (index, blockSignal) => {
+            await this.ask(
+              `/_worker/reading/${ref.fileId}/${ref.generation}/${index}`,
+              "POST",
+              blockSignal,
+              120000,
+            );
+          },
+        );
+        return "completed";
+      }
       if (job.kind === "browser-prepare") {
         if (!this.storage) throw new Error("Preparation unavailable");
         const data = z
@@ -559,6 +584,7 @@ export async function runLoops(
     lane("probe"),
     lane("prepare"),
     lane("artwork"),
+    lane("reading"),
   ]);
 }
 async function main() {

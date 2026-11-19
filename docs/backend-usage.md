@@ -34,3 +34,7 @@ Source edition reassignment is available to the owner via `PATCH /api/movies/:ta
 Set `MOV_ORIGIN=http://localhost:5173` when using the Vite proxy locally, matching the exact browser origin and Google callback registration. It must be a bare origin (`scheme://host[:port]`); a trailing slash or path is rejected at startup because it could never equal a browser's `Origin` header. A failed start prints the setting and rule that failed, never a configured value. The production origin must be the final HTTPS hostname. See [MFA recovery](security/mfa-usage.md).
 
 For local preparation, set `MOV_PREPARED_DIR` to an absolute real directory (not a symlink). In production it must be a separate bounded filesystem, with sufficient space reserved on the parent disk. The worker needs FFmpeg with libx264, AAC, zscale and tonemap. The service template allows 256 tasks for up to 64 subtitle outputs while retaining a one-core CPU limit and 2 GiB memory ceiling. Do not lower the task limit to the video encoder's thread count.
+
+### Book preparation
+
+Run the API and worker against the same data directory. After a Drive sync, the worker prepares supported books in a separate reading lane. Open a title to prioritize it. The shelf reports the worker’s measured progress, and Reading settings shows it while the book is open. A service restart resumes from verified cache blocks. Bookmarks are stored independently in SQLite. See [Reading room](reading-room.md).

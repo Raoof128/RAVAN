@@ -1,5 +1,57 @@
 # Changelog
 
+## Raouf: 2026-11-19 (Australia/Sydney) · parallel book downloads release
+
+**Scope:** release `ff6678f01250`, approved by the owner.
+
+- Live: backend `ff6678f01250-e3f57cff` (schema 10), Cloudflare Worker version `17e64b55-4166-4cad-8ec6-c3c34156dc37`. Record: the maintainer's private notes.
+- Verification: rehearsal on a copy of the live database; 12 release tests; 9 of 9 edge checks; Sentinel host checks; clean journal; no rollback.
+
+## Raouf: 2026-11-19 (Australia/Sydney) · reading room, second speed pass
+
+**Scope:** the owner asked for more speed after the fast reader release. Branch `audit/backend-2026-11-16`. Not released.
+
+- Production block timings showed each Drive download connection giving about 1 MiB/s: a 4 MiB block took about four seconds, even the first one of a book. Book blocks are now downloaded as four parallel 1 MiB requests (films are unchanged). Any part that fails fails the block, which keeps its fresh check after the read.
+- Opening a book has the API fetch its missing blocks, four at a time, both ends first, so PDF.js's one-at-a-time lookups join downloads already in flight. A full cache or a Drive refusal stops it quietly; at most two books warm at once.
+- A PDF slice request reads its spans in different blocks side by side, and the browser keeps four slice batches in flight instead of two.
+- Tried and removed: serving small reads of cold blocks straight from Drive. It made five times the Drive calls and the first page slower (4.5 s against 3.2 s).
+- Local benchmark, 38.6 MiB 223-page PDF, cold, no worker. At 1 MiB/s per Drive connection (production's observed rate) the first page went from 26.2 s on the live release to 3.2 s. At 25 MB/s it went from 3.2 s to 1.2 s. Reopening a stored book takes about 0.3 s, and page turns 30 to 50 ms.
+- Verification: `npm run check` clean; 59 files, 361 passed, 1 skipped; `npm run build` and `npm run build:web` pass; reader browser suite 30 passed in Chromium, Firefox and WebKit.
+
+### Files changed
+
+`apps/api/src/library/reading.ts`, `apps/api/src/library/reading-slices.ts`, `apps/api/src/media/source-stream.ts`, `apps/api/src/app.ts`, `packages/client/src/pdf-slices.ts`; `tests/backend/reading-speed.test.ts`, `tests/clients/reading-speed.test.ts`; `docs/reading-room.md`, `CHANGELOG.md`, `AGENT.md`.
+
+## Raouf: 2026-11-19 (Australia/Sydney) · fast reader release
+
+**Scope:** release `3653ae1075d7`, approved by the owner.
+
+- Live: backend `3653ae1075d7-35f5e79f` (schema 10), Cloudflare Worker version `a918a3ca-2bb5-495b-a85a-94790d617742`. Record: the maintainer's private notes.
+- Verification: rehearsal on a copy of the live database (counts preserved, schema 10, a book job planned); 12 release tests; 9 of 9 edge checks; Sentinel host checks; no rollback. The worker prepared three books from Drive within two minutes, 13 to 15 seconds each.
+- Local benchmark on a 223-page PDF with simulated Drive latency: first page 4.0 s to 3.2 s, Drive metadata calls 62 to 22; page turns 30 to 50 ms.
+
+## Raouf: 2026-11-19 (Australia/Sydney) · Reading room audit and speed
+
+**Scope:** the owner asked for a full audit of the reading room, improvements, and maximum speed. Branch `audit/backend-2026-11-16`, on top of the uncommitted worker-backed reading work above. Not committed, released or pushed.
+
+- Book byte requests now reuse a Drive check for five seconds, as films already did. Each range used to make three full checks (book, folder and the walk up to the library folder), so a cold block cost about twice the lookups it needs and a warm repeat still went to Drive. A fresh check after every Drive read is unchanged. A change or revoked access now takes effect within five seconds instead of on the next request.
+- The worker warms three book blocks at a time instead of one. The first block to fail cancels the others, and the job resumes from the cache rows as before.
+- The browser fetches the blocks of a long read together (up to four requests, below the API's eight), keeps 12 blocks instead of 6, and asks for a whole archive entry before inflating it instead of one block per inflate step. EPUB chapter images are extracted together, and an image used twice is extracted once.
+- CBZ and EPUB keep the pages around the reader's place. The next page (two for manga) is extracted and decoded while the current one is read, so a turn shows a finished page. PDFs draw the next page off screen in the same way and ask for the end of the file together with the start.
+- Verification: `npm run check` clean; 59 files, 357 passed, 1 skipped; `npm run build` and `npm run build:web` pass; `tests/e2e/reading.spec.ts` 30 passed across Chromium, Firefox and WebKit. The two new Drive-check tests fail on the previous code. No real Drive or device measurements were taken.
+
+### Files changed
+
+`apps/api/src/drive/sync.ts`, `apps/api/src/app.ts`, `apps/worker/src/reading.ts`, `apps/worker/src/main.ts`, `packages/client/src/reading-ranges.ts`, `packages/client/src/pdf-slices.ts`, `apps/web/src/reading/archive.ts`, `apps/web/src/reading/book.ts`, `apps/web/src/reading/pages.ts` (new), `apps/web/src/reading/Reader.tsx`, `apps/web/src/reading/PdfPage.tsx`; `tests/backend/reading-speed.test.ts` (new), `tests/clients/reading-speed.test.ts` (new), `tests/backend/reading.test.ts`, `tests/backend/end-to-end.test.ts`; `docs/reading-room.md`, `CHANGELOG.md`, `AGENT.md`.
+
+## 18 November 2026 · Worker-backed reading
+
+- Drive sync makes books eligible for background preparation. The worker uses a dedicated queue lane and stores verified blocks in the existing bounded source cache. Opening a title raises its priority. A restarted worker reads its checkpoints from SQLite and skips blocks already present.
+- The shelf and reader show measured preparation progress. Page turns save immediately, and scroll position is flushed when the reader leaves. Preparation and bookmarks follow separate records keyed to the Drive content generation.
+- PDFs fetch page data and small batches of directory entries. EPUB and CBZ fetch the archive ranges needed for the current chapter or page. A prepared book can reopen from server storage while Drive access is still checked.
+
+- Verification covered a worker restart at 55% preparation, bookmark recovery, range delivery, and cache eviction boundaries. The full browser suite passed 186 tests and the release suite passed 12. The unit and integration suite passed 350 tests with one conditional skip.
+
 ## 18 November 2026 · Reader layout and page navigation
 
 - Whole page fits an entire PDF or manga page between the title and navigation. Fit width enlarges the artwork for scrolling. Opening settings preserves the page dimensions.

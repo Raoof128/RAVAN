@@ -1,36 +1,43 @@
+import type { ReadingRanges } from "../../../../packages/client/src/reading-ranges.js";
 import {
   lazy,
   Suspense,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import type {
   ReadingFormat,
   ReadingPosition,
+  ReadingPreparation,
 } from "../../../../packages/contracts/src/reading.js";
 import type { PDFDocumentProxy } from "pdfjs-dist";
+import { PreparationStatus } from "./PreparationStatus.js";
 import { PageIndex } from "./PageIndex.js";
 import { ReaderPanel } from "./ReaderPanel.js";
 import { Icon } from "../../../../packages/ui/src/Icon.js";
 import { openBook, type BookPage, type OpenBook } from "./book.js";
+import { PageCache } from "./pages.js";
 const PdfReader = lazy(() =>
   import("./PdfPage.js").then((m) => ({ default: m.PdfReader })),
 );
 export type ReadingSource = {
   title: string;
   format: ReadingFormat;
-  blob: Blob;
+  blob: Blob | ReadingRanges;
   position: ReadingPosition;
 };
 
 export function Reader({
   source,
   onClose,
+  preparation,
   onProgress,
 }: {
   source: ReadingSource;
+  preparation?: ReadingPreparation;
   onClose: () => void;
   onProgress: (position: ReadingPosition) => Promise<void>;
 }) {
@@ -100,9 +107,11 @@ export function Reader({
       if (document.visibilityState === "hidden") save();
     };
     document.addEventListener("visibilitychange", hidden);
+    window.addEventListener("pagehide", save);
     return () => {
       clearInterval(timer);
       document.removeEventListener("visibilitychange", hidden);
+      window.removeEventListener("pagehide", save);
       save();
     };
   }, [save]);
@@ -133,23 +142,20 @@ export function Reader({
       if (opened) void opened.close().catch(() => {});
     };
   }, [source]);
+  const pages = useMemo(() => (book ? new PageCache(book) : undefined), [book]);
+  useEffect(() => () => pages?.dispose(), [pages]);
   useEffect(() => {
-    if (!book) return;
-    const controller = new AbortController();
+    if (!pages) return;
     let alive = true;
-    let result: BookPage | undefined;
     setReady(false);
     setError("");
     setPage(undefined);
-    void book
-      .page(section, controller.signal)
+    // Keep the pages either side, and the one after next for manga.
+    pages.keep([section - 1, section, section + 1, section + 2]);
+    void pages
+      .get(section)
       .then((value) => {
-        result = value;
-        if (!alive) {
-          value.release();
-          return;
-        }
-        setPage(value);
+        if (alive) setPage(value);
       })
       .catch((e: unknown) => {
         if (alive)
@@ -157,10 +163,14 @@ export function Reader({
       });
     return () => {
       alive = false;
-      controller.abort();
-      result?.release();
     };
-  }, [book, section]);
+  }, [pages, section]);
+  useEffect(() => {
+    // Read ahead only once the page in view is showing, so it never waits.
+    if (!pages || !ready) return;
+    pages.prefetch(section + 1);
+    if (source.format === "cbz") pages.prefetch(section + 2);
+  }, [pages, ready, section, source.format]);
   useEffect(() => {
     if (page?.html === undefined || !viewport.current) return;
     let current = true;
@@ -199,10 +209,11 @@ export function Reader({
       position.current = { section: next, fraction: 0 };
       pending.current = true;
       setSection(next);
+      void save();
       setReady(false);
       setError("");
     },
-    [count, section],
+    [count, section, save],
   );
   const unit = source.format === "epub" ? "Chapter" : "Page";
   return (
@@ -222,6 +233,10 @@ export function Reader({
         <div className="reading-title">
           <span>
             <b>RAVĀN</b> / {source.format.toUpperCase()}
+            {preparation?.state === "preparing" ||
+            preparation?.state === "queued"
+              ? ` · ${preparation.state === "queued" ? "Queued" : "Preparing"} ${preparation.percent}%`
+              : ""}
           </span>
           <h1>{source.title}</h1>
         </div>
@@ -251,6 +266,7 @@ export function Reader({
           title="Reading settings"
           onDismiss={() => setPanel(undefined)}
         >
+          <PreparationStatus status={preparation} />
           <div className="reading-tools">
             <label>
               Appearance

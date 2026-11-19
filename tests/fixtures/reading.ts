@@ -24,7 +24,7 @@ export function epubFixture(extra = "", language = "en") {
       '<html xmlns="http://www.w3.org/1999/xhtml"><body><h1>A second morning</h1><p>The story continues.</p></body></html>',
   });
 }
-export function pdfFixture() {
+export function pdfFixture(padding = 0) {
   const content = "BT /F1 24 Tf 60 700 Td (The reading room) Tj ET";
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
@@ -33,6 +33,10 @@ export function pdfFixture() {
     "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
     `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
   ];
+  if (padding)
+    objects.push(
+      `<< /Length ${padding} >>\nstream\n${"a".repeat(padding)}\nendstream`,
+    );
   let pdf = "%PDF-1.4\n";
   const offsets = [0];
   for (const [index, object] of objects.entries()) {
@@ -40,9 +44,11 @@ export function pdfFixture() {
     pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
   }
   const start = Buffer.byteLength(pdf);
-  pdf += `xref\n0 6\n0000000000 65535 f \n${offsets
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets
     .slice(1)
     .map((n) => `${String(n).padStart(10, "0")} 00000 n \n`)
-    .join("")}trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${start}\n%%EOF`;
+    .join(
+      "",
+    )}trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${start}\n%%EOF`;
   return Buffer.from(pdf);
 }

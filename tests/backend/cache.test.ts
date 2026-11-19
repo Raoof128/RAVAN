@@ -248,3 +248,22 @@ it("an early fetch that finds no cache room does not fail the stream", async () 
   const { cache } = await readAheadSetup(2, 8, 5);
   expect(await drain(cache)).toBe("0123456789abcdefghijklmnopqrstuv");
 });
+
+it("keeps an open book readable when storage cannot admit background work", async () => {
+  const { cache, reads } = await setup(1);
+  const signal = new AbortController().signal;
+  const values: Uint8Array[] = [];
+  for await (const data of cache.readSource(
+    { ...ref, reading: "foreground" },
+    1n,
+    3n,
+    signal,
+  ))
+    values.push(data);
+  expect(Buffer.concat(values).toString()).toBe("123");
+  const background = cache
+    .readSource({ ...ref, reading: "background" }, 1n, 3n, signal)
+    [Symbol.asyncIterator]();
+  await expect(background.next()).rejects.toThrow("Storage budget exhausted");
+  expect(reads()).toBe(1);
+});

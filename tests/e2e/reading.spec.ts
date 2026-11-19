@@ -23,6 +23,7 @@ async function driveShelf(
     generation: "a".repeat(64),
     sizeBytes: String(book.buffer.length),
     position: { section: 0, fraction: 0 },
+    preparation: { state: "on-demand", percent: 0 },
   }));
   const saves: Array<ReadingPosition & { generation: string }> = [];
   await page.route("**/api/**", async (route) => {
@@ -42,18 +43,46 @@ async function driveShelf(
         },
       });
     }
-    const match = /^\/api\/reading\/([^/]+)\/(content|progress)$/.exec(
-      url.pathname,
-    );
+    const match =
+      /^\/api\/reading\/([^/]+)\/(content|progress|preparation)$/.exec(
+        url.pathname,
+      );
     if (match) {
       const book = books.find((book) => book.id === match[1]);
       const item = items.find((item) => item.id === match[1]);
       if (!book || !item) return route.fulfill({ status: 404 });
+      if (match[2] === "preparation") {
+        if (route.request().method() === "POST")
+          item.preparation = { state: "preparing", percent: 25 };
+        return route.fulfill({ json: item.preparation });
+      }
       if (match[2] === "content") {
         expect(url.searchParams.get("generation")).toBe(item.generation);
+        const slices = url.searchParams.get("slices");
+        if (slices)
+          return route.fulfill({
+            contentType: "application/octet-stream",
+            body: Buffer.concat(
+              slices
+                .split(",")
+                .map((s) =>
+                  book.buffer.subarray(
+                    Number(s) * 16384,
+                    (Number(s) + 1) * 16384,
+                  ),
+                ),
+            ),
+          });
+        const range = route.request().headers().range;
+        expect(range).toMatch(/^bytes=\d+-\d+$/);
+        const [start, end] = range!.slice(6).split("-").map(Number);
         return route.fulfill({
-          contentType: "application/octet-stream",
-          body: book.buffer,
+          status: 206,
+          headers: {
+            "content-type": "application/octet-stream",
+            "content-range": `bytes ${start}-${end}/${book.buffer.length}`,
+          },
+          body: book.buffer.subarray(start, end! + 1),
         });
       }
       const position = route.request().postDataJSON() as ReadingPosition & {
@@ -373,4 +402,48 @@ test("browses manga previews without moving the bookmark until a page is chosen"
     page.getByRole("img", { name: "Page 8 of Volume" }),
   ).toBeVisible();
   await expect(index).toBeFocused();
+});
+
+test("renders a large PDF from ranges while the worker continues, then restores its status after reload", async ({
+  page,
+}) => {
+  const bytes = pdfFixture(7 * 1024 * 1024);
+  let total = 0;
+  page.on("response", async (response) => {
+    const url = new URL(response.url());
+    if (!url.pathname.endsWith("/content")) return;
+    const slices = url.searchParams.get("slices");
+    if (slices)
+      total += slices
+        .split(",")
+        .reduce(
+          (sum, s) => sum + Math.min(16384, bytes.length - Number(s) * 16384),
+          0,
+        );
+    else {
+      expect(response.status()).toBe(206);
+      const [a, b] = response
+        .request()
+        .headers()
+        .range!.slice(6)
+        .split("-")
+        .map(Number);
+      total += b! - a! + 1;
+    }
+  });
+  await driveShelf(page, [
+    { id: "large", title: "Range edition", format: "pdf", buffer: bytes },
+  ]);
+  await page.goto("/#/reading");
+  await page.getByRole("button", { name: /Range edition/ }).click();
+  await expect(page.locator(".reading-pdf canvas")).toBeVisible();
+  await expect(page.getByText(/Preparing 25%/)).toBeVisible();
+  expect(total).toBeGreaterThan(0);
+  expect(total).toBeLessThan(bytes.length / 2);
+  await page.reload();
+  const card = page.getByRole("button", { name: /Range edition/ });
+  await expect(card).toContainText("Preparing · 25%");
+  await expect(
+    card.getByRole("progressbar", { name: "Book preparation" }),
+  ).toHaveAttribute("value", "25");
 });

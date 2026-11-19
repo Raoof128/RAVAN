@@ -1,4 +1,5 @@
 import { statfs } from "node:fs/promises";
+export class StorageBudgetExceeded extends Error {}
 export class StorageBudget {
   private held = 0n;
   constructor(
@@ -15,7 +16,7 @@ export class StorageBudget {
       this.used() + this.held + bytes > this.max ||
       disk.bavail * disk.bsize - this.held - bytes < this.reserve
     )
-      throw new Error("Storage budget exhausted");
+      throw new StorageBudgetExceeded("Storage budget exhausted");
     this.held += bytes;
     let released = false;
     return {

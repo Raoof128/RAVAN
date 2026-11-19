@@ -10,8 +10,11 @@ import {
 import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { Database } from "../../../../packages/db/src/open.js";
-import type { SourceRef } from "../../../../packages/contracts/src/index.js";
-import { StorageBudget } from "./budget.js";
+import {
+  SOURCE_BLOCK_BYTES,
+  type SourceRef,
+} from "../../../../packages/contracts/src/index.js";
+import { StorageBudget, StorageBudgetExceeded } from "./budget.js";
 type Options = {
   maxBytes: bigint;
   minFreeBytes: bigint;
@@ -23,8 +26,9 @@ type Options = {
    */
   readAhead?: number;
 };
+type CachedSource = SourceRef & { reading?: "foreground" | "background" };
 type ReadBlock = (
-  ref: SourceRef,
+  ref: CachedSource,
   start: bigint,
   end: bigint,
   signal: AbortSignal,
@@ -45,7 +49,7 @@ export class BlockCache {
     private options: Options,
     private upstream: ReadBlock,
   ) {
-    this.blockSize = BigInt(options.blockSize ?? 4 * 1024 * 1024);
+    this.blockSize = BigInt(options.blockSize ?? SOURCE_BLOCK_BYTES);
     this.budget = new StorageBudget(
       directory,
       options.maxBytes,
@@ -106,8 +110,20 @@ export class BlockCache {
       }
     }
   }
+  private async fetchVerifiedBlock(
+    source: CachedSource,
+    start: bigint,
+    end: bigint,
+    signal: AbortSignal,
+  ) {
+    const data = await this.upstream(source, start, end, signal);
+    signal.throwIfAborted();
+    if (BigInt(data.length) !== end - start + 1n)
+      throw new Error("Cache block length mismatch");
+    return data;
+  }
   private async load(
-    ref: SourceRef,
+    ref: CachedSource,
     index: bigint,
     key: string,
     signal: AbortSignal,
@@ -143,10 +159,7 @@ export class BlockCache {
     const reservation = await this.makeRoom(end - start + 1n);
     const partial = join(this.directory, `${key}.${randomUUID()}.partial`);
     try {
-      const data = await this.upstream(ref, start, end, signal);
-      signal.throwIfAborted();
-      if (BigInt(data.length) !== end - start + 1n)
-        throw new Error("Cache block length mismatch");
+      const data = await this.fetchVerifiedBlock(ref, start, end, signal);
       await writeFile(partial, data, { flag: "wx", mode: 0o600, signal });
       signal.throwIfAborted();
       await rename(partial, path);
@@ -170,7 +183,7 @@ export class BlockCache {
       await reservation.release();
     }
   }
-  private async block(ref: SourceRef, index: bigint, signal: AbortSignal) {
+  private async block(ref: CachedSource, index: bigint, signal: AbortSignal) {
     signal.throwIfAborted();
     const key = createHash("sha256")
       .update(`${ref.fileId}:${ref.generation}:${index}`)
@@ -220,7 +233,7 @@ export class BlockCache {
     }
   }
   async *readSource(
-    source: SourceRef,
+    source: CachedSource,
     start: bigint,
     end: bigint,
     signal: AbortSignal,
@@ -236,7 +249,23 @@ export class BlockCache {
     if (signal.aborted) stop();
     const ahead = new Map<bigint, Promise<Uint8Array>>();
     const fetch = (index: bigint) => {
-      const pending = this.block(source, index, inner.signal);
+      const pending = this.block(source, index, inner.signal).catch((error) => {
+        // A full cache can defer background preparation. Keep an open book
+        // readable through the same verified Drive source without reserving disk.
+        if (
+          !(error instanceof StorageBudgetExceeded) ||
+          source.reading !== "foreground"
+        )
+          throw error;
+        const first = index * this.blockSize;
+        const size = BigInt(source.sizeBytes);
+        return this.fetchVerifiedBlock(
+          source,
+          first,
+          (first + this.blockSize < size ? first + this.blockSize : size) - 1n,
+          inner.signal,
+        );
+      });
       // Early fetches are opportunistic; a failure matters only at its turn.
       pending.catch(() => {});
       return pending;

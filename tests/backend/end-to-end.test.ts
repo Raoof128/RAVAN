@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { mkdtemp, open, realpath, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,6 +8,7 @@ import { issueSession } from "../../apps/api/src/auth/sessions.js";
 import type { DriveClient } from "../../apps/api/src/drive/client.js";
 import { openDatabase, type Database } from "../../packages/db/src/open.js";
 import { MediaWorker } from "../../apps/worker/src/main.js";
+import { VERIFY_REUSE_MS } from "../../apps/api/src/drive/sync.js";
 import { runProcess } from "../../apps/worker/src/process.js";
 import { probeMedia } from "../../apps/worker/src/probe.js";
 import { parseMaster, parsePlaylist } from "../../apps/worker/src/hls.js";
@@ -294,3 +295,212 @@ it("prepares a film in two languages and plays every part of it over HTTP", asyn
   ).toBe(204);
   expect((await fetch(base + "video.m3u8")).status).toBe(403);
 }, 60000);
+
+it("resumes interrupted book preparation and serves an authenticated range from the worker's cache", async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), "ravan-reading-e2e-"));
+  clean.push(() => rm(dataDir, { recursive: true, force: true }));
+  const size = 9 * 1024 * 1024,
+    bytes = Buffer.alloc(size, 91);
+  const folder = {
+    id: "root",
+    name: "Books",
+    mimeType: "application/vnd.google-apps.folder",
+  };
+  const book = {
+    id: "volume",
+    name: "Volume.pdf",
+    mimeType: "application/pdf",
+    size: String(size),
+    parents: ["root"],
+    version: "1",
+    capabilities: { canDownload: true },
+  };
+  const key = "ce".repeat(32);
+  const drive: DriveClient = {
+    get: async (id) => (id === "root" ? folder : book),
+    list: async () => ({ files: [book] }),
+    startToken: async () => "one",
+    changes: async () => ({ changed: false, newStartPageToken: "one" }),
+  };
+  const starts: number[] = [];
+  let holdMiddle = true;
+  let middleStarted = () => {};
+  const entered = new Promise<void>((resolve) => {
+    middleStarted = resolve;
+  });
+  let unblock = () => {};
+  const gate = new Promise<void>((resolve) => {
+    unblock = resolve;
+  });
+  const app = await buildApp(
+    parseConfig({
+      mode: "test",
+      dataDir,
+      minFreeBytes: 0,
+      origin,
+      workerKey: key,
+      clientId: "client",
+      clientSecret: "secret",
+      ownerSubject: "owner",
+      encryptionKey: "ab".repeat(32),
+    }),
+    {
+      driveClient: drive,
+      oauthProvider: {
+        authorizationUrl: ({ state }) =>
+          `https://accounts.google.com/auth?state=${state}`,
+        exchange: async (_code, _verifier, nonce) => ({
+          subject: "owner",
+          nonce,
+          accessToken: "private",
+          refreshToken: "private",
+          expiresAt: Date.now() + 3600000,
+        }),
+        refresh: async () => ({
+          accessToken: "private",
+          expiresAt: Date.now() + 3600000,
+        }),
+      },
+      sourceFetch: async (_url, init) => {
+        const range = new Headers(init?.headers).get("range")!;
+        const [, a, b] = /^bytes=(\d+)-(\d+)$/.exec(range)!;
+        const start = Number(a);
+        starts.push(start);
+        if (start === 4 * 1024 * 1024 && holdMiddle) {
+          middleStarted();
+          await gate;
+        }
+        return new Response(bytes.subarray(start, Number(b) + 1), {
+          status: 206,
+          headers: { "content-range": `bytes ${start}-${b}/${size}` },
+        });
+      },
+    },
+  );
+  clean.push(() => app.close());
+  const address = await app.listen({ host: "127.0.0.1", port: 0 });
+  const db = app.getDecorator<Database>("database");
+  const login = await app.inject("/auth/google/start");
+  const state = new URL(login.headers.location!).searchParams.get("state");
+  const callback = await app.inject({
+    url: `/auth/google/callback?code=ok&state=${state}`,
+    headers: {
+      cookie: login.cookies.map((c) => `${c.name}=${c.value}`).join("; "),
+    },
+  });
+  expect(callback.statusCode).toBe(302);
+  const session = issueSession(db, "owner");
+  const headers = {
+    cookie: `mov_session=${session.token}`,
+    origin,
+    "x-csrf-token": session.csrf,
+  };
+  await app.inject({
+    method: "POST",
+    url: "/api/library",
+    headers,
+    payload: { folderId: "root" },
+  });
+  await expect
+    .poll(
+      async () =>
+        (await app.inject({ url: "/api/reading", headers })).json().items
+          .length,
+    )
+    .toBe(1);
+  const item = (await app.inject({ url: "/api/reading", headers })).json()
+    .items[0];
+  const query = `?generation=${item.generation}`;
+  const prep = "/api/reading/volume/preparation" + query;
+  const url = "/api/reading/volume/content" + query;
+  const workerRoute = `/_worker/reading/volume/${item.generation}/0`;
+  expect(
+    (await app.inject({ method: "POST", url: workerRoute })).statusCode,
+  ).toBe(401);
+  expect(
+    (
+      await app.inject({
+        method: "POST",
+        url: prep,
+        headers: { cookie: headers.cookie },
+      })
+    ).statusCode,
+  ).toBe(403);
+  let workerDb = openDatabase(join(dataDir, "mov.sqlite"));
+  clean.push(async () => workerDb.close());
+  const worker = new MediaWorker(workerDb, address, key);
+  await worker.queueLibrary();
+  expect((await app.inject({ url: prep, headers })).json()).toEqual({
+    state: "queued",
+    percent: 0,
+  });
+  await Promise.all(
+    [1, 2].map(() => app.inject({ method: "POST", url: prep, headers })),
+  );
+  expect(
+    db.prepare("SELECT COUNT(*) AS n FROM jobs WHERE kind='reading'").get(),
+  ).toEqual({ n: 1 });
+  const stop = new AbortController();
+  const running = worker.runNextJob(stop.signal, "reading");
+  try {
+    await entered;
+    // Blocks are warmed together: the first and last become durable while
+    // the middle one is still fetching.
+    await expect
+      .poll(async () => (await app.inject({ url: prep, headers })).json())
+      .toEqual({ state: "preparing", percent: 55 });
+    expect(
+      (
+        await app.inject({
+          method: "PUT",
+          url: "/api/reading/volume/progress",
+          headers,
+          payload: { generation: item.generation, section: 12, fraction: 0.4 },
+        })
+      ).statusCode,
+    ).toBe(204);
+    const before = await app.inject({
+      url,
+      headers: { ...headers, range: "bytes=-17" },
+    });
+    expect(before.statusCode).toBe(206);
+    expect(before.rawPayload.equals(bytes.subarray(-17))).toBe(true);
+    stop.abort();
+    expect(await running).toBe("retry");
+    expect((await app.inject({ url: prep, headers })).json()).toEqual({
+      state: "queued",
+      percent: 55,
+    });
+  } finally {
+    stop.abort();
+    holdMiddle = false;
+    unblock();
+  }
+  workerDb.close();
+  workerDb = openDatabase(join(dataDir, "mov.sqlite"));
+  const restarted = new MediaWorker(workerDb, address, key);
+  expect(await restarted.runNextJob(idle(), "reading")).toBe("completed");
+  expect(starts.filter((i) => i === 0)).toHaveLength(1);
+  expect(starts.filter((i) => i === 8 * 1024 * 1024)).toHaveLength(1);
+  const ready = (await app.inject({ url: "/api/reading", headers })).json()
+    .items[0];
+  expect(ready.preparation).toEqual({ state: "ready", percent: 100 });
+  expect(ready.position).toEqual({ section: 12, fraction: 0.4 });
+  const count = starts.length;
+  expect(
+    (await app.inject({ url, headers: { ...headers, range: "bytes=40-50" } }))
+      .rawPayload,
+  ).toEqual(bytes.subarray(40, 51));
+  expect(starts.length).toBe(count);
+  book.capabilities.canDownload = false;
+  // The last Drive answer may be reused for VERIFY_REUSE_MS, never longer.
+  vi.useFakeTimers({ toFake: ["Date"], now: Date.now() + VERIFY_REUSE_MS });
+  try {
+    expect(
+      (await app.inject({ url, headers: { ...headers, range: "bytes=40-50" } }))
+        .statusCode,
+    ).toBe(410);
+  } finally {
+    vi.useRealTimers();
+  }
+}, 30000);

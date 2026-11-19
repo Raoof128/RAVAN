@@ -5,10 +5,12 @@ import {
   type ReadingItem,
   type ReadingPosition,
 } from "../../../../packages/contracts/src/reading.js";
+import { PreparationStatus } from "../reading/PreparationStatus.js";
 import { Reader, type ReadingSource } from "../reading/Reader.js";
 import { useTitle } from "../router.js";
 import "../reading/reading.css";
 type Selection = {
+  item: ReadingItem;
   source: ReadingSource;
   save: (position: ReadingPosition) => Promise<void>;
 };
@@ -63,7 +65,78 @@ export function Reading() {
       generation.current++;
     };
   }, [api, query, revision]);
+  const hasWork = (item: ReadingItem) =>
+    item.preparation?.state === "preparing" ||
+    item.preparation?.state === "queued";
+  const working = items.some(hasWork);
+  // The planner may pick an untouched title after the shelf was opened.
+  const pollingOffsets = [
+    ...new Set(
+      items.flatMap((item, i) => {
+        const state = item.preparation?.state;
+        return hasWork(item) ||
+          (!working &&
+            state === "on-demand" &&
+            Number(item.sizeBytes) <= MAX_READING_BYTES)
+          ? [Math.floor(i / 60) * 60]
+          : [];
+      }),
+    ),
+  ].join(",");
+  const selectedStatus =
+    selection &&
+    items.find(
+      (row) =>
+        row.id === selection.item.id &&
+        row.generation === selection.item.generation,
+    )?.preparation;
+  useEffect(() => {
+    if (!pollingOffsets && !selection?.item.preparation) return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        if (selection?.item.preparation) {
+          const status = await api.readingPreparation(selection.item);
+          if (stopped) return;
+          setItems((rows) =>
+            rows.map((row) =>
+              row.id === selection.item.id &&
+              row.generation === selection.item.generation
+                ? { ...row, preparation: status }
+                : row,
+            ),
+          );
+          if (status.state !== "queued" && status.state !== "preparing") return;
+        } else {
+          for (const offset of pollingOffsets.split(",")) {
+            const page = await api.reading(query, Number(offset));
+            if (stopped) return;
+            const refreshed = new Map(page.items.map((row) => [row.id, row]));
+            setItems((rows) =>
+              rows.map((row) => {
+                const current = refreshed.get(row.id);
+                return current?.generation === row.generation
+                  ? { ...row, preparation: current.preparation }
+                  : row;
+              }),
+            );
+          }
+        }
+      } catch {
+        /* A temporary network failure leaves the last measured value visible. */
+      }
+      if (!stopped)
+        timer = setTimeout(poll, selection || working ? 2500 : 15000);
+    };
+    timer = setTimeout(poll, selection || working ? 1000 : 15000);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
+  }, [api, selection, query, pollingOffsets, working, selectedStatus?.state]);
   const close = useCallback(() => {
+    controller.current?.abort();
     setSelection(undefined);
   }, []);
   const begin = () => {
@@ -79,10 +152,31 @@ export function Reading() {
     try {
       if (BigInt(item.sizeBytes) > BigInt(MAX_READING_BYTES))
         throw new Error("Choose a book up to 100 MB.");
-      const blob = await api.readingFile(item, job.signal);
+      const blob = item.preparation
+        ? api.readingRanges(item, job.signal)
+        : await api.readingFile(item, job.signal);
+      if (item.preparation) {
+        // Opening a page does not wait for job admission or for the worker.
+        void api
+          .readingPreparation(item, true)
+          .then((status) => {
+            if (!job.signal.aborted)
+              setItems((rows) =>
+                rows.map((row) =>
+                  row.id === item.id && row.generation === item.generation
+                    ? { ...row, preparation: status }
+                    : row,
+                ),
+              );
+          })
+          .catch(() => {
+            /* The byte route independently verifies the current Drive generation. */
+          });
+      }
       if (job.signal.aborted) return;
       openedId.current = item.id;
       setSelection({
+        item,
         source: {
           title: item.title,
           format: item.format,
@@ -120,6 +214,7 @@ export function Reading() {
     return (
       <Reader
         source={selection.source}
+        preparation={selectedStatus}
         onClose={close}
         onProgress={selection.save}
       />
@@ -212,6 +307,7 @@ export function Reading() {
                         ? "Open manga"
                         : "Start reading"}
                   </small>
+                  <PreparationStatus status={item.preparation} />
                 </span>
               </button>
             ))}

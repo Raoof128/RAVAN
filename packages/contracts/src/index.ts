@@ -25,6 +25,7 @@ export type PlaybackOptions = {
   forceCompatible?: boolean;
   capabilities?: ClientCapabilities;
 };
+export const SOURCE_BLOCK_BYTES = 4 * 1024 * 1024;
 export type SourceRef = {
   fileId: string;
   generation: string;

@@ -1,5 +1,8 @@
 import { setTimeout as delay } from "node:timers/promises";
-import type { SourceRef } from "../../../../packages/contracts/src/index.js";
+import {
+  SOURCE_BLOCK_BYTES,
+  type SourceRef,
+} from "../../../../packages/contracts/src/index.js";
 import { driveId, usageLimited } from "../drive/client.js";
 /** A Drive read that failed for a reason another attempt cannot change. */
 class PermanentSourceError extends Error {}
@@ -9,6 +12,12 @@ export class DriveSourceReader {
     private verify: (id: string, fresh?: boolean) => Promise<SourceRef>,
     private fetcher: typeof fetch = fetch,
     private retryDelayMs = 250,
+    /**
+     * Requests one block is split into. Drive was seen to give each download
+     * connection about 1 MiB/s from the production host, so a 4 MiB block in
+     * one request took about four seconds; parts arrive side by side.
+     */
+    private parts = 1,
   ) {}
   async block(
     source: SourceRef,
@@ -17,12 +26,12 @@ export class DriveSourceReader {
     signal: AbortSignal,
   ): Promise<Uint8Array> {
     signal.throwIfAborted();
-    if (end < start || end - start >= 4n * 1024n * 1024n)
+    if (end < start || end - start >= BigInt(SOURCE_BLOCK_BYTES))
       throw new Error("Invalid block size");
     const before = await this.verify(source.fileId);
     if (before.generation !== source.generation)
       throw new Error("Source changed");
-    const bytes = await this.read(source, start, end, signal);
+    const bytes = await this.readParts(source, start, end, signal);
     // This answer must be newer than the bytes just read; an earlier one cannot
     // vouch that they belong to the catalogued generation.
     const after = await this.verify(source.fileId, true);
@@ -33,6 +42,39 @@ export class DriveSourceReader {
       throw new Error("Source changed");
     signal.throwIfAborted();
     return bytes;
+  }
+  private async readParts(
+    source: SourceRef,
+    start: bigint,
+    end: bigint,
+    signal: AbortSignal,
+  ): Promise<Uint8Array> {
+    const length = end - start + 1n;
+    const count = BigInt(Math.max(1, Math.floor(this.parts)));
+    // Parts under 256 KiB cost more in round trips than they save.
+    if (count === 1n || length < count * 262144n)
+      return this.read(source, start, end, signal);
+    const size = (length + count - 1n) / count;
+    const inner = new AbortController();
+    const stop = () => inner.abort(signal.reason);
+    signal.addEventListener("abort", stop, { once: true });
+    try {
+      const ranges: Array<[bigint, bigint]> = [];
+      for (let from = start; from <= end; from += size)
+        ranges.push([from, from + size - 1n < end ? from + size - 1n : end]);
+      const pieces = await Promise.all(
+        ranges.map(([from, to]) =>
+          this.read(source, from, to, inner.signal).catch((error: unknown) => {
+            // One part that cannot be read makes the block unreadable.
+            inner.abort();
+            throw error;
+          }),
+        ),
+      );
+      return Buffer.concat(pieces);
+    } finally {
+      signal.removeEventListener("abort", stop);
+    }
   }
   /**
    * One dropped connection or 5xx used to end a whole response, and with it an

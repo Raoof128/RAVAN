@@ -76,10 +76,11 @@ export class LibrarySync {
   private running?: Promise<Result>;
   private activeFolder?: string;
   private verified = new Map<string, Verification>();
+  private verifiedReading = new Map<string, Verification>();
   constructor(
     private db: Database,
     private client: DriveClient,
-    private now = Date.now,
+    private now: () => number = () => Date.now(),
   ) {}
   status() {
     const row = this.checkpoint();
@@ -560,17 +561,60 @@ export class LibrarySync {
       throw error;
     }
   }
-  /** Books use the same live folder/access boundary, but never enter video jobs. */
-  async verifyReading(fileId: string): Promise<SourceRef> {
+  /**
+   * Books use the same live folder/access boundary, but never enter video jobs.
+   * Like `verifySource`, the Drive answer may be reused for VERIFY_REUSE_MS:
+   * a reader asks for many small ranges, and three Drive lookups per range made
+   * metadata, not bytes, the limit on turning a page. Pass `fresh` when the
+   * answer must postdate bytes just read from Drive.
+   */
+  async verifyReading(fileId: string, fresh = false): Promise<SourceRef> {
     driveId.parse(fileId);
     const row = this.db
-      .prepare(
-        "SELECT generation,metadata,available FROM reading_items WHERE id=?",
-      )
-      .get(fileId) as
-      { generation: string; metadata: string; available: number } | undefined;
+      .prepare("SELECT generation,available FROM reading_items WHERE id=?")
+      .get(fileId) as { generation: string; available: number } | undefined;
     const root = this.checkpoint()?.folder_id;
     if (!row?.available || !root) throw new Error("Source unavailable");
+    const recent = this.verifiedReading.get(fileId);
+    if (
+      !fresh &&
+      recent &&
+      recent.root === root &&
+      this.now() - recent.at < VERIFY_REUSE_MS
+    ) {
+      const ref = await recent.promise;
+      if (ref.generation === row.generation) return ref;
+    }
+    if (this.verifiedReading.size > 256)
+      for (const [id, entry] of this.verifiedReading)
+        if (this.now() - entry.at >= VERIFY_REUSE_MS)
+          this.verifiedReading.delete(id);
+    const entry: Verification = {
+      at: this.now(),
+      root,
+      promise: this.verifyReadingRemote(fileId, row.generation, root),
+    };
+    this.verifiedReading.set(fileId, entry);
+    try {
+      return await entry.promise;
+    } catch (error) {
+      // Never let a failed or stale answer satisfy a later caller.
+      if (this.verifiedReading.get(fileId) === entry)
+        this.verifiedReading.delete(fileId);
+      throw error;
+    }
+  }
+  private async verifyReadingRemote(
+    fileId: string,
+    expected: string,
+    root: string,
+  ): Promise<SourceRef> {
+    const stored = this.db
+      .prepare(
+        "SELECT metadata FROM reading_items WHERE id=? AND generation=? AND available=1",
+      )
+      .get(fileId, expected) as { metadata: string } | undefined;
+    if (!stored) throw new Error("Source changed or unavailable");
     const signal = AbortSignal.timeout(30000);
     const [file, folder] = await Promise.all([
       this.client.get(fileId, signal),
@@ -580,7 +624,7 @@ export class LibrarySync {
       folder.trashed ||
       folder.mimeType !== folderMime ||
       file.capabilities?.canDownload === false ||
-      !sameContent(row.metadata, file) ||
+      !sameContent(stored.metadata, file) ||
       !(await belongsTo(this.client, file, root, signal))
     )
       throw new Error("Source changed or unavailable");
@@ -591,10 +635,10 @@ export class LibrarySync {
     if (
       this.checkpoint()?.folder_id !== root ||
       !current?.available ||
-      current.generation !== row.generation
+      current.generation !== expected
     )
       throw new Error("Source changed or unavailable");
-    return { fileId, generation: row.generation, sizeBytes: file.size! };
+    return { fileId, generation: expected, sizeBytes: file.size! };
   }
   /** Whether Drive's answer is still the content catalogued as `expected`. */
   private sameGeneration(fileId: string, expected: string, file: DriveFile) {

@@ -1,3 +1,4 @@
+import type { ReadingRanges } from "../../../../packages/client/src/reading-ranges.js";
 import DOMPurify from "dompurify";
 import {
   MAX_READING_BYTES,
@@ -114,7 +115,7 @@ export function sanitizeChapter(
   return container.innerHTML;
 }
 export async function openBook(
-  blob: Blob,
+  blob: Blob | ReadingRanges,
   format: "epub" | "cbz",
   signal: AbortSignal,
 ): Promise<OpenBook> {
@@ -189,6 +190,7 @@ export async function openBook(
         const urls = new Set<string>();
         let imageBytes = 0;
         try {
+          const wanted = new Map<string, Element[]>();
           for (const img of elements(doc, "img")) {
             const local = resolveResource(path, img.getAttribute("src") ?? "");
             img.removeAttribute("src");
@@ -197,13 +199,31 @@ export async function openBook(
                 ? archive.entries.get(local)
                 : undefined;
             if (!local || !entry) continue;
+            const users = wanted.get(local);
+            if (users) {
+              users.push(img);
+              continue;
+            }
             imageBytes += entry.uncompressedSize;
-            if (imageBytes > 40 * 1024 * 1024 || urls.size >= 100)
+            if (imageBytes > 40 * 1024 * 1024 || wanted.size >= 100)
               throw new Error("This chapter contains too many large images.");
-            const url = await imageUrl(archive, local, pageSignal);
-            urls.add(url);
-            img.setAttribute("src", url);
+            wanted.set(local, [img]);
           }
+          // Extract a chapter's illustrations together; one at a time cost a
+          // round trip each on a book read in ranges.
+          const loaded = await Promise.allSettled(
+            [...wanted.keys()].map((local) =>
+              imageUrl(archive, local, pageSignal),
+            ),
+          );
+          for (const result of loaded)
+            if (result.status === "fulfilled") urls.add(result.value);
+          const failure = loaded.find((result) => result.status === "rejected");
+          if (failure) throw failure.reason;
+          [...wanted.values()].forEach((images, i) => {
+            const url = (loaded[i] as PromiseFulfilledResult<string>).value;
+            for (const img of images) img.setAttribute("src", url);
+          });
           const root = doc.documentElement;
           const body = elements(doc, "body")[0] ?? root;
           // The sanitizer unwraps the document and body. Preserve their inherited language for assistive technology.

@@ -19,7 +19,11 @@ import { equal, hash, secret } from "./auth/sessions.js";
 import { z } from "zod";
 import { registerSessions } from "./sessions/routes.js";
 import { registerCatalogue } from "./library/routes.js";
-import { registerReading } from "./library/reading.js";
+import {
+  BOOK_BLOCK_PARTS,
+  registerReading,
+  warmReadingBlock,
+} from "./library/reading.js";
 
 export async function buildApp(
   config: AppConfig,
@@ -221,6 +225,13 @@ export async function buildApp(
     (id, fresh) => library.verifySource(id, fresh),
     options.sourceFetch,
   );
+  const bookSource = new DriveSourceReader(
+    app.getDecorator<() => Promise<string>>("getDriveAccessToken"),
+    (id, fresh) => library.verifyReading(id, fresh),
+    options.sourceFetch,
+    undefined,
+    BOOK_BLOCK_PARTS,
+  );
   const cache = new BlockCache(
     db,
     join(config.dataDir, "source-cache"),
@@ -229,12 +240,13 @@ export async function buildApp(
       minFreeBytes: BigInt(config.minFreeBytes),
       readAhead: 2,
     },
-    (ref, start, end, signal) => source.block(ref, start, end, signal),
+    (ref, start, end, signal) =>
+      (ref.reading ? bookSource : source).block(ref, start, end, signal),
   );
   await cache.init();
   registerSessions(app, db, config, library, cache);
   registerCatalogue(app, db, config.dataDir);
-  registerReading(app, db, library, options.sourceFetch);
+  registerReading(app, db, library, cache, Boolean(config.workerKey));
   if (config.workerKey) {
     const workerAuth = async (
       request: import("fastify").FastifyRequest,
@@ -252,6 +264,11 @@ export async function buildApp(
     // loopback; back-to-back probes would trip the per-address limit meant for
     // the public routes.
     const unlimited = { rateLimit: false as const };
+    app.post<{ Params: { id: string; generation: string; index: string } }>(
+      "/_worker/reading/:id/:generation/:index",
+      { preHandler: workerAuth, config: unlimited },
+      (request, reply) => warmReadingBlock(request, reply, library, cache),
+    );
     // The worker must tell "this film is gone" from "ask again later": the
     // first is a verdict on the job, the second must not cost it an attempt.
     const verified = async (

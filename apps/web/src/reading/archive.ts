@@ -1,4 +1,5 @@
-import { BlobReader, ZipReader, type FileEntry } from "@zip.js/zip.js";
+import type { ReadingRanges } from "../../../../packages/client/src/reading-ranges.js";
+import { BlobReader, Reader, ZipReader, type FileEntry } from "@zip.js/zip.js";
 
 const ENTRY_LIMIT = 32 * 1024 * 1024;
 /** Reject ambiguity even though nothing is ever extracted onto the filesystem. */
@@ -12,11 +13,26 @@ export function safeArchivePath(path: string): boolean {
     !/^[a-z][a-z\d+.-]*:/i.test(path)
   );
 }
-export async function openArchive(blob: Blob, signal: AbortSignal) {
-  const zip = new ZipReader(new BlobReader(blob), {
-    useWebWorkers: false,
-    useCompressionStream: true,
-  });
+class RangeArchiveReader extends Reader<ReadingRanges> {
+  constructor(private readonly ranges: ReadingRanges) {
+    super(ranges);
+    this.size = ranges.size;
+  }
+  readUint8Array(offset: number, length: number) {
+    return this.ranges.read(offset, Math.min(length, this.size - offset));
+  }
+}
+export async function openArchive(
+  blob: Blob | ReadingRanges,
+  signal: AbortSignal,
+) {
+  const zip = new ZipReader(
+    blob instanceof Blob ? new BlobReader(blob) : new RangeArchiveReader(blob),
+    {
+      useWebWorkers: false,
+      useCompressionStream: true,
+    },
+  );
   const entries = new Map<string, FileEntry>();
   let total = 0,
     count = 0;
@@ -59,6 +75,11 @@ export async function openArchive(blob: Blob, signal: AbortSignal) {
       const entry = entries.get(path);
       if (!entry || entry.uncompressedSize > limit)
         throw new Error("A book resource is missing or too large.");
+      // Ask for the whole entry at once instead of one block per inflate step.
+      // The local header (30 bytes, a name and an extra field) comes first;
+      // anything past this hint is still read, just without read-ahead.
+      if (!(blob instanceof Blob))
+        blob.prefetch(entry.offset, entry.compressedSize + 65536);
       let size = 0;
       const chunks: Uint8Array<ArrayBuffer>[] = [];
       // Declared ZIP sizes are untrusted. Stop the actual output stream too.

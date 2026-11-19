@@ -1,7 +1,9 @@
+import { ReadingRanges } from "./reading-ranges.js";
 import { createContext, useContext } from "react";
 import {
   MAX_READING_BYTES,
   type ReadingItem,
+  type ReadingPreparation,
   type ReadingPosition,
 } from "../../contracts/src/reading.js";
 import type {
@@ -33,6 +35,7 @@ export function createApiClient(baseUrl: string) {
     method = "GET",
     body?: unknown,
     accepted: number[] = [],
+    keepalive = false,
   ): Promise<T> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
@@ -40,6 +43,7 @@ export function createApiClient(baseUrl: string) {
       const response = await fetch(`${baseUrl}${path}`, {
         method,
         credentials: "same-origin",
+        keepalive,
         signal: controller.signal,
         headers: {
           ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
@@ -69,11 +73,26 @@ export function createApiClient(baseUrl: string) {
         `/api/reading?${new URLSearchParams({ q, offset: String(offset) })}`,
       );
     },
+    readingPreparation(item: ReadingItem, enqueue = false) {
+      return request<ReadingPreparation>(
+        `/api/reading/${encodeURIComponent(item.id)}/preparation?generation=${encodeURIComponent(item.generation)}`,
+        enqueue ? "POST" : "GET",
+      );
+    },
+    readingRanges(item: ReadingItem, signal: AbortSignal) {
+      return new ReadingRanges(
+        Number(item.sizeBytes),
+        `${baseUrl}/api/reading/${encodeURIComponent(item.id)}/content?generation=${encodeURIComponent(item.generation)}`,
+        signal,
+      );
+    },
     saveReading(item: ReadingItem, position: ReadingPosition) {
       return request<void>(
         `/api/reading/${encodeURIComponent(item.id)}/progress`,
         "PUT",
         { generation: item.generation, ...position },
+        [],
+        true,
       );
     },
     async readingFile(item: ReadingItem, signal: AbortSignal): Promise<Blob> {

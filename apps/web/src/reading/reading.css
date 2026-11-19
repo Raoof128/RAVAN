@@ -627,3 +627,13 @@ body:has(.reading-reader) .site-header {
     transition: none;
   }
 }
+
+.reading-preparation {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+}
+.reader-panel > .reading-preparation {
+  margin-block: 1rem;
+}
