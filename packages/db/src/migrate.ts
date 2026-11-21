@@ -11,6 +11,7 @@ const files = [
   "008_folders.sql",
   "009_reading.sql",
   "010_reading_cache.sql",
+  "011_reading_covers.sql",
 ];
 function current(db: Database): number {
   return (

@@ -47,6 +47,9 @@ RAVAN is a private, single-owner cinema: a Fastify API, a media worker, a Cloudf
 - **Loading uses the primitives in `packages/ui/src/Loading.tsx`.** Do not add another spinner, shimmer or skeleton. Animate `opacity` and `transform` only.
 - **Every animation needs a still form.** Both `prefers-reduced-motion` and `:root[data-motion="reduce"]` set `animation: none`; an element whose base style is invisible until its animation runs will stay invisible. Write keyframes from the hidden state, not to the visible one, or add an explicit reset.
 - **`index.html` may carry inline CSS but no inline script.** The content security policy permits self-hosted scripts and WebAssembly compilation for local PDF decoders, never general JavaScript eval.
+- **The reader keeps a mouse selection inside the page.** `containSelection` (`apps/web/src/reading/selection.ts`) corrects a drag that leaves `.reading-viewport`; browsers otherwise select to the end of the chapter. Keep it when changing the reader's layout, and keep the bars outside the scrolling page or remove it with a test that drags past both bars.
+- **Book covers are pictures like films' pictures.** Files live in `<data directory>/artwork`, rows in `reading_covers`, and they are served only by random id at `/api/artwork/:id`. Anything that lists or clears picture files (`sweepArtwork`, the restore scrub in `packages/db/src/backup.ts`) must include `reading_covers`, or covers are deleted as strays.
+- **PDF text is PDF.js's `TextLayer` over the canvas.** Keep `--total-scale-factor` in step with the size the canvas is shown at, and keep the `endOfContent`/`selecting` guard; without it a drag in a gap selects to the end of the page.
 - **The reading room is Google Drive only.** Books have their own catalogue and server progress. Do not add device imports or browser-local reading history. Serve bytes only after live folder/access/generation checks; never serve book HTML as a same-origin document.
 - **Browser storage holds the motion flag (`ravan:motion`) and the TV's device credential, nothing else.** Never an MFA secret, a session token or library data.
 - **A control whose action is running stays focusable.** Use `ActionButton` and `usePending`; do not set `disabled` on it. When an action removes the focused control, move focus somewhere deliberate.
@@ -309,7 +312,26 @@ Raouf: 2026-11-19 (Australia/Sydney), twenty-fourth entry
 Raouf: 2026-11-19 (Australia/Sydney), twenty-fifth entry
 
 - Scope: release and publish the reading documentation audit, approved by the owner.
-- Summary: backend `92019068e456-84496e2c` and Worker version `eafcdd9d` are live. See the maintainer's private notes.
+- Summary: backend `92019068e456-84496e2c` and Worker version `eafcdd9d` are live. See the maintainer's private notes. Published as public `de19838` on `public/fast-reader-2026-11-19`.
 - Files changed: the maintainer's private notes, the maintainer's private notes, `CHANGELOG.md`, this file.
 - Verification: rehearsal on a copy of the live database, 12 release tests, 9 of 9 edge checks, Sentinel host checks; no rollback needed.
 - Follow-ups: when the owner opens a book that is not stored, read its per-block times in `cache_blocks` (before parallel parts: 3.5 to 4 s per block); signed-in timing of the first page and page turns; clear old rollback material.
+
+Raouf: 2026-11-21 (Australia/Sydney), twenty-sixth entry
+
+- Scope: the owner reported that dragging the mouse over reader text glitched; audit and fix.
+- Summary: a drag that left the scrolling page for the top bar or footer made every engine select to the end of the chapter or into the bar. `containSelection` now keeps the selection end on the nearest line inside the page, before paint, and keeps the start.
+- Files changed: see `CHANGELOG.md`.
+- Verification: `npm run check`; 59 files, 364 passed, 1 skipped; new browser test fails without the fix and passes in three engines.
+- Follow-ups: release (owner's approval). Owner to confirm on a real book in their browser. Manga images can be dragged as images; PDF pages have no selectable text.
+- Rule: test a selection fix by measuring the selection after the pointer crosses each edge, in all three engines. CSS on the bars (`user-select`, `pointer-events`) does not stop the jump in Chromium or WebKit.
+
+Raouf: 2026-11-21 (Australia/Sydney), twenty-seventh entry
+
+- Scope: the owner asked to fix the drag audit's two findings and to give books server-made thumbnails like the films', checked against current documentation.
+- Summary: the worker makes a cover per book (EPUB cover, CBZ first page, PDF page 1 via PDF.js in Node) from ranged reads of at most 48 MiB, stored in `reading_covers` (migration 11) and shown on the shelf. PDF pages carry a selectable PDF.js text layer. Manga pages cannot be dragged.
+- Files changed: see `CHANGELOG.md`.
+- Verification: `npm run check`; 60 files, 373 passed, 1 skipped; both builds; 198 browser tests in three engines; built code makes a PDF cover under plain Node.
+- Follow-ups: release (owner's approval, includes migration 11). Confirm `@napi-rs/canvas-linux-x64-gnu` is in the server's `node_modules` before switching. Watch the first cover pass on production for Drive quota and time per book.
+- Rule: run a new picture job's code from `dist` under plain Node before release; `tsx` and the tests resolve modules differently.
+- Rule: never run a regular expression over a whole file from a book or film. Find tags with `indexOf`, cap their number and length, and match patterns only on the short pieces. Test with a large malformed input.

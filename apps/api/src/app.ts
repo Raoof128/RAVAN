@@ -24,6 +24,7 @@ import {
   BOOK_DRIVE_IN_FLIGHT,
   registerReading,
   warmReadingBlock,
+  sendBookToWorker,
 } from "./library/reading.js";
 
 export async function buildApp(
@@ -270,6 +271,12 @@ export async function buildApp(
       "/_worker/reading/:id/:generation/:index",
       { preHandler: workerAuth, config: unlimited },
       (request, reply) => warmReadingBlock(request, reply, library, cache),
+    );
+    // The parts of a book its cover is made from, through the same cache.
+    app.get<{ Params: { id: string; generation: string } }>(
+      "/_worker/book/:id/:generation",
+      { preHandler: workerAuth, config: unlimited },
+      (request, reply) => sendBookToWorker(request, reply, library, cache),
     );
     // The worker must tell "this film is gone" from "ask again later": the
     // first is a verdict on the job, the second must not cost it an attempt.

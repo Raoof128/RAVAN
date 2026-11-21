@@ -135,9 +135,10 @@ export function registerReading(
     if (!query.success) return reply.code(400).send({ error: "invalid_query" });
     const rows = db
       .prepare(
-        `SELECT r.id,r.name,r.format,r.generation,r.size_bytes,r.section,r.fraction,j.state AS job_state,
+        `SELECT r.id,r.name,r.format,r.generation,r.size_bytes,r.section,r.fraction,j.state AS job_state,cv.picture_id AS cover_id,
         (SELECT COALESCE(SUM(c.size_bytes),0) FROM cache_blocks c WHERE c.source_id=r.id AND c.generation=r.generation AND c.state='ready') AS cached_bytes
         FROM reading_items r LEFT JOIN jobs j ON j.unique_key='reading:'||r.id||':'||r.generation
+        LEFT JOIN reading_covers cv ON cv.item_id=r.id AND cv.generation=r.generation
         WHERE r.available=1 AND instr(lower(r.name),lower(?))>0 ORDER BY r.name COLLATE NOCASE,r.id LIMIT 61 OFFSET ?`,
       )
       .all(query.data.q, query.data.offset) as Array<{
@@ -149,6 +150,7 @@ export function registerReading(
       section: number;
       fraction: number;
       job_state: string | null;
+      cover_id: string | null;
       cached_bytes: number;
     }>;
     return {
@@ -165,6 +167,8 @@ export function registerReading(
           Number(r.size_bytes),
           r.job_state,
         ),
+        // Made by the worker from this generation of the book.
+        ...(r.cover_id ? { coverUrl: `/api/artwork/${r.cover_id}` } : {}),
       })),
       nextOffset: rows.length > 60 ? query.data.offset + 60 : null,
     };
@@ -344,5 +348,49 @@ export async function warmReadingBlock(
       .send({ error: "reading_unavailable" });
   } finally {
     reply.raw.off("close", cancel);
+  }
+}
+
+// Only the authenticated loopback worker calls this endpoint, to read the
+// parts of a book its shelf picture is made from.
+export async function sendBookToWorker(
+  request: FastifyRequest<{ Params: { id: string; generation: string } }>,
+  reply: FastifyReply,
+  library: LibrarySync,
+  cache: BlockCache,
+) {
+  const { id, generation } = request.params;
+  if (!driveId.safeParse(id).success || !/^[a-f0-9]{64}$/.test(generation))
+    return reply.code(400).send({ error: "invalid_book" });
+  try {
+    const ref = await library.verifyReading(id);
+    if (
+      ref.generation !== generation ||
+      BigInt(ref.sizeBytes) <= 0n ||
+      BigInt(ref.sizeBytes) > BigInt(MAX_READING_BYTES)
+    )
+      return reply.code(409).send({ error: "source_changed" });
+    let checkedAt = Date.now();
+    const book = { ...ref, reading: "background" as const };
+    return await sendRaw(
+      request,
+      reply,
+      book,
+      cache,
+      async () => {
+        if (Date.now() - checkedAt < 5000) return;
+        const current = await library.verifyReading(id);
+        if (current.generation !== generation)
+          throw new Error("Source changed");
+        checkedAt = Date.now();
+      },
+      "application/octet-stream",
+    );
+  } catch (error) {
+    if (error instanceof StorageBudgetExceeded)
+      return reply.code(507).send({ error: "cache_full" });
+    return reply
+      .code(sourceGone(error) ? 410 : 503)
+      .send({ error: "reading_unavailable" });
   }
 }

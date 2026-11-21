@@ -25,9 +25,10 @@ const YIELD_PROGRESS_LIMIT = 90;
 // behind them, and they never wait behind an hours-long conversion.
 const lanes: Record<Lane, string> = {
   probe: "kind='probe'",
-  prepare: "kind NOT IN ('probe','artwork','reading')",
+  prepare: "kind NOT IN ('probe','artwork','book-cover','reading')",
   reading: "kind='reading'",
-  artwork: "kind='artwork'",
+  // Book covers are pictures too, and as quick.
+  artwork: "kind IN ('artwork','book-cover')",
 };
 export class JobQueue {
   constructor(

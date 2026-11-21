@@ -14,6 +14,8 @@ export type ReadingItem = {
   sizeBytes: string;
   position: ReadingPosition;
   preparation?: ReadingPreparation;
+  /** The book's cover, made by the server from the book. */
+  coverUrl?: string;
 };
 export function readingFormat(
   name: string,

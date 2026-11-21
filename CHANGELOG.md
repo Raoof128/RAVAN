@@ -1,5 +1,45 @@
 # Changelog
 
+## Raouf: 2026-11-21 (Australia/Sydney) · book covers release
+
+**Scope:** release `98e7ee592a7b`, then the scan fix `7bd893135c64`, and publish, approved by the owner.
+
+- Live: backend `7bd893135c64-09f29870` (schema 11), Cloudflare Worker version `6a997e30-2dd1-4727-8330-b96810b08a00`. Record: the maintainer's private notes.
+- Verification: rehearsal in the worker's sandbox on a copy of the live database, covers made by the staged code, 12 release tests, 9 of 9 edge checks twice, Sentinel host checks, clean journal, no rollback.
+- Production covers take two to four minutes each for the 13 PDF books; not yet explained.
+
+## Raouf: 2026-11-21 (Australia/Sydney) · book covers on the shelf, selectable PDF text, manga pages stay put
+
+**Scope:** the owner asked to fix the two findings of the drag audit and to give books thumbnails like the films' pictures, made on the server, checked against current documentation. Branch `audit/backend-2026-11-16`. Not released.
+
+- **Book covers:** a new worker job (`book-cover`, pictures lane) makes each book's cover from the book: an EPUB's cover image (EPUB 3 `cover-image`, EPUB 2 cover meta, an image named "cover", or the picture on the first page), a CBZ's first page in reading order, or a PDF's first page drawn by PDF.js in Node with `@napi-rs/canvas`. It reads only those parts, at most 48 MiB, through the API's verified cache at the new key-only route `/_worker/book/:id/:generation`. FFmpeg makes a 480 × 720 JPEG (`posterFromImage`). Migration 11 adds `reading_covers`, one row per book and generation, including "no cover". `/api/reading` lists `coverUrl`, served by `/api/artwork/:id`. The hourly sweep keeps cover files, a restore clears their records, and covers of departed books are forgotten. The shelf shows the cover and falls back to the drawn one if there is none or it fails to load.
+- **PDF text:** pages carry PDF.js 6.5's `TextLayer` over the canvas, sized with `--total-scale-factor` as the canvas is shown, with the selection guard of PDF.js's own viewer (`endOfContent`, `selecting`; the end is moved only outside Firefox and Chromium 148+, as PDF.js does). Words can be selected and copied, and the highlight sits on the drawn words. The hidden text copy is kept only for pages with no text.
+- **Manga:** pages are `draggable="false"`, so a drag no longer picks up the picture.
+- **Security, found by review after the first release:** the EPUB package was scanned with a pattern that backtracked; a malformed 1.2 MB package with many `<item` openings and no `>` took 74 seconds and would have held the worker. Tags are now found by a linear scan from each `<` to the next `>`, at most 20,000 tags of at most 16 KiB. A test fails on the old scan and passes in well under two seconds. Production had no EPUB books waiting for covers when the first release went out.
+- **Documentation checked:** PDF.js 6.5.438 source and types (`TextLayer`, `TextLayerBuilder`, `NodeCanvasFactory`, `canvasFactory`); `isEvalSupported` no longer exists and was not used. `TextLayerBuilder` is not imported: it needs a `globalThis.pdfjsLib` and the whole viewer module.
+- **Tests:** `tests/backend/book-covers.test.ts` (10, including the malformed package): each EPUB cover rule with decoys, path escapes refused, CBZ order, a large PDF read in ranges, the read limit, replacing and refusing covers, the sweep, and a real worker job against a live API (key-only route, `coverUrl`, owner-only picture, made once). Browser: PDF words selected and copied, manga drag, shelf covers at desktop and phone widths with fallbacks. Each new test was seen failing without its change.
+- Verification: `npm run check` clean. `npm test`: 60 files, 374 passed, 1 skipped. `npm run build` (migration 11 ships) and `npm run build:web` pass; the built cover code makes a PDF cover under plain Node. All 198 browser tests pass in three engines.
+- Release note: the server needs `@napi-rs/canvas-linux-x64-gnu` in `node_modules`. It is already in the lock file as an optional dependency of `pdfjs-dist`; without it PDF books keep the drawn cover and the job fails cleanly.
+
+### Files changed
+
+`apps/worker/src/book-cover.ts` (new), `apps/worker/src/artwork.ts`, `apps/worker/src/main.ts`, `apps/worker/src/leases.ts`, `apps/api/src/app.ts`, `apps/api/src/library/reading.ts`, `apps/api/src/library/routes.ts`, `packages/contracts/src/reading.ts`, `packages/db/migrations/011_reading_covers.sql` (new), `packages/db/src/migrate.ts`, `packages/db/src/backup.ts`, `apps/web/src/pages/Reading.tsx`, `apps/web/src/reading/PdfPage.tsx`, `apps/web/src/reading/Reader.tsx`, `apps/web/src/reading/reading.css`; `tests/backend/book-covers.test.ts` (new), `tests/e2e/reading.spec.ts`; `docs/reading-room.md`, the maintainer's private notes, `docs/2026-source-register.md`, `CHANGELOG.md`, `AGENT.md`.
+
+## Raouf: 2026-11-21 (Australia/Sydney) · reader text selection no longer jumps while dragging
+
+**Scope:** the owner reported that dragging the mouse over text in the reader made it glitch. Branch `audit/backend-2026-11-16`. Not released.
+
+- **Bug, reader:** the chapter scrolls inside `.reading-viewport`, and the top bar and footer sit outside it. When a mouse drag crossed onto either bar, Chromium, Firefox and WebKit all moved the selection end to the end of the chapter or into the bar's text ("Chapter 1 of 2", "Shelf"). The highlight jumped from a few lines to the whole chapter and back as the pointer crossed the edge, while the page auto-scrolled at full speed. A probe measured the selection going from 381 to 10,767 characters in one step.
+- **Fix:** `apps/web/src/reading/selection.ts` (`containSelection`, started by `Reader.tsx`). While a mouse drag that began on the page is outside it, the selection end is moved once a frame, before paint, to the line under the nearest point inside the page. The start read on the first frame is kept. The browser's own drag scrolling still runs, and the selection follows it line by line. Touch selection and scroll bar presses are left alone.
+- Tried first and rejected: `user-select: none` on the bars only hid their text, and the jump to the end of the chapter remained in every engine. `pointer-events: none` on the bars fixed Firefox only.
+- **Test:** `tests/e2e/reading.spec.ts` "keeps a text selection on the page when the pointer is dragged past it". It drags over the footer, then over the top bar, then back onto the page. It fails in all three engines without the fix.
+- Seen during the audit: manga pages could be dragged as images, and PDF pages had no selectable text. Both are fixed in the entry above.
+- Verification: `npm run check` clean. `npm test`: 59 files, 364 passed, 1 skipped. The new test passed 15 of 15 serially and 12 of 12 in parallel across three engines. Reader, UX and loading browser suites pass. Two Firefox loading tests failed only when three suites ran at once on a loaded machine, and pass alone with or without this change.
+
+### Files changed
+
+`apps/web/src/reading/selection.ts` (new), `apps/web/src/reading/Reader.tsx`, `tests/e2e/reading.spec.ts`, `CHANGELOG.md`, `AGENT.md`.
+
 ## Raouf: 2026-11-19 (Australia/Sydney) · reading documentation audit release
 
 **Scope:** release `92019068e456` and publish it, approved by the owner.
@@ -7,6 +47,7 @@
 - Live: backend `92019068e456-84496e2c` (schema 10), Cloudflare Worker version `eafcdd9d-e2f8-4b74-9f03-e92c417d7448`. Record: the maintainer's private notes.
 - Verification: rehearsal on a copy of the live database; 12 release tests; 9 of 9 edge checks; Sentinel host checks; clean journal; no rollback.
 - No book has been downloaded on production since the parallel-parts release, so that gain is still unmeasured there.
+- Published: sanitized snapshot of private `b614d9c` as public `de19838` on `public/fast-reader-2026-11-19`; secret scan clean.
 
 ## Raouf: 2026-11-19 (Australia/Sydney) · reading room checked against current documentation
 

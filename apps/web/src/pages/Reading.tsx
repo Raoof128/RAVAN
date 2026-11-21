@@ -8,6 +8,7 @@ import {
 import { PreparationStatus } from "../reading/PreparationStatus.js";
 import { Reader, type ReadingSource } from "../reading/Reader.js";
 import { useTitle } from "../router.js";
+import { artworkUrl } from "../../../../packages/ui/src/artwork.js";
 import "../reading/reading.css";
 type Selection = {
   item: ReadingItem;
@@ -288,13 +289,7 @@ export function Reading() {
                 disabled={Boolean(opening)}
                 onClick={() => void openDrive(item)}
               >
-                <span className="reading-cover" aria-hidden="true">
-                  <span className="reading-format">
-                    {item.format.toUpperCase()}
-                  </span>
-                  <strong>{item.title}</strong>
-                  <span className="reading-cover-rule" />
-                </span>
+                <BookCover item={item} />
                 <span className="reading-book-caption">
                   <strong>{item.title}</strong>
                   <small>
@@ -362,5 +357,32 @@ export function Reading() {
         )}
       </section>
     </main>
+  );
+}
+
+/** The book's own cover when the server has made one, else a drawn one. */
+function BookCover({ item }: { item: ReadingItem }) {
+  const source = artworkUrl(item.coverUrl);
+  const [failed, setFailed] = useState<string>();
+  if (source && failed !== source)
+    return (
+      <span className="reading-cover reading-cover-picture" aria-hidden="true">
+        <img
+          src={source}
+          width={480}
+          height={720}
+          decoding="async"
+          alt=""
+          loading="lazy"
+          onError={() => setFailed(source)}
+        />
+      </span>
+    );
+  return (
+    <span className="reading-cover" aria-hidden="true">
+      <span className="reading-format">{item.format.toUpperCase()}</span>
+      <strong>{item.title}</strong>
+      <span className="reading-cover-rule" />
+    </span>
   );
 }

@@ -8,7 +8,9 @@ import {
   getDocument,
   PDFDataRangeTransport,
   GlobalWorkerOptions,
+  TextLayer,
   type PDFDocumentProxy,
+  type PageViewport,
 } from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 GlobalWorkerOptions.workerSrc = workerUrl;
@@ -30,7 +32,7 @@ export function PdfReader({
 }) {
   const [pdf, setPdf] = useState<PDFDocumentProxy>();
   const host = useRef<HTMLDivElement>(null);
-  const [text, setText] = useState("");
+  const [empty, setEmpty] = useState(false);
   useEffect(() => {
     let alive = true;
     let task: ReturnType<typeof getDocument> | undefined;
@@ -191,8 +193,11 @@ export function PdfReader({
         entry.cancel();
         pages.delete(index);
       }
-    setText("");
+    setEmpty(false);
     host.current?.replaceChildren();
+    let layer: TextLayer | undefined;
+    let resize: ResizeObserver | undefined;
+    let unguard: (() => void) | undefined;
     void draw(current)
       .then(async (canvas) => {
         if (!alive) return;
@@ -203,27 +208,180 @@ export function PdfReader({
         // Some image-only or damaged PDFs render even when the text layer fails.
         const page = await pdf.getPage(current + 1);
         const content = await page.getTextContent().catch(() => undefined);
-        if (alive && content) {
-          setText(
-            content.items
-              .map((item) => ("str" in item ? item.str : ""))
-              .join(" "),
-          );
+        if (!alive) return;
+        if (!content?.items.some((item) => "str" in item && item.str.trim())) {
+          setEmpty(true);
+          return;
         }
+        // Selectable text over the drawing, laid out by PDF.js at the size
+        // the canvas is shown, so it can be selected and copied.
+        const container = document.createElement("div");
+        container.className = "textLayer";
+        const viewport = page.getViewport({ scale: 1 });
+        layer = new TextLayer({
+          textContentSource: content,
+          container,
+          viewport,
+        });
+        await layer.render();
+        if (!alive || !host.current) return;
+        unguard = guardSelection(container);
+        host.current.append(container);
+        resize = new ResizeObserver(() => place(container, canvas, viewport));
+        resize.observe(canvas);
+        place(container, canvas, viewport);
       })
       .catch(() => {
         if (alive) onError("This PDF page could not be rendered.");
       });
     return () => {
       alive = false;
+      layer?.cancel();
+      resize?.disconnect();
+      unguard?.();
     };
   }, [pdf, section, onReady, onError]);
   return (
     <>
       <div className="reading-pdf" ref={host} />
-      <p className="reading-accessible-text">
-        {text || "No text is available for this PDF page."}
-      </p>
+      {empty && (
+        <p className="reading-accessible-text">
+          No text is available for this PDF page.
+        </p>
+      )}
     </>
   );
+}
+
+/** Lay the text over the canvas as the reader shows it. */
+function place(
+  layer: HTMLElement,
+  canvas: HTMLCanvasElement,
+  viewport: PageViewport,
+) {
+  if (!canvas.clientWidth) return;
+  layer.style.left = `${canvas.offsetLeft}px`;
+  layer.style.top = `${canvas.offsetTop}px`;
+  layer.style.setProperty(
+    "--total-scale-factor",
+    String(canvas.clientWidth / viewport.width),
+  );
+}
+
+let placing: boolean | undefined;
+function selfPlacing() {
+  if (placing !== undefined) return placing;
+  const agent = navigator.userAgent;
+  const chromium =
+    (
+      navigator as Navigator & {
+        userAgentData?: { brands: Array<{ brand: string; version: string }> };
+      }
+    ).userAgentData?.brands.find((b) => b.brand === "Chromium")?.version ??
+    /\bChrome\/(\d+)\b/.exec(agent)?.[1];
+  placing =
+    /\bFirefox\//.test(agent) || (!!chromium && parseInt(chromium, 10) >= 148);
+  return placing;
+}
+
+/**
+ * Text layer lines are positioned boxes with gaps between them. A pointer in
+ * a gap, or past the end of a line, would select to the end of the page or
+ * drop the selection. As PDF.js's own viewer does (TextLayerBuilder,
+ * pdfjs-dist 6.5), a selectable block that covers the layer is kept just
+ * after the moving end of the selection while a selection is being made.
+ */
+function guardSelection(layer: HTMLElement): () => void {
+  const end = document.createElement("div");
+  end.className = "endOfContent";
+  layer.append(end);
+  const controller = new AbortController();
+  const { signal } = controller;
+  let pointer = false;
+  let previous: Range | undefined;
+  const reset = () => {
+    layer.append(end);
+    end.style.width = "";
+    end.style.height = "";
+    end.style.userSelect = "";
+    layer.classList.remove("selecting");
+    previous = undefined;
+  };
+  layer.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (event.button === 0) layer.classList.add("selecting");
+    },
+    { signal },
+  );
+  document.addEventListener("pointerdown", () => (pointer = true), {
+    signal,
+  });
+  const release = () => {
+    pointer = false;
+    reset();
+  };
+  document.addEventListener("pointerup", release, { signal });
+  document.addEventListener("pointercancel", release, { signal });
+  window.addEventListener("blur", release, { signal });
+  document.addEventListener(
+    "keyup",
+    () => {
+      if (!pointer) reset();
+    },
+    { signal },
+  );
+  document.addEventListener(
+    "selectionchange",
+    () => {
+      const selection = document.getSelection();
+      if (!selection?.rangeCount) return reset();
+      const range = selection.getRangeAt(0);
+      if (
+        (range.collapsed && !pointer) ||
+        !range.intersectsNode(layer) ||
+        !pointer
+      )
+        return;
+      layer.classList.add("selecting");
+      // Firefox and Chromium 148 or later place the end correctly over the
+      // covering block; moving it there misplaces the end (PDF.js does the same).
+      if (selfPlacing()) return;
+      const moveStart =
+        previous &&
+        (range.compareBoundaryPoints(Range.END_TO_END, previous) === 0 ||
+          range.compareBoundaryPoints(Range.START_TO_END, previous) === 0);
+      let anchor: Node | null = moveStart
+        ? range.startContainer
+        : range.endContainer;
+      if (anchor.nodeType === Node.TEXT_NODE) anchor = anchor.parentNode;
+      if (!moveStart && range.endOffset === 0 && anchor) {
+        // The end sits before a line: keep the block after the line before it.
+        do {
+          while (anchor && !anchor.previousSibling && anchor !== layer)
+            anchor = anchor.parentNode;
+          if (!anchor || anchor === layer) break;
+          anchor = anchor.previousSibling;
+        } while (anchor && !anchor.childNodes.length);
+      }
+      const parent = anchor?.parentElement;
+      if (
+        anchor &&
+        anchor !== end &&
+        parent &&
+        parent.closest(".textLayer") === layer
+      ) {
+        end.style.width = layer.style.width;
+        end.style.height = layer.style.height;
+        end.style.userSelect = "text";
+        parent.insertBefore(end, moveStart ? anchor : anchor.nextSibling);
+      }
+      previous = range.cloneRange();
+    },
+    { signal },
+  );
+  return () => {
+    controller.abort();
+    reset();
+  };
 }

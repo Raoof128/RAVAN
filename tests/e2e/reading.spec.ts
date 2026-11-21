@@ -447,3 +447,206 @@ test("renders a large PDF from ranges while the worker continues, then restores 
     card.getByRole("progressbar", { name: "Book preparation" }),
   ).toHaveAttribute("value", "25");
 });
+
+test("keeps a text selection on the page when the pointer is dragged past it", async ({
+  page,
+}) => {
+  const paragraphs = Array.from(
+    { length: 80 },
+    (_, i) =>
+      `<p>Line ${i} of a long chapter, written to be selected with a pointer.</p>`,
+  ).join("");
+  await driveShelf(page, [
+    {
+      id: "long",
+      title: "Long chapter",
+      format: "epub",
+      buffer: await epubFixture(paragraphs),
+    },
+  ]);
+  await page.goto("/#/reading");
+  await page.getByRole("button", { name: /Long chapter/ }).click();
+  const start = page.getByText("Line 2 of a long chapter");
+  await expect(start).toBeVisible();
+  const viewport = (await page.locator(".reading-viewport").boundingBox())!;
+  const from = (await start.boundingBox())!;
+  const selected = () =>
+    page.evaluate(() => {
+      const selection = document.getSelection()!;
+      return {
+        text: String(selection),
+        inPage: !!selection.focusNode?.parentElement?.closest(".reading-prose"),
+      };
+    });
+  await page.mouse.move(from.x + 4, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 120, from.y + 60, { steps: 4 });
+  // Over the footer, then the top bar: both sit outside the scrolling page.
+  for (const y of [viewport.y + viewport.height + 20, viewport.y - 20]) {
+    await page.mouse.move(from.x + 120, y, { steps: 4 });
+    // Before the fix the selection stayed on the end of the chapter or the
+    // bar text for as long as the pointer was there.
+    await expect
+      .poll(async () => {
+        const now = await selected();
+        return (
+          now.inPage &&
+          !now.text.includes("Line 79") &&
+          !/Chapter 1 of|Previous|Shelf/.test(now.text)
+        );
+      })
+      .toBe(true);
+  }
+  // Back on the page, the selection still runs from where the drag began.
+  const end = (await page.getByText("Line 5 of a long chapter").boundingBox())!;
+  await page.mouse.move(end.x + 30, end.y + end.height / 2, { steps: 4 });
+  await page.mouse.up();
+  const last = await selected();
+  expect(last.inPage).toBe(true);
+  expect(last.text).toMatch(/Line 2 of[^]*Line 3 of[^]*Line 4 of/);
+  expect(last.text).not.toContain("Line 6");
+});
+
+test("selects and copies the words of a PDF page by dragging across them", async ({
+  page,
+}) => {
+  await driveShelf(page, [
+    { id: "notes", title: "Notes", format: "pdf", buffer: pdfFixture() },
+  ]);
+  await page.goto("/#/reading");
+  await page.getByRole("button", { name: /Notes/ }).click();
+  const words = page.locator(".reading-pdf .textLayer span", {
+    hasText: "The reading room",
+  });
+  await expect(words).toBeAttached();
+  const canvas = (await page.locator(".reading-pdf canvas").boundingBox())!;
+  const box = (await words.boundingBox())!;
+  // The text sits where the page draws it: 60 points in, 100 points down.
+  expect(Math.abs(box.x - canvas.x - (canvas.width * 60) / 600)).toBeLessThan(
+    canvas.width * 0.02,
+  );
+  expect(box.y - canvas.y).toBeLessThan((canvas.height * 100) / 800);
+  // From the first letter to the last one.
+  await page.mouse.move(box.x + 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 1, box.y + box.height / 2, {
+    steps: 6,
+  });
+  await page.mouse.up();
+  expect(
+    await page.evaluate(() => String(document.getSelection()).trim()),
+  ).toBe("The reading room");
+});
+
+test("a drag on a manga page does not pick the picture up", async ({
+  page,
+}) => {
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aB9sAAAAASUVORK5CYII=",
+    "base64",
+  );
+  await driveShelf(page, [
+    {
+      id: "manga",
+      title: "Manga",
+      format: "cbz",
+      buffer: await readingZip({ "1.png": png, "2.png": png }),
+    },
+  ]);
+  await page.goto("/#/reading");
+  await page.getByRole("button", { name: /Manga.*Open manga/ }).click();
+  const picture = page.getByRole("img", { name: "Page 1 of Manga" });
+  await expect(picture).toBeVisible();
+  await expect(picture).toHaveAttribute("draggable", "false");
+  await page.evaluate(() => {
+    (window as unknown as { drags: number }).drags = 0;
+    document.addEventListener("dragstart", () => {
+      (window as unknown as { drags: number }).drags++;
+    });
+  });
+  const box = (await picture.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 80, box.y + 40, {
+    steps: 6,
+  });
+  await page.mouse.up();
+  expect(
+    await page.evaluate(() => (window as unknown as { drags: number }).drags),
+  ).toBe(0);
+});
+
+test("shows each book's own cover on the shelf, and a drawn one without", async ({
+  page,
+}) => {
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aB9sAAAAASUVORK5CYII=",
+    "base64",
+  );
+  const book = (id: string, coverUrl?: string): ReadingItem => ({
+    id,
+    title: id,
+    name: `${id}.epub`,
+    format: "epub",
+    generation: "a".repeat(64),
+    sizeBytes: "100",
+    position: { section: 0, fraction: 0 },
+    ...(coverUrl ? { coverUrl } : {}),
+  });
+  await page.route("**/api/**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === "/api/session")
+      return route.fulfill({
+        json: { authenticated: true, configured: true, csrfToken: "test" },
+      });
+    if (url.pathname === "/api/reading")
+      return route.fulfill({
+        json: {
+          items: [
+            book("Covered", `/api/artwork/${"a".repeat(32)}`),
+            book("Plain"),
+            book("Broken", `/api/artwork/${"b".repeat(32)}`),
+          ],
+          nextOffset: null,
+        },
+      });
+    if (url.pathname === `/api/artwork/${"a".repeat(32)}`)
+      return route.fulfill({ contentType: "image/png", body: png });
+    return route.fulfill({ status: 404, json: { error: "not_found" } });
+  });
+  await page.goto("/#/reading");
+  const card = (name: string) =>
+    page.getByRole("button", { name: new RegExp(`^${name}`) });
+  await expect(card("Covered").locator("img")).toHaveJSProperty(
+    "complete",
+    true,
+  );
+  expect(
+    await card("Covered")
+      .locator("img")
+      .evaluate((img: HTMLImageElement) => img.naturalWidth),
+  ).toBe(1);
+  await expect(card("Covered").locator(".reading-cover")).toHaveCSS(
+    "aspect-ratio",
+    "2 / 3",
+  );
+  // The picture fills the cover at every width, a phone's included.
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    const frame = (await card("Covered")
+      .locator(".reading-cover")
+      .boundingBox())!;
+    const shown = (await card("Covered").locator("img").boundingBox())!;
+    expect(shown.height).toBeCloseTo(frame.height, 0);
+    expect(frame.width - shown.width).toBeLessThanOrEqual(8);
+  }
+  await expect(card("Plain").locator("img")).toHaveCount(0);
+  await expect(card("Plain").locator(".reading-cover strong")).toHaveText(
+    "Plain",
+  );
+  // A picture that cannot be fetched falls back to the drawn cover.
+  await expect(card("Broken").locator("img")).toHaveCount(0);
+  await expect(card("Broken").locator(".reading-cover strong")).toHaveText(
+    "Broken",
+  );
+});

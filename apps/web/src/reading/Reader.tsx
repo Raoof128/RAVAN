@@ -20,6 +20,7 @@ import { ReaderPanel } from "./ReaderPanel.js";
 import { Icon } from "../../../../packages/ui/src/Icon.js";
 import { openBook, type BookPage, type OpenBook } from "./book.js";
 import { PageCache } from "./pages.js";
+import { containSelection } from "./selection.js";
 const PdfReader = lazy(() =>
   import("./PdfPage.js").then((m) => ({ default: m.PdfReader })),
 );
@@ -101,6 +102,10 @@ export function Reader({
   useEffect(() => {
     viewport.current?.focus();
   }, []);
+  useEffect(
+    () => (viewport.current ? containSelection(viewport.current) : undefined),
+    [],
+  );
   useEffect(() => {
     const timer = setInterval(save, 2000);
     const hidden = () => {
@@ -376,6 +381,8 @@ export function Reader({
             ) : page?.image ? (
               <img
                 className="reading-manga"
+                // A drag on a page selects nothing; it must not pick the image up.
+                draggable={false}
                 src={page.image}
                 alt={`Page ${section + 1} of ${source.title}`}
                 onLoad={loaded}

@@ -30,8 +30,12 @@ import {
   storeArtwork,
   sweepArtwork,
 } from "./artwork.js";
+import { extractBookCover, storeBookCover } from "./book-cover.js";
+import { MAX_READING_BYTES } from "../../../packages/contracts/src/reading.js";
 /** Bump to make every film's pictures again, for example after a better method. */
 export const ARTWORK_VERSION = 1;
+/** Bump to make every book's cover again. */
+export const BOOK_COVER_VERSION = 1;
 const sourceSchema = z.strictObject({
   fileId: z.string().regex(/^[A-Za-z0-9_-]{1,160}$/),
   generation: z.string().regex(/^[a-f0-9]{64}$/),
@@ -107,6 +111,42 @@ export class MediaWorker {
               sizeBytes: film.sizeBytes,
             },
             movieId: film.movieId,
+          },
+        );
+    })();
+    // A cover for each book, made again when the file changes. Covers of books
+    // that are gone are forgotten; their files go with the hourly sweep.
+    this.db.transaction(() => {
+      this.db
+        .prepare(
+          "DELETE FROM reading_covers WHERE item_id NOT IN (SELECT id FROM reading_items WHERE available=1)",
+        )
+        .run();
+      const books = this.db
+        .prepare(
+          `SELECT r.id fileId,r.generation,r.size_bytes sizeBytes,r.format FROM reading_items r
+           WHERE r.available=1 AND CAST(r.size_bytes AS INTEGER) BETWEEN 1 AND ?
+           AND NOT EXISTS (SELECT 1 FROM reading_covers c WHERE c.item_id=r.id AND c.generation=r.generation)
+           AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.unique_key='book-cover-v${BOOK_COVER_VERSION}:'||r.id||':'||r.generation)
+           ORDER BY r.name COLLATE NOCASE,r.id LIMIT 100`,
+        )
+        .all(MAX_READING_BYTES) as Array<{
+        fileId: string;
+        generation: string;
+        sizeBytes: string;
+        format: string;
+      }>;
+      for (const book of books)
+        queue.enqueue(
+          "book-cover",
+          `book-cover-v${BOOK_COVER_VERSION}:${book.fileId}:${book.generation}`,
+          {
+            source: {
+              fileId: book.fileId,
+              generation: book.generation,
+              sizeBytes: book.sizeBytes,
+            },
+            format: book.format,
           },
         );
     })();
@@ -199,6 +239,44 @@ export class MediaWorker {
     }
     return response.json();
   }
+  /** Part of a book, through the API's verified cache (`end` exclusive). */
+  private async bookBytes(
+    fileId: string,
+    generation: string,
+    start: number,
+    end: number,
+    signal: AbortSignal,
+  ): Promise<Uint8Array> {
+    if (end <= start) return new Uint8Array();
+    let response: Response;
+    try {
+      response = await fetch(
+        `${this.origin}/_worker/book/${fileId}/${generation}`,
+        {
+          headers: {
+            authorization: `Bearer ${this.key}`,
+            range: `bytes=${start}-${end - 1}`,
+          },
+          signal: AbortSignal.any([signal, AbortSignal.timeout(120000)]),
+          redirect: "error",
+        },
+      );
+    } catch (error) {
+      if (signal.aborted) throw error;
+      throw new ApiUnavailable("API unreachable");
+    }
+    if (response.status === 429 || response.status >= 500) {
+      await response.body?.cancel();
+      throw new ApiUnavailable("API unavailable");
+    }
+    if (response.status !== 206) {
+      await response.body?.cancel();
+      throw new Error("Source changed");
+    }
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.length !== end - start) throw new Error("Short book read");
+    return bytes;
+  }
   /** A credential FFmpeg may show on its command line: one file, and it expires. */
   private async grant(
     fileId: string,
@@ -244,6 +322,7 @@ export class MediaWorker {
         if (
           job.kind !== "probe" &&
           job.kind !== "artwork" &&
+          job.kind !== "book-cover" &&
           this.queue.shouldYield(job)
         ) {
           yielded = true;
@@ -460,6 +539,30 @@ export class MediaWorker {
           );
           throw error;
         }
+        this.queue.complete(job);
+        return "completed";
+      }
+      if (job.kind === "book-cover") {
+        if (!this.storage) throw new Error("Artwork unavailable");
+        const data = z
+          .object({
+            source: sourceSchema,
+            format: z.enum(["epub", "pdf", "cbz"]),
+          })
+          .parse(JSON.parse(job.payload));
+        const { fileId, generation, sizeBytes } = data.source;
+        const directory = artworkDirectory(this.storage.dataDir);
+        const picture = await extractBookCover(
+          data.format,
+          Number(sizeBytes),
+          (start, end, readSignal) =>
+            this.bookBytes(fileId, generation, start, end, readSignal),
+          directory,
+          combined,
+        );
+        // No cover is an answer too: it is recorded, and not looked for again
+        // until the file changes.
+        await storeBookCover(this.db, directory, fileId, generation, picture);
         this.queue.complete(job);
         return "completed";
       }

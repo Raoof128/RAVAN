@@ -127,6 +127,17 @@
   color: #f1eee5;
   transition: transform 0.2s;
 }
+/* Above the phone layout's padding for the drawn cover. */
+.reading-cover.reading-cover-picture {
+  padding: 0;
+  background: #2b2c28;
+}
+.reading-cover-picture img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .reading-book:hover .reading-cover {
   transform: translateY(-4px);
 }
@@ -441,8 +452,85 @@ body:has(.reading-reader) .site-header {
   max-width: 100%;
   margin: auto;
 }
+.reading-pdf {
+  position: relative;
+}
 .reading-pdf canvas {
   box-shadow: 0 2px 12px #0003;
+}
+/*
+ * The PDF.js text layer, from pdfjs-dist 6.5 web/pdf_viewer.css: transparent
+ * text laid over the drawing so a page can be selected and copied. The reader
+ * sets --total-scale-factor to the size the canvas is shown at.
+ */
+.reading-pdf .textLayer {
+  position: absolute;
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+  text-align: initial;
+  overflow: clip;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+.reading-pdf .textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  user-select: text;
+}
+.reading-pdf .textLayer > :not(.markedContent),
+.reading-pdf .textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x))
+    scale(var(--min-font-size-inv));
+}
+.reading-pdf .textLayer .markedContent {
+  display: contents;
+}
+.reading-pdf .textLayer span[role="img"] {
+  user-select: none;
+  cursor: default;
+}
+.reading-pdf .textLayer ::selection {
+  background: rgb(0 0 255 / 25%);
+  background: color-mix(in srgb, AccentColor, transparent 50%);
+  color: transparent;
+}
+.reading-pdf .textLayer br::selection {
+  background: transparent;
+}
+.reading-pdf .textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  user-select: none;
+}
+.reading-pdf .textLayer.selecting .endOfContent {
+  top: 0;
+}
+.reading-pdf .textLayer[data-main-rotation="90"] {
+  transform: rotate(90deg) translateY(-100%);
+}
+.reading-pdf .textLayer[data-main-rotation="180"] {
+  transform: rotate(180deg) translate(-100%, -100%);
+}
+.reading-pdf .textLayer[data-main-rotation="270"] {
+  transform: rotate(270deg) translateX(-100%);
 }
 .reading-viewport[data-fit="page"] canvas {
   max-height: 100%;

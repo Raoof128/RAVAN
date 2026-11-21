@@ -339,6 +339,56 @@ export async function extractArtwork(
   }
 }
 
+/** Decoders a book's picture may use: the formats books carry pictures in. */
+const IMAGE_FORMATS = "image2,jpeg_pipe,png_pipe,webp_pipe,gif,gif_pipe";
+
+/**
+ * Make a poster from a picture file taken out of a book, held to a cover's
+ * size. Undefined when FFmpeg makes nothing worth keeping.
+ */
+export async function posterFromImage(
+  path: string,
+  directory: string,
+  signal: AbortSignal,
+): Promise<Picture | undefined> {
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  const out = join(directory, `.${randomBytes(8).toString("hex")}.tmp`);
+  try {
+    await runProcess(
+      "ffmpeg",
+      [
+        "-nostdin",
+        "-v",
+        "error",
+        "-max_pixels",
+        String(MAX_COVER_PIXELS),
+        "-protocol_whitelist",
+        "file",
+        "-format_whitelist",
+        IMAGE_FORMATS,
+        "-i",
+        path,
+        "-frames:v",
+        "1",
+        "-vf",
+        `scale=${POSTER.width}:${POSTER.height}:force_original_aspect_ratio=increase,crop=${POSTER.width}:${POSTER.height},format=yuvj420p`,
+        ...encode,
+        out,
+      ],
+      signal,
+      90000,
+    );
+    const info = await stat(out);
+    if (!info.isFile() || info.size < 1024 || info.size > MAX_ARTWORK_BYTES)
+      return;
+    const file = artworkName();
+    await rename(out, join(directory, file));
+    return { kind: "poster", provider: "cover", file };
+  } finally {
+    await rm(out, { force: true });
+  }
+}
+
 /**
  * Replace a film's pictures from the given providers with new ones, in one
  * transaction, then remove the files of those they replaced. If recording
@@ -412,9 +462,14 @@ export async function sweepArtwork(
   } catch {
     return 0;
   }
+  // Book covers live beside the films' pictures.
   const known = new Set(
     (
-      db.prepare("SELECT path FROM artwork").all() as Array<{ path: string }>
+      db
+        .prepare(
+          "SELECT path FROM artwork UNION ALL SELECT path FROM reading_covers WHERE path IS NOT NULL",
+        )
+        .all() as Array<{ path: string }>
     ).map((row) => row.path),
   );
   let removed = 0;

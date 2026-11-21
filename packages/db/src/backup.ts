@@ -154,7 +154,7 @@ export async function restoreEncryptedBackup(
             "UPDATE owner_mfa SET last_counter=max(last_counter,?)",
           ).run(Math.floor(Date.now() / 30000));
           db.exec(
-            "DELETE FROM web_sessions; DELETE FROM mfa_challenges; DELETE FROM pairing_requests; DELETE FROM prepared_assets; DELETE FROM jobs WHERE kind IN ('browser-prepare','artwork'); DELETE FROM artwork;",
+            "DELETE FROM web_sessions; DELETE FROM mfa_challenges; DELETE FROM pairing_requests; DELETE FROM prepared_assets; DELETE FROM jobs WHERE kind IN ('browser-prepare','artwork','book-cover'); DELETE FROM artwork;",
           );
           // The pictures are not in the backup: let them be made, and looked up, again.
           if (
@@ -165,6 +165,14 @@ export async function restoreEncryptedBackup(
               .get()
           )
             db.exec("DELETE FROM artwork_lookups;");
+          if (
+            db
+              .prepare(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='reading_covers'",
+              )
+              .get()
+          )
+            db.exec("DELETE FROM reading_covers;");
           db.prepare(
             "UPDATE devices SET revoked_at=? WHERE revoked_at IS NULL",
           ).run(Date.now());

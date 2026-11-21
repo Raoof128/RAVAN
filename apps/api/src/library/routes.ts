@@ -392,7 +392,7 @@ export function registerCatalogue(
     ).run(JSON.stringify(body.data));
     return body.data;
   });
-  // Pictures made by the worker from the films, or fetched by this server
+  // Pictures made by the worker from the films and books, or fetched by this server
   // when TMDB is configured. Served only by their random id, only to the owner
   // and paired screens, and never from a URL a client supplies.
   app.get<{ Params: { id: string } }>(
@@ -401,8 +401,11 @@ export function registerCatalogue(
     async (request, reply) => {
       const id = request.params.id;
       const row = /^[a-f0-9]{32}$/.test(id)
-        ? (db.prepare("SELECT path FROM artwork WHERE id=?").get(id) as
-            { path: string } | undefined)
+        ? (db
+            .prepare(
+              "SELECT path FROM artwork WHERE id=? UNION ALL SELECT path FROM reading_covers WHERE picture_id=? AND path IS NOT NULL LIMIT 1",
+            )
+            .get(id, id) as { path: string } | undefined)
         : undefined;
       const bytes = row
         ? await readArtwork(artworkDirectory(dataDir), row.path).catch(
