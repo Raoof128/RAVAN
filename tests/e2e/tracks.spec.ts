@@ -297,11 +297,9 @@ test("shows the audio menu for a film with one language, and keeps the menus in 
     panel.getByText("The only language in this film."),
   ).toBeVisible();
   await page.keyboard.press("Escape");
-  // The browser's own full-screen button is hidden; ours takes the menus along.
-  await expect(page.locator("video")).toHaveAttribute(
-    "controlslist",
-    "nofullscreen",
-  );
+  // RAVAN draws its own controls: the browser's (and its full-screen button,
+  // greyed on Chromium 79) are gone, and ours takes the menus along.
+  await expect(page.locator("video")).not.toHaveAttribute("controls", "");
   if (browserName !== "chromium") return;
   await page.getByRole("button", { name: "Full screen" }).click();
   await expect

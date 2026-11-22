@@ -1,5 +1,11 @@
 # LG C1 development installation
 
+## In the TV's browser, with nothing installed
+
+Open the site in the C1's own web browser and sign in. Since 22 November 2026 the web client is built for Chromium 79, the C1's engine, and the owner confirmed on the TV that it opens and plays films. Focus rings, reading-room layout and reading progress work there; PDF books say they need a newer browser, so open those on a phone or computer.
+
+## The packaged TV app
+
 The development target is an LG C1. LG's official table maps its webOS 6.x generation to Chromium 79. The separate TV bundle targets that engine and uses native media playback. The actual TV's firmware is not yet recorded. Browser automation is only shell evidence.
 
 1. Choose the final HTTPS Mov origin and complete server authorization/streaming verification.

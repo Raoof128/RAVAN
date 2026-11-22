@@ -12,6 +12,7 @@ import {
   useDelayed,
   usePending,
 } from "../../../../packages/ui/src/Loading.js";
+import { episodeLabel, episodeWords } from "../player/UpNext.js";
 import { Icon } from "../../../../packages/ui/src/Icon.js";
 import { forgetLibrary } from "../libraryCache.js";
 import { returnTo, useTitle } from "../router.js";
@@ -140,6 +141,16 @@ export function Detail({ id }: { id: string }) {
       <div className="detail-grid">
         <Poster movie={film} large />
         <div className="detail-copy">
+          {film.episode && (
+            <p className="detail-episode">
+              <a
+                href={`#/folder/${encodeURIComponent(film.episode.folder.id)}`}
+              >
+                {film.episode.folder.name || "This series"}
+              </a>{" "}
+              · {episodeWords(film.episode)} of {film.episode.count}
+            </p>
+          )}
           <h1 data-long={film.title.length > 28 || undefined}>{film.title}</h1>
           {film.year ? <p className="detail-year">{film.year}</p> : null}
           {film.description ? (
@@ -173,6 +184,14 @@ export function Detail({ id }: { id: string }) {
               {film.saved ? "✓ In watchlist" : "+ Watchlist"}
             </ActionButton>
           </div>
+          {film.episode?.next && (
+            <p className="detail-next">
+              Next:{" "}
+              <a href={`#/movie/${encodeURIComponent(film.episode.next.id)}`}>
+                {episodeLabel(film.episode.next)} · {film.episode.next.title}
+              </a>
+            </p>
+          )}
           {!film.available && (
             <p className="muted">
               The file is no longer in your Drive folder, or Google needs to be

@@ -15,11 +15,16 @@ import {
   preferencesSchema,
 } from "../../../../packages/contracts/src/schemas.js";
 import type {
+  EpisodeInfo,
   FolderCard,
   MovieCard,
   MovieDetail,
   MovieList,
 } from "../../../../packages/contracts/src/index.js";
+import {
+  compareEpisodes,
+  parseEpisode,
+} from "../../../../packages/contracts/src/episodes.js";
 type MovieRow = {
   id: string;
   title: string;
@@ -69,10 +74,62 @@ export function registerCatalogue(
   db: Database,
   dataDir: string,
 ) {
+  /**
+   * Where a film named as an episode stands in its Drive folder, and the one
+   * after it. The file names decide: titles can be edited, numbers cannot.
+   */
+  function episodeOf(id: string): EpisodeInfo | undefined {
+    const source = db
+      .prepare(
+        "SELECT name,parent_id FROM source_files WHERE movie_id=? AND available=1 AND parent_id IS NOT NULL ORDER BY id LIMIT 1",
+      )
+      .get(id) as { name: string; parent_id: string } | undefined;
+    const own = source && parseEpisode(source.name);
+    if (!source || !own) return;
+    const films = new Map<
+      string,
+      { id: string; name: string; season?: number; episode: number }
+    >();
+    for (const sibling of db
+      .prepare(
+        "SELECT movie_id id,name FROM source_files WHERE parent_id=? AND available=1 ORDER BY id",
+      )
+      .all(source.parent_id) as Array<{ id: string; name: string }>) {
+      const number = parseEpisode(sibling.name);
+      if (number && !films.has(sibling.id))
+        films.set(sibling.id, { ...sibling, ...number });
+    }
+    const order = [...films.values()].sort(compareEpisodes);
+    const at = order.findIndex((film) => film.id === id);
+    const after = order[at + 1];
+    const nextRow = after
+      ? (db.prepare(`${selection} WHERE m.id=?`).get(after.id) as
+          MovieRow | undefined)
+      : undefined;
+    const folder = db
+      .prepare("SELECT name FROM library_folders WHERE id=?")
+      .get(source.parent_id) as { name: string } | undefined;
+    return {
+      ...own,
+      index: at + 1,
+      count: order.length,
+      folder: { id: source.parent_id, name: folder?.name ?? "" },
+      ...(after && nextRow
+        ? {
+            next: {
+              ...card(nextRow),
+              ...(after.season !== undefined ? { season: after.season } : {}),
+              episode: after.episode,
+            },
+          }
+        : {}),
+    };
+  }
   function detail(id: string): MovieDetail | undefined {
     const row = db.prepare(`${selection} WHERE m.id=?`).get(id) as
       MovieRow | undefined;
     if (!row) return;
+    const episode = episodeOf(id);
     const editions = db
       .prepare(
         "SELECT e.id,e.label,e.state,e.source_id sourceId,COALESCE(s.available,0) available FROM editions e LEFT JOIN source_files s ON s.id=e.source_id WHERE e.movie_id=? ORDER BY e.id",
@@ -104,6 +161,7 @@ export function registerCatalogue(
         text: textSubtitles.has(s.codec),
       })),
       ...card(row),
+      ...(episode ? { episode } : {}),
       description: row.description,
       saved: Boolean(row.saved),
       editions: editions.map((e) => ({
@@ -338,7 +396,7 @@ export function registerCatalogue(
         return reply.code(400).send({ error: "invalid_metadata" });
       const changed = db
         .prepare(
-          "UPDATE movies SET title=?,description=?,year=?,updated_at=? WHERE id=?",
+          "UPDATE movies SET title=?,description=?,year=?,updated_at=?,title_edited=1 WHERE id=?",
         )
         .run(
           body.data.title,

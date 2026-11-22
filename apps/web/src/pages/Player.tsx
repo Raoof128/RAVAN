@@ -28,8 +28,14 @@ import {
   PlayerController,
   type ControllerState,
 } from "../player/PlayerController.js";
-import { Icon } from "../../../../packages/ui/src/Icon.js";
 import { forgetLibrary } from "../libraryCache.js";
+import {
+  episodeLabel,
+  episodeWords,
+  UpNextEnd,
+  UpNextPeek,
+} from "../player/UpNext.js";
+import { Transport } from "../player/Transport.js";
 import { useTitle } from "../router.js";
 const qualities: Array<[Quality, string]> = [
   ["auto", "Auto, recommended"],
@@ -46,8 +52,12 @@ const shortcuts: Array<[string, string]> = [
   ["↑ ↓", "Volume"],
   ["M", "Mute"],
   ["C", "Next subtitle track, then off"],
-  ["F", "Full screen"],
+  ["F, or double-click the picture", "Full screen"],
+  ["Click the picture", "Play or pause"],
+  ["Shift + N", "Next episode"],
 ];
+/** The last seconds of an episode, when the next one is offered in a corner. */
+const PEEK_SECONDS = 30;
 type FullscreenElement = HTMLElement & {
   webkitRequestFullscreen?: () => void;
   webkitEnterFullscreen?: () => void;
@@ -87,7 +97,9 @@ export function Player({
   );
   const [state, setState] = useState<ControllerState>({ kind: "loading" }),
     [movie, setMovie] =
-      useState<Pick<MovieDetail, "title" | "posterUrl" | "stillUrl">>(),
+      useState<
+        Pick<MovieDetail, "title" | "posterUrl" | "stillUrl" | "episode">
+      >(),
     [retry, setRetry] = useState(0),
     [resume, setResume] = useState(0),
     [waiting, setWaiting] = useState(false),
@@ -193,6 +205,7 @@ export function Player({
             title: film.title,
             posterUrl: film.posterUrl,
             stillUrl: film.stillUrl,
+            episode: film.episode,
           });
           setAudioTracks(film.audioTracks ?? []);
           setSubtitleTracks(film.subtitleTracks ?? []);
@@ -226,6 +239,65 @@ export function Player({
     };
   }, [api, id, startOver, retry, quality, audioTrack]);
   const visible = state.kind === "ready" || state.kind === "paused";
+  // Series: the episode after this one, offered near the end and at the end.
+  const episode = movie?.episode;
+  const next = episode?.next;
+  const following = next && episode ? { ...episode, next } : undefined;
+  const [autoplay, setAutoplay] = useState(true);
+  const [nearEnd, setNearEnd] = useState(false);
+  const [peekHidden, setPeekHidden] = useState(false);
+  useEffect(() => {
+    setNearEnd(false);
+    setPeekHidden(false);
+  }, [id]);
+  const playNext = () => {
+    if (next) location.hash = `#/player/${encodeURIComponent(next.id)}`;
+  };
+  const nextRef = useRef(playNext);
+  nextRef.current = playNext;
+  async function turnOffAutoplay() {
+    setAutoplay(false);
+    try {
+      const saved = await api.preferences();
+      await api.savePreferences({ ...saved, autoplayNext: false });
+      setNotice("Episodes will wait for you. Change this in Your cinema.");
+    } catch {
+      setNotice("That couldn’t be saved. It applies to this episode.");
+    }
+  }
+  // Watching the clock only for the corner card: once a second is enough.
+  useEffect(() => {
+    const element = video.current;
+    if (!element || !next) return;
+    const tick = () => {
+      const left = element.duration - element.currentTime;
+      // A stream still being written has no end yet to count back from.
+      setNearEnd(
+        Number.isFinite(element.duration) &&
+          element.duration > PEEK_SECONDS * 4 &&
+          left <= PEEK_SECONDS,
+      );
+    };
+    element.addEventListener("timeupdate", tick);
+    return () => element.removeEventListener("timeupdate", tick);
+  }, [next]);
+  // The system's media keys and lock screen: "next track" is the next episode.
+  useEffect(() => {
+    const session = (navigator as { mediaSession?: MediaSession }).mediaSession;
+    if (!session || !next) return;
+    try {
+      session.setActionHandler("nexttrack", () => nextRef.current());
+    } catch {
+      return;
+    }
+    return () => {
+      try {
+        session.setActionHandler("nexttrack", null);
+      } catch {
+        // The browser no longer offers the action.
+      }
+    };
+  }, [next]);
   useEffect(() => {
     let active = true;
     api
@@ -236,6 +308,7 @@ export function Player({
           typeof p.subtitleLanguage === "string" ? p.subtitleLanguage : "off";
         preferredAudio.current =
           typeof p.audioLanguage === "string" ? p.audioLanguage : "original";
+        setAutoplay(p.autoplayNext !== false);
         // Apply it to captions that were already there.
         const adapter = adapterRef.current;
         const options = adapter?.subtitleOptions() ?? [];
@@ -267,18 +340,36 @@ export function Player({
   const [fullscreen, setFullscreen] = useState(false);
   const [idle, setIdle] = useState(false);
   const idleTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // The controls fade three seconds after the last sign of the viewer, but
+  // never while the pointer rests on them.
+  const holding = useRef(false);
   const wake = () => {
     setIdle(false);
     clearTimeout(idleTimer.current);
-    idleTimer.current = setTimeout(() => setIdle(true), 3000);
+    const rest = () => {
+      if (holding.current) idleTimer.current = setTimeout(rest, 3000);
+      else setIdle(true);
+    };
+    idleTimer.current = setTimeout(rest, 3000);
   };
+  const wakeRef = useRef(wake);
+  wakeRef.current = wake;
   useEffect(() => {
-    const change = () =>
+    const change = () => {
+      const current =
+        document.fullscreenElement ??
+        (document as unknown as { webkitFullscreenElement?: Element })
+          .webkitFullscreenElement;
+      const element = video.current;
       setFullscreen(
-        document.fullscreenElement === frame.current ||
-          (document as unknown as { webkitFullscreenElement?: Element })
-            .webkitFullscreenElement === frame.current,
+        current !== undefined &&
+          current !== null &&
+          (current === frame.current || current === element),
       );
+      // The picture alone in full screen (the fallback below) carries the
+      // browser's own controls, as RAVAN's are outside it.
+      if (element) element.controls = current === element;
+    };
     document.addEventListener("fullscreenchange", change);
     document.addEventListener("webkitfullscreenchange", change);
     return () => {
@@ -287,8 +378,14 @@ export function Player({
       document.removeEventListener("webkitfullscreenchange", change);
     };
   }, []);
+  /**
+   * Full screen is the frame's, so the menus and Up next come along. A
+   * browser that refuses an element other than the video (some embedded TV
+   * browsers) gets the picture alone instead of nothing.
+   */
   function toggleFullscreen() {
     const box = frame.current as FullscreenElement | null;
+    const picture = video.current as FullscreenElement | null;
     const doc = document as unknown as {
       webkitFullscreenElement?: Element;
       webkitExitFullscreen?: () => void;
@@ -301,9 +398,17 @@ export function Player({
       doc.webkitExitFullscreen?.();
       return;
     }
-    if (box?.requestFullscreen) void box.requestFullscreen().catch(() => {});
+    const pictureAlone = () => {
+      if (picture?.requestFullscreen)
+        void picture.requestFullscreen().catch(() => {
+          picture.webkitEnterFullscreen?.();
+        });
+      else picture?.webkitEnterFullscreen?.();
+    };
+    if (box?.requestFullscreen)
+      void box.requestFullscreen().catch(pictureAlone);
     else if (box?.webkitRequestFullscreen) box.webkitRequestFullscreen();
-    else (video.current as FullscreenElement | null)?.webkitEnterFullscreen?.();
+    else pictureAlone();
     wake();
   }
   const textSubtitles = subtitleTracks.filter((t) => t.text);
@@ -484,6 +589,7 @@ export function Player({
       )
         return;
       const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+      wakeRef.current();
       if (key === " " || key === "k") {
         if (element.paused) {
           void element.play().catch(() => {});
@@ -528,6 +634,8 @@ export function Player({
         }
       } else if (key === "f") {
         toggleFullscreen();
+      } else if (key === "n" && event.shiftKey) {
+        nextRef.current();
       } else return;
       event.preventDefault();
     };
@@ -541,7 +649,15 @@ export function Player({
   return (
     <main id="main" className="player-page">
       <div className="player-heading">
-        <h1 data-long={title.length > 36 || undefined}>{title}</h1>
+        <div className="player-title">
+          {episode && (
+            <p className="player-episode">
+              {episodeWords(episode)} of {episode.count}
+              {episode.folder.name ? ` · ${episode.folder.name}` : ""}
+            </p>
+          )}
+          <h1 data-long={title.length > 36 || undefined}>{title}</h1>
+        </div>
         <a className="button" href={`#/movie/${encodeURIComponent(id)}`}>
           Close player
         </a>
@@ -553,7 +669,7 @@ export function Player({
         onFocusCapture={wake}
       >
         <div
-          className={`stage${visible ? " stage-live" : ""}`}
+          className={`stage${visible ? " stage-live" : ""}${visible && ended && following ? " is-up-next" : ""}`}
           data-state={state.kind}
         >
           {!visible && (
@@ -563,9 +679,8 @@ export function Player({
           )}
           <video
             ref={video}
-            controls
-            // Full screen is the frame's, so the language menus come along.
-            controlsList="nofullscreen"
+            // RAVAN draws its own controls (Transport), so full screen is the
+            // frame's and the menus and Up next come along in every browser.
             playsInline
             preload="metadata"
             aria-label={`${title} player`}
@@ -577,16 +692,58 @@ export function Player({
               <span className="sr-only">Buffering</span>
             </div>
           )}
-          {visible && !playing && state.kind === "paused" && !ended && (
-            <button
-              className="stage-play primary"
-              onClick={() => void video.current?.play().catch(() => {})}
-            >
-              <Icon name="play" />
-              Play film
-            </button>
+          {visible && !ended && (
+            <Transport
+              video={video}
+              title={title}
+              caption={
+                episode
+                  ? `${episodeWords(episode)} of ${episode.count}${episode.folder.name ? `, ${episode.folder.name}` : ""}`
+                  : undefined
+              }
+              shown={!idle}
+              onWake={wake}
+              onHide={() => {
+                clearTimeout(idleTimer.current);
+                setIdle(true);
+              }}
+              onHold={(hold) => {
+                holding.current = hold;
+                if (hold) wake();
+              }}
+              fullscreen={fullscreen}
+              onFullscreen={toggleFullscreen}
+              next={
+                next
+                  ? { label: episodeLabel(next), title: next.title }
+                  : undefined
+              }
+              onNext={playNext}
+            />
           )}
-          {visible && ended && (
+          {visible && ended && following && (
+            <UpNextEnd
+              key={id}
+              episode={following}
+              autoplay={autoplay}
+              onPlay={playNext}
+              onWatchAgain={() => {
+                const element = video.current;
+                if (!element) return;
+                element.currentTime = 0;
+                void element.play().catch(() => {});
+              }}
+              onTurnOff={() => void turnOffAutoplay()}
+            />
+          )}
+          {visible && !ended && nearEnd && following && !peekHidden && (
+            <UpNextPeek
+              episode={following}
+              onPlay={playNext}
+              onHide={() => setPeekHidden(true)}
+            />
+          )}
+          {visible && ended && !following && (
             <div className="stage-ended">
               <p>The end.</p>
               <div className="button-row">
@@ -601,9 +758,20 @@ export function Player({
                 >
                   Watch again
                 </button>
-                <a className="button" href="#/library">
-                  Back to the collection
-                </a>
+                {episode ? (
+                  <a
+                    className="button"
+                    href={`#/folder/${encodeURIComponent(episode.folder.id)}`}
+                  >
+                    {episode.folder.name
+                      ? `Back to ${episode.folder.name}`
+                      : "Back to the series"}
+                  </a>
+                ) : (
+                  <a className="button" href="#/library">
+                    Back to the collection
+                  </a>
+                )}
               </div>
             </div>
           )}
@@ -678,14 +846,6 @@ export function Player({
             subtitles={subtitleList}
             picture={pictureList}
           />
-          <button
-            type="button"
-            className="fullscreen-button"
-            aria-pressed={fullscreen}
-            onClick={toggleFullscreen}
-          >
-            {fullscreen ? "Exit full screen" : "Full screen"}
-          </button>
           {state.kind === "ready" && state.session.label && (
             <span className="playback-edition">
               Now playing: {state.session.label}

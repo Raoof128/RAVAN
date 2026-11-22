@@ -58,6 +58,9 @@ RAVAN is a private, single-owner cinema: a Fastify API, a media worker, a Cloudf
 - **One link per film card.** The poster link covers the card; the title is a heading, not a second link.
 - **Text an owner needs is at least 11 px, targets at least 24 by 24 px, control outlines `var(--control)`.** `tests/e2e/loading.spec.ts` measures all three on every screen from 320 to 3840 px.
 - **`PlayerController.ts` and `BrowserAdapter.ts` own tickets, sessions and recovery.** Interface work goes around them, in the pages.
+- **The web player draws its own controls** (`apps/web/src/player/Transport.tsx`); the video has no `controls` attribute except while it is full screen alone (the fallback for browsers that refuse the frame). The controls act on the video element only.
+- **A film's title follows its Drive file name until the owner edits it in RAVAN** (`movies.title_edited`). Any code that changes a title for the owner must set `title_edited=1`, or the next scan puts the file name back.
+- **Episodes are read from file names, never from titles** (`packages/contracts/src/episodes.ts`). Titles can be edited; numbers cannot.
 - **Both clients must run on Chromium 79 (LG C1).** Keep `build.target` at `chrome79` and newer; fill a missing function in `packages/client/src/legacy.ts`, never by raising the target. `npm run check:legacy` and `build:cloudflare` refuse a script Chromium 79 cannot run. Write layout that holds without flex `gap`, `aspect-ratio` and `dvh`, or give it a fallback. Never put `:focus-visible` in a selector list with another selector (Chromium 79 drops the whole rule); give it a `[data-focus-visible="fallback"]` `:focus` copy. No `:is()`, `:where()` or `:has()`.
 - **Type sizes are in rem; colours for text come from tokens.** `--text`, `--text-soft`, `--muted`, `--accent`, `--success`, `--danger`. `tests/clients/design-rules.test.ts` fails on a px type size or a new raw text colour. The TV stylesheet is exempt: it is a fixed 1080p layout.
 - **Icons come from `packages/ui/src/Icon.tsx`.** Do not type ▶, ↗ or similar characters as icons; devices draw them differently, some as emoji.
@@ -395,3 +398,43 @@ Raouf: 2026-11-22 (Australia/Sydney), thirty-third entry
 - Verification: 12 release tests, 9 of 9 edge checks, live assets pass `check-legacy-browsers.mjs`, live demo in real Chromium 79 with no page errors.
 - Follow-ups: the owner to try the C1: play a film, open an EPUB and confirm the reading position is kept.
 - Rule: after a web release, run `node scripts/check-legacy-browsers.mjs` on the live page's and live demo's downloaded assets; it confirms what is served, not only what was built.
+- Published: private `523e783` as public `7238df6` on `public/lg-c1-2026-11-22` (based on `public/cover-reads-2026-11-22`), gitleaks clean.
+- Rule: the export refuses a host id such as the droplet's in `AGENT.md`; name the owner's machines in words in log entries.
+
+Raouf: 2026-11-22 (Australia/Sydney), thirty-fourth entry
+
+- Scope: the owner tried the LG C1 release on the TV.
+- Summary: the owner reported that RAVAN works on the C1 and shows video, through the TV's own browser. Documents updated to match; the packaged TV app stays unverified.
+- Files changed: `README.md`, `docs/implementation-status.md`, `docs/tv-installation.md`, the maintainer's private notes, `CHANGELOG.md`, this file.
+- Verification: the owner's report on the TV; no code changed.
+- Follow-ups: the owner to open an EPUB on the TV and confirm the position is kept after closing; decide whether server-drawn PDF pages are worth building for the C1; the packaged TV app's physical acceptance.
+- Rule: the C1's browser is now a supported client. Keep `npm run check:legacy` and the `build:cloudflare` guard passing; a regression there blanks the owner's TV.
+
+Raouf: 2026-11-22 (Australia/Sydney), thirty-fifth entry
+
+- Scope: the owner asked for a next-episode option with a design of its own, after checking current guidance.
+- Summary: titles now follow Drive renames (32 of 43 production films showed old download names); films named as episodes know the next one in their folder; the player offers it in the last 30 seconds and, at the end, as a ten-second copper line the owner can stop or turn off with one press. Details in `CHANGELOG.md`.
+- Files changed: see `CHANGELOG.md`.
+- Verification: `npm run check` clean, Prettier clean. `npx vitest run`: 396 passed, 1 skipped. `npx playwright test`: 213 passed in Chromium, Firefox and WebKit. `npm run check:legacy` passes. Real Chromium 79 on the owner's own droplet (removed afterwards): end panel, focus, Enter, autoplay and session replacement, no page errors. Screens checked at 1440 and 390 px.
+- Follow-ups: release (backend with migration 12, and web together: the client sends `autoplayNext`, which the old API refuses) with the owner's approval; the next scan then renames the 32 films. Next episode in the packaged TV app; chaining a season's last episode to the next season's folder.
+- Rule: a fake media address in a test must start with `/media/s/`; the adapter refuses any other as untrusted, which reads like a playback bug.
+
+Raouf: 2026-11-22 (Australia/Sydney), thirty-sixth entry
+
+- Scope: the owner asked for a play control in the middle of the picture, a working full-screen button, and a player upgrade from current guidance with a design of RAVAN's own.
+- Summary: RAVAN's own controls replace the browser's: the copper line over the Ā as the seek line with the macron as playhead, click in the middle to play or pause with a drawn copper ring, pause as an intermission, a bar that fades and returns, and full screen of the frame with a picture-alone fallback. Video.js 10 was ruled out (Chrome 111+, no TVs). Details in `CHANGELOG.md`.
+- Files changed: see `CHANGELOG.md`.
+- Verification: `npm run check` clean, Prettier clean. `npx vitest run`: 396 passed, 1 skipped. `npx playwright test`: 223 passed, 2 skipped (the full-screen fallback outside Chromium). `npm run check:legacy` passes. Real Chromium 79 on the owner's own droplet (removed afterwards): click to pause and play, ring, intermission, seek, fade and wake, focus ring, no page errors. Screens checked at 1440 and 390 px.
+- Follow-ups: release together with the next-episode work (owner's approval); the owner to try full screen on the C1 (headless Chromium 79 cannot complete one).
+- Rule: headless Chromium 79 never settles `requestFullscreen()`; test full screen in a current engine and on the TV.
+- Rule: with no `controls`, a video cannot take focus. Tests that need the player's shortcuts blur the active element instead of focusing the video.
+
+Raouf: 2026-11-22 (Australia/Sydney), thirty-seventh entry
+
+- Scope: release and publish the next-episode, Drive-title and player-controls work, approved by the owner.
+- Summary: backend `0b5f319bd4ae-9e5c2d44` (schema 12) and Worker `8c6d623e-5b12-470e-a258-89872a81687a` are live. See the maintainer's private notes.
+- Files changed: the maintainer's private notes, the maintainer's private notes, `CHANGELOG.md`, this file.
+- Verification: rehearsal in the worker's sandbox with the staged API on a live copy, activation with no viewers or jobs, schema 12 and 40 of 40 Drive titles after, Sentinel host checks, 12 release tests, 9 of 9 edge checks, live assets checked for Chromium 79.
+- Follow-ups: the owner to try full screen and an episode ending into the next on the C1.
+- Rule: a release whose lock adds only development packages may reuse the installed `node_modules`; compare the lock's production entries (packages without `dev`, and the root without `devDependencies`) instead of the whole file.
+- Rule: the unattended scan does nothing when Drive reports no change, so a rule that changes how existing rows are read from Drive needs a migration to apply it, or it waits for a manual refresh.

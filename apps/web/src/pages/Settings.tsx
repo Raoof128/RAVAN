@@ -377,6 +377,24 @@ export function Settings() {
                   />
                   Reduce interface motion
                 </label>
+                <label className="checkbox">
+                  <input
+                    type="checkbox"
+                    checked={preferences.autoplayNext !== false}
+                    aria-describedby="autoplay-hint"
+                    onChange={(e) =>
+                      setPreferences({
+                        ...preferences,
+                        autoplayNext: e.target.checked,
+                      })
+                    }
+                  />
+                  Play the next episode on its own
+                </label>
+                <p className="field-hint" id="autoplay-hint">
+                  When an episode ends, the next one in its folder plays after
+                  ten seconds. You can stop it each time, or turn it off here.
+                </p>
                 <ActionButton
                   pending={prefsBusy}
                   pendingLabel="Saving your preferences"

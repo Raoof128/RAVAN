@@ -147,7 +147,22 @@ export type TrackOption = {
   language: string;
   active: boolean;
 };
+/**
+ * Where an episode stands in its series folder, read from the Drive file
+ * names ("Show - S03E01"). Only films named as episodes have one.
+ */
+export type EpisodeInfo = {
+  season?: number;
+  episode: number;
+  /** Its place among the folder's episodes, counting from 1. */
+  index: number;
+  count: number;
+  folder: { id: string; name: string };
+  /** The episode after it in the folder, if there is one in Drive. */
+  next?: MovieCard & { season?: number; episode: number };
+};
 export type MovieDetail = MovieCard & {
+  episode?: EpisodeInfo;
   audioTracks?: Array<{ index: number; language: string; label: string }>;
   /**
    * The film's subtitle tracks. Text subtitles are shown in the player once
@@ -175,6 +190,8 @@ export type Preferences = {
   subtitleLanguage: string;
   quality: "original" | "720p" | "1080p";
   reducedMotion: boolean;
+  /** When an episode ends, play the next one after a short count. */
+  autoplayNext: boolean;
 };
 /**
  * The step a film is at before it can play. Every value is a state the server

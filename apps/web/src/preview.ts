@@ -69,6 +69,7 @@ export function previewApi() {
     subtitleLanguage: "en",
     quality: "original",
     reducedMotion: false,
+    autoplayNext: true,
   });
   api.devices = async () => [];
   const previewOnly = async () => {

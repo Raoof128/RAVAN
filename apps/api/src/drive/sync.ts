@@ -501,6 +501,22 @@ export class LibrarySync {
             "INSERT INTO editions(id,movie_id,source_id,label,generation) VALUES(?,?,?,'Original',?) ON CONFLICT(id) DO UPDATE SET generation=excluded.generation",
           )
           .run(`source-${file.id}`, movie, file.id, gen);
+        // The title follows the Drive name, so a rename there shows here,
+        // until the owner edits it in RAVAN. A film with several sources
+        // keeps its title: no one name speaks for it.
+        const title = file.name.replace(/\.[^.]+$/, "");
+        const renamed = this.db
+          .prepare(
+            "UPDATE movies SET title=? WHERE id=? AND title_edited=0 AND title<>? AND (SELECT COUNT(*) FROM source_files WHERE movie_id=? AND available=1)=1",
+          )
+          .run(title, movie, title, movie);
+        // A new name deserves another look for a poster, as an edit does.
+        if (renamed.changes)
+          this.db
+            .prepare(
+              "DELETE FROM artwork_lookups WHERE movie_id=? AND outcome<>'found'",
+            )
+            .run(movie);
       }
       this.db
         .prepare(

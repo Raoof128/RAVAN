@@ -42,6 +42,7 @@ export const preferencesSchema = z.strictObject({
   subtitleLanguage: z.string().max(32).default("off"),
   quality: z.enum(["original", "720p", "1080p"]).default("original"),
   reducedMotion: z.boolean().default(false),
+  autoplayNext: z.boolean().default(true),
 });
 export const metadataSchema = z.strictObject({
   title: z.string().trim().min(1).max(300),

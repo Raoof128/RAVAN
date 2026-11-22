@@ -1,11 +1,70 @@
 # Changelog
 
+## Raouf: 2026-11-22 (Australia/Sydney) · next episode and player controls release
+
+**Scope:** release and publish the next-episode, Drive-title and player-controls work, approved by the owner.
+
+- Live: backend `0b5f319bd4ae-9e5c2d44` (schema 12) and Cloudflare Worker version `8c6d623e-5b12-470e-a258-89872a81687a`, from commit `0b5f319bd4ae`. Record: the maintainer's private notes.
+- Rehearsal on a copy of the live database: 32 titles renamed to their Drive names, nothing else changed; Fire Force (24) and Pluto (8) chained episode to episode by the staged API; the Anime folder of films has none.
+- After activation: all 40 films in Drive show their Drive names; services active, no restarts, clean journal; 9 of 9 edge checks; live assets pass the Chromium 79 check.
+
+## Raouf: 2026-11-22 (Australia/Sydney) · RAVAN's own player controls
+
+**Scope:** the owner asked for a play control in the middle of the picture that pauses on a click there, a working full-screen button (on the LG C1 it looked disabled), and an upgrade of the player from current guidance, with a design of RAVAN's own. Design: `docs/superpowers/specs/2026-11-22-player-controls-design.md`. Branch `audit/backend-2026-11-16`. Not released.
+
+- **Why not a library:** Video.js 10, the 2026 successor of Vidstack, Plyr and Media Chrome, supports Chrome 111 and later (its Compat skin 99) and says "TV is not a supported target today"; it would break the C1.
+- **Full screen:** the browser's own controls are gone, and with them the full-screen button that `controlsList="nofullscreen"` left greyed on older Chromium. RAVAN's button sends the frame full screen (menus and Up next come along); a browser that refuses an element other than the video gets the picture alone, with the browser's own controls only while it is full screen.
+- **The seek line** is the copper line over the Ā in the wordmark, and its playhead is that mark riding above the line. It thickens under the pointer, writes the time there in the serif, drags, and is a `slider` for the keyboard (arrows ten seconds, Home and End) and screen readers.
+- **The middle of the picture:** a click plays or pauses, and the glyph for what happened appears in the centre while a copper ring draws round it; a double click is full screen. On a touch screen a tap shows or hides the controls and a double tap on either side moves ten seconds.
+- **Pause is an intermission:** a large Resume button, the film's title in the serif and "Paused at 0:12, 2 minutes to go." (only the button on phones).
+- **Bar:** play or pause, back and forward 10 seconds, mute and volume, the time (a press shows what is left), Next episode, picture in picture where offered, full screen. The bar fades three seconds after the last movement while a film plays, never under the pointer or with focus inside, and returns on any movement, touch or key. In full screen the title and episode ride above the line.
+- **Chromium 79 (LG C1):** margins in place of flex gaps, only opacity and transform animate, `:focus-visible` with its fallback copy. Checked in a real Chromium 79.0.3945.0: click to pause and play, the ring, the intermission, seeking, fading and waking, the focus ring, no page errors. Its headless mode never completes a full-screen request, so full screen on the TV itself is for the owner to confirm.
+- **Tests:** `tests/e2e/controls.spec.ts` (four, three engines; the fallback in Chromium): click in the middle, the intermission, the slider by keyboard and pointer, fading and waking, the time toggle, full screen with the title, and the picture-alone fallback. `tracks.spec.ts` and `next-episode.spec.ts` follow the new controls.
+- Verification: see the AGENT.md entry.
+
+### Files changed
+
+`apps/web/src/player/Transport.tsx` (new), `apps/web/src/pages/Player.tsx`, `apps/web/src/cinema.css`, `packages/ui/src/Icon.tsx`, `docs/superpowers/specs/2026-11-22-player-controls-design.md` (new), `tests/e2e/controls.spec.ts` (new), `tests/e2e/tracks.spec.ts`, `tests/e2e/next-episode.spec.ts`, `CHANGELOG.md`, `AGENT.md`.
+
+## Raouf: 2026-11-22 (Australia/Sydney) · next episode, and titles that follow Drive renames
+
+**Scope:** the owner asked for a next-episode option with its own design, after checking current guidance; their series are renamed in Drive ("Fire Force - S03E01.mkv"). Branch `audit/backend-2026-11-16`. Not released.
+
+- **Found on production (read-only):** Drive renames never reached RAVAN. A film's title was copied from its file name once, on import, so 32 of 43 films still showed old download names ("[Kayoanime] Enen no Shouboutai - S03E01" for "Fire Force - S03E01.mkv"). No title had been edited in RAVAN.
+- **Titles follow Drive (migration 12):** `movies.title_edited` marks a title the owner edited in RAVAN; the migration sets it where `updated_at` is in milliseconds (an edit) rather than seconds (an import). The migration also renames at once the films Drive renamed before it (the unattended schedule rescans only when Drive changes, so they would otherwise wait for a manual refresh). Each scan sets an unedited film's title to its file name without the extension, and clears its unfound artwork lookups, as an edit does. A film with several sources keeps its title.
+- **Episodes (`packages/contracts/src/episodes.ts`):** season and episode numbers are read from file names (`S03E01`, `S1 E12`, `2x05`, `Episode 10`, `Ep. 3`); years, resolutions and codecs never match. `GET /api/movies/:id` adds `episode` (season, episode, place and count in its folder, the folder, and the next episode as a card) for films named as episodes. Order is by season then episode, so 10 follows 9; episodes gone from Drive are skipped; folders of films (the "Anime" folder) get none.
+- **Preference:** `autoplayNext`, on by default.
+- **Player:** in an episode's last 30 seconds (films over two minutes, not on phones) a corner card offers the next one without taking focus. At the end the stage becomes the next episode: its picture running into the words, its place in the season as a rail of marks, and a copper line that flows for ten seconds before it plays. "Play now" has the focus, so OK on a remote plays it; "Not now" stops the count; "Don’t play episodes on their own" turns it off for good and says where to turn it back on. With it off, the end waits with "Play next episode". A Next episode button, Shift+N and the system's next-track key (Media Session) skip ahead. The next episode replaces the finished one's session, so there is no conflict, and full screen carries over. On phones the end panel takes the picture's place. Reduced motion keeps the line still while the seconds count.
+- **Film page and settings:** an episode's page names its series and place and links the next episode; Settings has "Play the next episode on its own".
+- **Guidance checked:** WCAG 2.2.1 (a time limit can be turned off or extended) and 2.2.2 (auto-starting media can be stopped); Netflix counts about 5 seconds, and a 2026 study of 76 viewers favoured a longer, adjustable count, hence ten; Section 508 advises against autoplay when unsure, hence one-press off; MDN Media Session `nexttrack`.
+- **Tests:** `tests/backend/episodes.test.ts` (7): name parsing, next episode and order, films without episodes, the preference, titles following renames, the migration's rule on old rows, edits marking the title. `tests/e2e/next-episode.spec.ts` (4, three engines): Play now by keyboard with the session replaced, autoplay after the line, Not now and turning it off, the waiting end and Shift+N.
+- **Chromium 79 (LG C1):** the end panel, focus on Play now, Enter, the ten-second autoplay and session replacement all checked in a real Chromium 79.0.3945.0 with a VP9 test episode; no page errors.
+- **Not done:** the packaged TV app has no next episode yet; seasons in sibling folders do not chain (the last episode of a season offers nothing).
+- Verification: see the AGENT.md entry.
+
+### Files changed
+
+`packages/contracts/src/episodes.ts` (new), `packages/contracts/src/index.ts`, `packages/contracts/src/schemas.ts`, `packages/db/migrations/012_title_follows_drive.sql` (new), `packages/db/src/migrate.ts`, `apps/api/src/library/routes.ts`, `apps/api/src/drive/sync.ts`, `apps/web/src/player/UpNext.tsx` (new), `apps/web/src/pages/Player.tsx`, `apps/web/src/pages/Detail.tsx`, `apps/web/src/pages/Settings.tsx`, `apps/web/src/preview.ts`, `apps/web/src/cinema.css`, `packages/ui/src/Icon.tsx`, `tests/backend/episodes.test.ts` (new), `tests/e2e/next-episode.spec.ts` (new), `CHANGELOG.md`, `AGENT.md`.
+
+## Raouf: 2026-11-22 (Australia/Sydney) · RAVAN confirmed on the LG C1
+
+**Scope:** the owner tried the LG C1 release on the TV.
+
+- **Owner's report (16:32 Sydney time):** RAVAN works on the LG C1 and shows video. This is the first confirmed film playback on the physical TV, through its own web browser (webOS 6, Chromium 79), on Worker version `55740333-7466-4ecf-9bfc-9937ebb8c338`.
+- **Documents:** the README, `docs/implementation-status.md` and `docs/tv-installation.md` now say the browser route on the C1 is confirmed, PDF books need another device, and the packaged TV app is still unverified on the TV. The release record gains an "On the TV" section.
+- **Still open:** a signed-in reading room and a kept reading position on the TV itself; the packaged TV app.
+
+### Files changed
+
+`README.md`, `docs/implementation-status.md`, `docs/tv-installation.md`, the maintainer's private notes, `CHANGELOG.md`, `AGENT.md`.
+
 ## Raouf: 2026-11-22 (Australia/Sydney) · LG C1 web release
 
 **Scope:** commit, release and publish the LG C1 work, approved by the owner.
 
 - Live: Cloudflare Worker version `55740333-7466-4ecf-9bfc-9937ebb8c338` from commit `7dfa5248afd7`. Backend unchanged at `98762ef4a832-74b72b75`, not restarted. Record: the maintainer's private notes.
 - Verification: 12 release tests on a local Worker, 9 of 9 edge checks, the live scripts and stylesheets pass the Chromium 79 check, and the live demo renders in a real Chromium 79 with no page errors.
+- Published: sanitized snapshot of private `523e783` as public `7238df6` on `public/lg-c1-2026-11-22`; secret scan clean.
 
 ## Raouf: 2026-11-22 (Australia/Sydney) · the rest of RAVAN on the LG C1
 
