@@ -1,3 +1,4 @@
+import "../../../packages/client/src/legacy.js";
 import { FilmStill } from "../../../packages/ui/src/FilmStill.js";
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";

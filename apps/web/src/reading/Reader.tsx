@@ -21,6 +21,7 @@ import { Icon } from "../../../../packages/ui/src/Icon.js";
 import { openBook, type BookPage, type OpenBook } from "./book.js";
 import { PageCache } from "./pages.js";
 import { containSelection } from "./selection.js";
+import { PDF_NEEDS_NEWER_BROWSER, pdfReaderSupported } from "./support.js";
 const PdfReader = lazy(() =>
   import("./PdfPage.js").then((m) => ({ default: m.PdfReader })),
 );
@@ -46,7 +47,11 @@ export function Reader({
   const [section, setSection] = useState(source.position.section);
   const [count, setCount] = useState(0);
   const [page, setPage] = useState<BookPage>();
-  const [error, setError] = useState("");
+  const [error, setError] = useState(() =>
+    source.format === "pdf" && !pdfReaderSupported()
+      ? PDF_NEEDS_NEWER_BROWSER
+      : "",
+  );
   const [ready, setReady] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [rtl, setRtl] = useState(source.format === "cbz");
@@ -70,6 +75,12 @@ export function Reader({
       opener.current = null;
     }
   }, [panel]);
+  // The open book owns the viewport; reading.css hides the site header on
+  // this mark (Chromium 79 has no :has() to find the reader by itself).
+  useEffect(() => {
+    document.body.classList.add("reading-open");
+    return () => document.body.classList.remove("reading-open");
+  }, []);
   const [pdf, setPdf] = useState<PDFDocumentProxy>();
   const [fit, setFit] = useState("page");
   const position = useRef(source.position);

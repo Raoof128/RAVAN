@@ -128,6 +128,43 @@
   transition: transform 0.2s;
 }
 /* Above the phone layout's padding for the drawn cover. */
+/* Chromium 79 (LG C1) has no aspect-ratio. A zero-width float holds the
+   shape while the box flows as a block. Its padding-top is a share of the
+   content width, so the drawn cover adds back its own padding and border
+   (24px 22px and 7px here, 16px 12px on phones) to reach 2:3 of the whole.
+   A picture cover takes its shape from its 480 by 720 image. */
+@supports not (aspect-ratio: 1) {
+  .reading-cover:not(.reading-cover-picture),
+  .reader-thumb {
+    display: block;
+  }
+  .reading-cover:not(.reading-cover-picture):before,
+  .reader-thumb:before {
+    content: "";
+    float: left;
+  }
+  .reading-cover:not(.reading-cover-picture):before {
+    /* 1.5 × (22 + 22 + 7) − (24 + 24) */
+    padding-top: calc(150% + 28.5px);
+  }
+  .reader-thumb:before {
+    padding-top: 120%;
+  }
+  .reading-cover:not(.reading-cover-picture):after,
+  .reader-thumb:after {
+    content: "";
+    display: table;
+    clear: both;
+  }
+}
+@media (max-width: 560px) {
+  @supports not (aspect-ratio: 1) {
+    .reading-cover:not(.reading-cover-picture):before {
+      /* 1.5 × (12 + 12 + 7) − (16 + 16) */
+      padding-top: calc(150% + 14.5px);
+    }
+  }
+}
 .reading-cover.reading-cover-picture {
   padding: 0;
   background: #2b2c28;
@@ -195,13 +232,15 @@
   color: var(--danger);
   line-height: 1.6;
 }
-/* The open book owns the viewport. The shelf button restores the regular navigation. */
-body:has(.reading-reader) .site-header {
+/* The open book owns the viewport. The shelf button restores the regular
+   navigation. The reader marks the body itself: Chromium 79 has no :has(). */
+body.reading-open .site-header {
   display: none;
 }
 .reading-reader {
   display: flex;
   flex-direction: column;
+  height: 100vh;
   height: 100dvh;
   min-height: 22rem;
   padding: 0;
@@ -250,12 +289,14 @@ body:has(.reading-reader) .site-header {
   gap: 8px;
   justify-self: end;
 }
-.reading-topbar :is(button, select) {
+.reading-topbar button,
+.reading-topbar select {
   width: auto;
   min-height: 44px;
   padding: 8px 12px;
 }
-.reading-reader :is(.reading-back, .reading-settings-button) {
+.reading-reader .reading-back,
+.reading-reader .reading-settings-button {
   border-color: transparent;
 }
 .reading-actions select {
@@ -265,6 +306,7 @@ body:has(.reading-reader) .site-header {
 }
 .reader-panel {
   width: min(37rem, calc(100% - 24px));
+  max-height: calc(100vh - 24px);
   max-height: calc(100dvh - 24px);
   overflow: auto;
   overscroll-behavior: contain;
@@ -479,7 +521,8 @@ body:has(.reading-reader) .site-header {
   --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
   --min-font-size-inv: calc(1 / var(--min-font-size));
 }
-.reading-pdf .textLayer :is(span, br) {
+.reading-pdf .textLayer span,
+.reading-pdf .textLayer br {
   color: transparent;
   position: absolute;
   white-space: pre;
@@ -541,7 +584,8 @@ body:has(.reading-reader) .site-header {
   height: 100%;
   object-fit: contain;
 }
-.reading-viewport[data-fit="width"] :is(canvas, .reading-manga) {
+.reading-viewport[data-fit="width"] canvas,
+.reading-viewport[data-fit="width"] .reading-manga {
   width: 100%;
 }
 .reading-bottom {

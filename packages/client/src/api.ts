@@ -30,6 +30,9 @@ export class ApiError extends Error {
 export function createApiClient(baseUrl: string) {
   let csrf: string | undefined;
   let credential: string | undefined;
+  // Chromium before 81 (an LG C1 runs 79) refuses, unsent, a keepalive
+  // request that needs a preflight: a JSON body or the CSRF header.
+  let keepaliveRefused = false;
   async function request<T>(
     path: string,
     method = "GET",
@@ -39,11 +42,11 @@ export function createApiClient(baseUrl: string) {
   ): Promise<T> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
-    try {
-      const response = await fetch(`${baseUrl}${path}`, {
+    const send = (alive: boolean) =>
+      fetch(`${baseUrl}${path}`, {
         method,
         credentials: "same-origin",
-        keepalive,
+        keepalive: alive,
         signal: controller.signal,
         headers: {
           ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
@@ -52,6 +55,21 @@ export function createApiClient(baseUrl: string) {
         },
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       });
+    try {
+      let response: Response;
+      if (keepalive && !keepaliveRefused) {
+        try {
+          response = await send(true);
+        } catch (error) {
+          if (!(error instanceof TypeError) || controller.signal.aborted)
+            throw error;
+          // Only idempotent saves ask for keepalive, so sending again is safe.
+          // If the plain request goes through, keepalive was the refusal (not
+          // the network), so later saves skip it.
+          response = await send(false);
+          keepaliveRefused = true;
+        }
+      } else response = await send(false);
       if (response.status === 204) return undefined as T;
       let data: T & { error?: string };
       try {

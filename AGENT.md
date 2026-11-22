@@ -58,6 +58,7 @@ RAVAN is a private, single-owner cinema: a Fastify API, a media worker, a Cloudf
 - **One link per film card.** The poster link covers the card; the title is a heading, not a second link.
 - **Text an owner needs is at least 11 px, targets at least 24 by 24 px, control outlines `var(--control)`.** `tests/e2e/loading.spec.ts` measures all three on every screen from 320 to 3840 px.
 - **`PlayerController.ts` and `BrowserAdapter.ts` own tickets, sessions and recovery.** Interface work goes around them, in the pages.
+- **Both clients must run on Chromium 79 (LG C1).** Keep `build.target` at `chrome79` and newer; fill a missing function in `packages/client/src/legacy.ts`, never by raising the target. `npm run check:legacy` and `build:cloudflare` refuse a script Chromium 79 cannot run. Write layout that holds without flex `gap`, `aspect-ratio` and `dvh`, or give it a fallback. Never put `:focus-visible` in a selector list with another selector (Chromium 79 drops the whole rule); give it a `[data-focus-visible="fallback"]` `:focus` copy. No `:is()`, `:where()` or `:has()`.
 - **Type sizes are in rem; colours for text come from tokens.** `--text`, `--text-soft`, `--muted`, `--accent`, `--success`, `--danger`. `tests/clients/design-rules.test.ts` fails on a px type size or a new raw text colour. The TV stylesheet is exempt: it is a fixed 1080p layout.
 - **Icons come from `packages/ui/src/Icon.tsx`.** Do not type ▶, ↗ or similar characters as icons; devices draw them differently, some as emoji.
 - **Fields are 16 px where a finger is the pointer, and non-inline targets 44 px on a phone.** `tests/e2e/ux.spec.ts` measures both.
@@ -365,3 +366,32 @@ Raouf: 2026-11-22 (Australia/Sydney), thirtieth entry
 - Follow-ups: the owner to check covers, PDF selection and the drag fix signed in.
 - Rule: when the live API has a known fault the fix removes, a rehearsal that reads through it must avoid the fault (here, pieces under 64 KiB), or it tests the old API, not the staged code.
 - Rule: build release archives with `COPYFILE_DISABLE=1` so macOS extended attributes stay out of them.
+
+Raouf: 2026-11-22 (Australia/Sydney), thirty-first entry
+
+- Scope: the owner said RAVAN does not work on their LG C1 and asked for it to work there and in current browsers.
+- Summary: the web build targeted `es2022`, so Chromium 79 could not parse the entry script and showed an empty page. The build now targets Chromium 79; `legacy.ts` fills in three abort functions and flex `gap`; posters and the reader have CSS fallbacks; a checker guards every Cloudflare build. Details in `CHANGELOG.md`.
+- Files changed: see `CHANGELOG.md`.
+- Verification: `npm run check` clean. `npx vitest run`: 381 passed, 1 skipped. `npx playwright test`: 201 passed in Chromium, Firefox and WebKit. The new build test fails on the old config. `npm run build:cloudflare` passes the check. Real Chromium 79.0.3945.0 (Linux snapshot, run on the owner's own droplet under `/root`, libraries unpacked there, removed afterwards), driven over DevTools: the live demo throws `SyntaxError: Unexpected token '?'` and renders nothing; the new demo build renders the library (6 posters, 338 px tall as in current engines, pictures loaded), the film page and the player, with no errors, and menu and button spacing within 1 px of current Chromium.
+- Follow-ups: release the web client (Cloudflare only, the server is unchanged) with the owner's approval; then try it on the TV itself and play a film there; decide whether PDF books matter on the TV (PDF.js legacy build or a message).
+- Rule: a test that builds a client under Vitest must set `NODE_ENV=production`; Vitest's `test` value builds React's development copy, which is not what ships.
+- Rule: headless Chromium 79's `--screenshot` with `--virtual-time-budget` stops animations part way and misses pictures; drive it over DevTools for a true picture.
+
+Raouf: 2026-11-22 (Australia/Sydney), thirty-second entry
+
+- Scope: the owner asked to check the current documentation and fix everything left on the LG C1.
+- Summary: fixed reading progress that never saved on Chromium 79 (refused keepalive), hover rules lost with `:focus-visible`, missing focus rings, `:is()`/`:has()` rules, shelf and thumbnail shapes, `replaceChildren` and listener `signal`; PDF books now say they need a newer browser. The checker reads CSS too. Details in `CHANGELOG.md`.
+- Files changed: see `CHANGELOG.md`.
+- Verification: `npm run check` clean, Prettier clean. `npx vitest run`: 389 passed, 1 skipped. `npx playwright test`: 201 passed in Chromium, Firefox and WebKit. `npm run build:cloudflare` passes the Chromium 79 check. Real Chromium 79.0.3945.0 on the owner's own droplet (under `/root`, removed afterwards) against the production build and a fake API: focus ring by Tab (3 px), poster hover lift, shelf covers 193 × 290 and 163 × 245 on a phone, EPUB opens, turns and closes with the header restored, CBZ page shown, PDF message shown, no page errors. The WebKit dev-server line "Importing a module script failed" appears on the previous code too.
+- Follow-ups: release the web client (Cloudflare only) with the owner's approval, then play a film on the TV. Rendering PDF pages on the server for old browsers would make PDFs readable on the C1; it is a backend feature and needs the owner's decision.
+- Rule: a request that sets `keepalive` must survive Chromium before 81 refusing it unsent. Only idempotent requests may use it.
+- Rule: to test a lazy chunk in Chromium 79, drive it over DevTools against the production build; headless `--screenshot` timing misleads.
+
+Raouf: 2026-11-22 (Australia/Sydney), thirty-third entry
+
+- Scope: commit, release and publish the LG C1 work, approved by the owner.
+- Summary: web-only release; Worker version `55740333-7466-4ecf-9bfc-9937ebb8c338` from `7dfa5248afd7`. Backend unchanged at `98762ef4a832-74b72b75`. See the maintainer's private notes.
+- Files changed: the maintainer's private notes, the maintainer's private notes, `CHANGELOG.md`, this file.
+- Verification: 12 release tests, 9 of 9 edge checks, live assets pass `check-legacy-browsers.mjs`, live demo in real Chromium 79 with no page errors.
+- Follow-ups: the owner to try the C1: play a film, open an EPUB and confirm the reading position is kept.
+- Rule: after a web release, run `node scripts/check-legacy-browsers.mjs` on the live page's and live demo's downloaded assets; it confirms what is served, not only what was built.

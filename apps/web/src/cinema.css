@@ -289,8 +289,16 @@ body {
     transform 0.25s ease,
     box-shadow 0.25s ease;
 }
-.poster-link:hover,
+/* Separate rules: a browser without :focus-visible drops a whole list. */
+.poster-link:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 19px 40px #0006;
+}
 .poster-link:focus-visible {
+  transform: translateY(-6px);
+  box-shadow: 0 19px 40px #0006;
+}
+[data-focus-visible="fallback"] .poster-link:focus {
   transform: translateY(-6px);
   box-shadow: 0 19px 40px #0006;
 }
@@ -610,8 +618,13 @@ body {
     transition: none !important;
     scroll-behavior: auto !important;
   }
-  .poster-link:hover,
+  .poster-link:hover {
+    transform: none;
+  }
   .poster-link:focus-visible {
+    transform: none;
+  }
+  [data-focus-visible="fallback"] .poster-link:focus {
     transform: none;
   }
 }
@@ -662,6 +675,7 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 7vw;
+  min-height: calc(100vh - 104px);
   min-height: calc(100svh - 104px);
   padding-top: 48px;
   padding-bottom: 48px;
@@ -928,6 +942,7 @@ body {
     display: block;
     padding-top: 36px;
     padding-bottom: 40px;
+    min-height: calc(100vh - 84px);
     min-height: calc(100svh - 84px);
   }
   .login-copy {
@@ -2118,6 +2133,10 @@ button.danger:hover {
   background: var(--accent);
 }
 .track-option input:focus-visible + .track-row {
+  outline: 3px solid var(--focus);
+  outline-offset: 1px;
+}
+[data-focus-visible="fallback"] .track-option input:focus + .track-row {
   outline: 3px solid var(--focus);
   outline-offset: 1px;
 }

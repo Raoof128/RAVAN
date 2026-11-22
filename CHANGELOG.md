@@ -1,5 +1,48 @@
 # Changelog
 
+## Raouf: 2026-11-22 (Australia/Sydney) · LG C1 web release
+
+**Scope:** commit, release and publish the LG C1 work, approved by the owner.
+
+- Live: Cloudflare Worker version `55740333-7466-4ecf-9bfc-9937ebb8c338` from commit `7dfa5248afd7`. Backend unchanged at `98762ef4a832-74b72b75`, not restarted. Record: the maintainer's private notes.
+- Verification: 12 release tests on a local Worker, 9 of 9 edge checks, the live scripts and stylesheets pass the Chromium 79 check, and the live demo renders in a real Chromium 79 with no page errors.
+
+## Raouf: 2026-11-22 (Australia/Sydney) · the rest of RAVAN on the LG C1
+
+**Scope:** the owner asked to check the current documentation and fix everything left from the LG C1 pass. Branch `audit/backend-2026-11-16`. Not released.
+
+- **Documentation checked:** LG's Web API and Web Engine page lists webOS TV 6.x (2021) as Chromium 79. PDF.js raised its minimum to Chrome 110 for the legacy build (pull request 19454, February 2025), and PDF.js 6.5 calls `Promise.withResolvers`, `Promise.try` and `URL.parse` unguarded. LG's webOS 6 media pages list H.264, HEVC and AAC, HLS v7 and MSE.
+- **Reading progress never saved on Chromium 79 (bug):** the progress save used `fetch` with `keepalive`, which Chromium before 81 refuses unsent when the request needs a preflight (JSON body, CSRF header). The reader then would not close. `packages/client/src/api.ts` now sends the save again without keepalive when the browser refuses it, and skips keepalive afterwards only once a plain save has gone through.
+- **Hover lost with focus:** Chromium 79 drops any CSS rule whose selector list names `:focus-visible`, so `.poster-link:hover, .poster-link:focus-visible` lost hover too. Hover and focus rules are now separate. Where `:focus-visible` is unknown, `legacy.ts` marks the page (`data-focus-visible="fallback"`) and `:focus` copies draw the focus ring, poster lift and track-row outline.
+- **Reading room:** `:is()` selectors written out; the header hides on a `reading-open` class the reader sets on the body, not `:has()`; drawn shelf covers and page-index thumbnails keep 2:3 and 4:4.8 without `aspect-ratio` (a float sized to add back the cover's padding and border, desktop and phone).
+- **PDF on Chromium 79:** PDF.js 6.5 cannot run there, so the reader says "PDF books need a newer browser than this one" instead of failing part way (`apps/web/src/reading/support.ts`). EPUB and comic books open.
+- **More fill-ins (`legacy.ts`):** `replaceChildren` (Chromium 86, used by the page index) and the `signal` option of `addEventListener` (Chromium 90).
+- **Checker:** `scripts/check-legacy-browsers.mjs` now reads the built CSS too (`:is()`, `:where()`, `:has()`, and `:focus-visible` in a selector list) and more functions (`Promise.try`, `URL.parse`, `.at()`, `checkVisibility`, `startViewTransition`, popovers, compression streams). A call inside a `try` (React's own view transitions) counts as guarded.
+- **Tests:** `tests/clients/legacy-dom.test.tsx` (new): `replaceChildren` and listener `signal` with the native versions removed, the focus mark, and the PDF message with `Promise.try` removed. `tests/clients/api.test.ts`: three keepalive cases (refused, accepted, network failure); the refused case failed before the change. `tests/clients/legacy-browsers.test.ts`: the CSS checks. `tests/e2e/legacy.spec.ts`: no focus mark in current engines.
+- **Known differences on Chromium 79:** a flex item with its own margin (the 6 px "Sign out" margin) keeps it without the gap added; `text-underline-offset`, `accent-color` and `text-wrap` are cosmetic and ignored. PDF books need another device. Film playback on the TV itself is unverified.
+- Verification: see the AGENT.md entry.
+
+### Files changed
+
+`packages/client/src/api.ts`, `packages/client/src/legacy.ts`, `packages/ui/src/tokens.css`, `apps/web/src/cinema.css`, `apps/web/src/reading/reading.css`, `apps/web/src/reading/Reader.tsx`, `apps/web/src/reading/support.ts` (new), `scripts/check-legacy-browsers.mjs`, `tests/clients/api.test.ts`, `tests/clients/legacy-browsers.test.ts`, `tests/clients/legacy-dom.test.tsx` (new), `tests/e2e/legacy.spec.ts`, `CHANGELOG.md`, `AGENT.md`.
+
+## Raouf: 2026-11-22 (Australia/Sydney) · RAVAN on the LG C1 browser
+
+**Scope:** the owner reported that RAVAN does not work on their LG C1 and asked for it to work there and in current browsers. Branch `audit/backend-2026-11-16`. Not released.
+
+- **Cause:** the web client was built for `es2022`. Its entry script held `?.`, `??` and `||=`, which Chromium 79 (webOS 6, the C1's engine) cannot parse, so the page stayed empty. Seen on the live site in a real Chromium 79.0.3945.0: `Uncaught SyntaxError: Unexpected token '?'`, nothing rendered.
+- **Build:** `apps/web/vite.config.ts` targets `chrome79`, `edge79`, `firefox78`, `safari14` for scripts and CSS. Current browsers run the lowered code unchanged.
+- **Missing functions (`packages/client/src/legacy.ts`, imported first by the web and TV clients):** `AbortSignal.any`, `AbortSignal.timeout` and `throwIfAborted`, each only where the browser has none. Chromium 79 also has no flex `gap` (Chromium 84), and CSS cannot test for it: where a measurement shows it missing, flex items get the gap as a margin, including next to text. Current browsers measure it present and run none of this.
+- **CSS:** posters kept no height without `aspect-ratio` (every child is absolutely placed), so `@supports not (aspect-ratio: 1)` gives them a 2:3 box. `vh` fallbacks before `dvh`/`svh` in the reader and two cinema rules.
+- **Guard:** `scripts/check-legacy-browsers.mjs` parses every built script for syntax Chromium 79 lacks and for newer functions not filled in (`npm run check:legacy`). `npm run build:cloudflare` refuses a build that fails it. The PDF reader chunk is exempt: PDF.js 6 needs a current browser.
+- **Tests:** `tests/clients/legacy-browsers.test.ts` builds both clients and runs the check (fails on the old config), checks the poster fallback, and the filled-in abort functions with the native ones removed. `tests/e2e/legacy.spec.ts`: in Chromium, Firefox and WebKit the flex-gap stand-in stays off and `AbortSignal.any` is the browser's own.
+- **Not covered:** PDF books on Chromium 79 (PDF.js 6); `:focus-visible` rings (Chromium 86) and a few cosmetic CSS details (`:has`, `color-mix`); real playback on the TV, which depends on the C1's decoders.
+- Verification: see the AGENT.md entry.
+
+### Files changed
+
+`apps/web/vite.config.ts`, `apps/web/src/main.tsx`, `apps/tv/src/main.tsx`, `packages/client/src/legacy.ts` (new), `packages/ui/src/tokens.css`, `apps/web/src/cinema.css`, `apps/web/src/reading/reading.css`, `scripts/check-legacy-browsers.mjs` (new), `scripts/build-cloudflare.mjs`, `package.json`, `package-lock.json` (`acorn` 8.19.0 pinned as a dev dependency), `tests/clients/legacy-browsers.test.ts` (new), `tests/e2e/legacy.spec.ts` (new), `CHANGELOG.md`, `AGENT.md`.
+
 ## Raouf: 2026-11-22 (Australia/Sydney) · cover reads release
 
 **Scope:** release `98762ef4a832` and publish, approved by the owner.
@@ -7,6 +50,7 @@
 - Live: backend `98762ef4a832-74b72b75` (schema 11). Web client and Worker unchanged. Record: the maintainer's private notes.
 - Rehearsal made the cover of the largest failed production PDF (50.9 MB) in 1.6 seconds from 0.45 MB of reads. After activation all 13 PDF books have covers; the 9 new jobs completed on their first attempt; zero worker restarts.
 - Verification: 9 of 9 edge checks, Sentinel host checks, clean journal, no rollback.
+- Published: sanitized snapshot of private `832f1c2` as public `58901ca` on `public/cover-reads-2026-11-22`; secret scan clean.
 
 ## Raouf: 2026-11-22 (Australia/Sydney) · book covers stopped after four of thirteen
 

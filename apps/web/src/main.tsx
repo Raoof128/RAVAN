@@ -1,3 +1,4 @@
+import "../../../packages/client/src/legacy.js";
 import {
   Component,
   StrictMode,

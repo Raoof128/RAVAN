@@ -98,6 +98,12 @@ button:disabled,
   outline: 3px solid var(--focus);
   outline-offset: 5px;
 }
+/* Chromium 79 (LG C1) has no :focus-visible and drops any rule that names it;
+   packages/client/src/legacy.ts marks the page so :focus stands in. */
+[data-focus-visible="fallback"] :focus:not(.view) {
+  outline: 3px solid var(--focus);
+  outline-offset: 5px;
+}
 input,
 textarea,
 select {
@@ -361,6 +367,18 @@ nav a[aria-current]:after {
   isolation: isolate;
   --poster-ink: #484d3b;
 }
+/* Chromium 79 (LG C1) has no aspect-ratio, and every child of a poster is
+   absolutely placed, so without this the poster has no height at all. */
+@supports not (aspect-ratio: 1) {
+  .poster:before {
+    content: "";
+    display: block;
+    padding-top: 150%;
+  }
+  .resume-ticket-art .poster:before {
+    display: none;
+  }
+}
 .poster img {
   position: absolute;
   inset: 0;
@@ -412,8 +430,16 @@ nav a[aria-current]:after {
   transform: translateY(8px);
   transition: 0.2s;
 }
-.poster-link:hover .poster-open,
+/* Separate rules: a browser without :focus-visible drops a whole list. */
+.poster-link:hover .poster-open {
+  opacity: 1;
+  transform: translateY(0);
+}
 .poster-link:focus-visible .poster-open {
+  opacity: 1;
+  transform: translateY(0);
+}
+[data-focus-visible="fallback"] .poster-link:focus .poster-open {
   opacity: 1;
   transform: translateY(0);
 }

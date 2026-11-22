@@ -11,6 +11,7 @@ import {
 import { resolve, join, extname, relative } from "node:path";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
+import { checkLegacyBrowsers } from "./check-legacy-browsers.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const work = join(root, ".local/cloudflare");
@@ -39,6 +40,10 @@ try {
       { cwd: join(root, "apps/web"), stdio: "inherit" },
     );
   }
+  // An LG C1 (Chromium 79) must be able to run every script the Worker serves.
+  const legacy = checkLegacyBrowsers([publicDir, demoDir]);
+  if (legacy.length)
+    throw new Error(`Chromium 79 cannot run the build:\n${legacy.join("\n")}`);
   await cp(demoDir, join(publicDir, "demo"), { recursive: true });
   await writeFile(
     join(publicDir, "_headers"),
