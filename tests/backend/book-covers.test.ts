@@ -17,6 +17,7 @@ import {
 } from "../../apps/worker/src/artwork.js";
 import {
   boundedRead,
+  COVER_READ_BYTES,
   extractBookCover,
   storeBookCover,
   type ReadRange,
@@ -31,7 +32,8 @@ import type {
 } from "../../apps/api/src/drive/client.js";
 import { openDatabase, type Database } from "../../packages/db/src/open.js";
 import { migrate } from "../../packages/db/src/migrate.js";
-import { pdfFixture, readingZip } from "../fixtures/reading.js";
+import { pdfFixture, readingZip, virtualPdf } from "../fixtures/reading.js";
+import { MAX_READING_BYTES } from "../../packages/contracts/src/reading.js";
 
 const dirs: string[] = [];
 const clean: Array<() => Promise<unknown> | unknown> = [];
@@ -460,3 +462,127 @@ it("reads a malformed EPUB package in linear time", async () => {
   expect((await cover("epub", book)).made).toBeUndefined();
   expect(performance.now() - started).toBeLessThan(2000);
 }, 20000);
+
+it("makes covers for books over the 100 MB reading limit, reading only what a cover needs", async () => {
+  // Production, 22 November 2026: 30 of 42 Berserk volumes are 100 to 347 MB
+  // and never had a cover job; the planner and the worker's book route both
+  // stopped at the reading limit, though a cover reads at most 48 MiB.
+  const size = 150 * 1024 * 1024;
+  expect(size).toBeGreaterThan(MAX_READING_BYTES);
+  const bytesAt = virtualPdf(size);
+  const dataDir = await workspace();
+  const key = "ef".repeat(32);
+  const origin = "https://cinema.example";
+  const root: DriveFile = {
+    id: "root",
+    name: "Library",
+    mimeType: "application/vnd.google-apps.folder",
+  };
+  const book: DriveFile = {
+    id: "volume2",
+    name: "Berserk - Volume 02.pdf",
+    mimeType: "application/pdf",
+    parents: ["root"],
+    version: "1",
+    md5Checksum: "d".repeat(32),
+    size: String(size),
+    capabilities: { canDownload: true },
+  };
+  let served = 0;
+  const drive: DriveClient = {
+    get: async (id) => ({ ...(id === "root" ? root : book) }),
+    list: async () => ({ files: [book] }),
+    startToken: async () => "token",
+    changes: async () => ({ changed: false, newStartPageToken: "token" }),
+  };
+  const app = await buildApp(
+    parseConfig({
+      mode: "test",
+      dataDir,
+      minFreeBytes: 0,
+      origin,
+      workerKey: key,
+      clientId: "client",
+      clientSecret: "secret",
+      ownerSubject: "owner",
+      encryptionKey: "ab".repeat(32),
+    }),
+    {
+      driveClient: drive,
+      oauthProvider: {
+        authorizationUrl: ({ state }) =>
+          `https://accounts.google.com/auth?state=${state}`,
+        exchange: async (_code, _verifier, nonce) => ({
+          subject: "owner",
+          nonce,
+          accessToken: "private",
+          refreshToken: "private",
+          expiresAt: Date.now() + 3600000,
+        }),
+        refresh: async () => ({
+          accessToken: "private",
+          expiresAt: Date.now() + 3600000,
+        }),
+      },
+      sourceFetch: async (_url, init) => {
+        const range = new Headers(init?.headers).get("range")!;
+        const [, a, b] = /^bytes=(\d+)-(\d+)$/.exec(range)!;
+        served += Number(b) - Number(a) + 1;
+        return new Response(bytesAt(Number(a), Number(b) + 1), {
+          status: 206,
+          headers: { "content-range": `bytes ${a}-${b}/${size}` },
+        });
+      },
+    },
+  );
+  clean.push(() => app.close());
+  const address = await app.listen({ host: "127.0.0.1", port: 0 });
+  const db = app.getDecorator<Database>("database");
+  const login = await app.inject("/auth/google/start");
+  const state = new URL(login.headers.location!).searchParams.get("state");
+  await app.inject({
+    url: `/auth/google/callback?code=ok&state=${state}`,
+    headers: {
+      cookie: login.cookies.map((c) => `${c.name}=${c.value}`).join("; "),
+    },
+  });
+  const session = issueSession(db, "owner");
+  const headers = {
+    cookie: `mov_session=${session.token}`,
+    origin,
+    "x-csrf-token": session.csrf,
+  };
+  await app.inject({
+    method: "POST",
+    url: "/api/library",
+    headers,
+    payload: { folderId: "root" },
+  });
+  await expect
+    .poll(
+      async () =>
+        (await app.inject({ url: "/api/reading", headers })).json().items
+          .length,
+    )
+    .toBe(1);
+  const workerDb = openDatabase(join(dataDir, "mov.sqlite"));
+  clean.push(() => workerDb.close());
+  const prepared = join(dataDir, "prepared");
+  await mkdir(prepared, { recursive: true });
+  const worker = new MediaWorker(workerDb, address, key, {
+    directory: prepared,
+    dataDir,
+    production: false,
+  });
+  await worker.queueLibrary();
+  expect(
+    db.prepare("SELECT count(*) n FROM jobs WHERE kind='book-cover'").get(),
+  ).toEqual({ n: 1 });
+  expect(await worker.runNextJob(idle(), "artwork")).toBe("completed");
+  const listed = (await app.inject({ url: "/api/reading", headers })).json()
+    .items[0];
+  expect(listed.coverUrl).toMatch(/^\/api\/artwork\/[a-f0-9]{32}$/);
+  // The cover came from the ends of the book, not all 150 MB of it. Reads
+  // reach Drive in whole cache blocks, so allow a few.
+  expect(served).toBeLessThan(COVER_READ_BYTES);
+});

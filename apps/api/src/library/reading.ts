@@ -7,7 +7,10 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { Database } from "../../../../packages/db/src/open.js";
 import {
+  MAX_COVER_BOOK_BYTES,
   MAX_READING_BYTES,
+  readingLimit,
+  type ReadingFormat,
   type ReadingFolder,
   type ReadingItem,
   type ReadingList,
@@ -292,19 +295,23 @@ export function registerReading(
         return reply.code(400).send({ error: "invalid_book" });
       const row = db
         .prepare(
-          "SELECT size_bytes,generation FROM reading_items WHERE id=? AND available=1",
+          "SELECT size_bytes,generation,format FROM reading_items WHERE id=? AND available=1",
         )
-        .get(id) as { size_bytes: string; generation: string } | undefined;
+        .get(id) as
+        | { size_bytes: string; generation: string; format: ReadingFormat }
+        | undefined;
       if (!row || row.generation !== request.query.generation)
         return reply.code(409).send({ error: "source_changed" });
-      if (
-        Number(row.size_bytes) > MAX_READING_BYTES ||
-        Number(row.size_bytes) <= 0
-      )
+      const size = Number(row.size_bytes);
+      if (size > readingLimit(row.format) || size <= 0)
         return reply.code(413).send({ error: "book_too_large" });
-      return request.method === "POST" && workerEnabled
-        ? queueReading(db, id, row.generation, Number(row.size_bytes))
-        : readingPreparation(db, id, row.generation, Number(row.size_bytes));
+      // A PDF over the whole-book limit is read in pieces only: it is never
+      // prepared whole, so asking for preparation just reports what is cached.
+      return request.method === "POST" &&
+        workerEnabled &&
+        size <= MAX_READING_BYTES
+        ? queueReading(db, id, row.generation, size)
+        : readingPreparation(db, id, row.generation, size);
     },
   });
   app.get<{
@@ -319,9 +326,15 @@ export function registerReading(
       const ref = await library.verifyReading(request.params.id);
       if (request.query.generation !== ref.generation)
         return reply.code(409).send({ error: "source_changed" });
+      const format = (
+        db
+          .prepare("SELECT format FROM reading_items WHERE id=?")
+          .get(ref.fileId) as { format: ReadingFormat } | undefined
+      )?.format;
       if (
+        !format ||
         BigInt(ref.sizeBytes) <= 0n ||
-        BigInt(ref.sizeBytes) > BigInt(MAX_READING_BYTES)
+        BigInt(ref.sizeBytes) > BigInt(readingLimit(format))
       )
         return reply.code(413).send({ error: "book_too_large" });
       void warmer.start(ref);
@@ -444,10 +457,12 @@ export async function sendBookToWorker(
     return reply.code(400).send({ error: "invalid_book" });
   try {
     const ref = await library.verifyReading(id);
+    // A cover reads only the parts of a book it needs, so a book over the
+    // reading limit still gets one.
     if (
       ref.generation !== generation ||
       BigInt(ref.sizeBytes) <= 0n ||
-      BigInt(ref.sizeBytes) > BigInt(MAX_READING_BYTES)
+      BigInt(ref.sizeBytes) > BigInt(MAX_COVER_BOOK_BYTES)
     )
       return reply.code(409).send({ error: "source_changed" });
     let checkedAt = Date.now();

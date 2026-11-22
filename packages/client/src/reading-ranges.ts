@@ -1,5 +1,5 @@
 import { PdfSlices } from "./pdf-slices.js";
-import { MAX_READING_BYTES } from "../../contracts/src/reading.js";
+import { MAX_PDF_READING_BYTES } from "../../contracts/src/reading.js";
 
 export const RANGE_BYTES = 1024 * 1024;
 
@@ -27,7 +27,9 @@ export class ReadingRanges {
     private readonly url: string,
     private readonly signal: AbortSignal,
   ) {
-    if (!Number.isSafeInteger(size) || size < 1 || size > MAX_READING_BYTES)
+    // Read in bounded pieces, so the largest book that opens at all: a PDF.
+    // An EPUB or CBZ is held to its own limit where it is opened whole.
+    if (!Number.isSafeInteger(size) || size < 1 || size > MAX_PDF_READING_BYTES)
       throw new Error("Invalid book size");
     this.pdfSlices = new PdfSlices(size, (ids, length) =>
       this.fetchBytes(url + "&slices=" + ids.join(","), length),

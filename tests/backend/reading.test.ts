@@ -103,7 +103,9 @@ it("streams exact book bytes in bounded blocks and refuses stale, oversized and 
     clock += VERIFY_REUSE_MS;
     expect((await app.inject(url)).statusCode).toBe(410);
     file.capabilities = { canDownload: true };
-    file.size = String(101 * 1024 * 1024);
+    // A PDF is oversized above 512 MB (an EPUB or CBZ above 100 MB: see
+    // reading-large.test.ts).
+    file.size = String(513 * 1024 * 1024);
     file.version = "2";
     await sync.syncLibrary("root", new AbortController().signal);
     const large = await sync.verifyReading("book");

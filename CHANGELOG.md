@@ -1,5 +1,42 @@
 # Changelog
 
+## Raouf: 2026-11-22 (Australia/Sydney) · big books release
+
+**Scope:** release the covers for books over 100 MB and the 512 MB PDF limit, approved by the owner.
+
+- Live: backend `b3fdb50690ad-b71dfdf7` (schema 12, unchanged) and Cloudflare Worker version `fab7267f-17b5-4e0c-8c13-eb75b589cd17`, from commit `b3fdb50690ad`. Record: the maintainer's private notes.
+- Rehearsal on a live copy with the staged code: 30 cover jobs planned for the 30 books without one (all over 100 MB, up to 347 MB); the 347 MB volume reported `on-demand` with no whole-book job.
+- After activation: Berserk covers went from 12 to 41 of 42 within minutes, the last in progress; no worker restarts; 9 of 9 edge checks; live assets pass the Chromium 79 check.
+- **Mistake:** the release tests' first run had three Firefox timeouts under heavy load, and the deploy, chained after them, went ahead. Run again one at a time against the same build, 12 of 12 passed. The release steps now stop on any failure.
+
+## Raouf: 2026-11-22 (Australia/Sydney) · PDFs up to 512 MB
+
+**Scope:** the owner chose to raise the reading limit for PDFs to 512 MB, so the 30 Berserk volumes over 100 MB open. Branch `audit/backend-2026-11-16`. Not released.
+
+- **Rule:** `readingLimit(format)`: PDFs up to `MAX_PDF_READING_BYTES` (512 MB), EPUB and CBZ up to `MAX_READING_BYTES` (100 MB). PDF.js reads a PDF in pieces; an EPUB or CBZ archive is held whole.
+- **Big PDFs are only read in pieces:** the content route allows them; the preparation route reports what is cached and never queues whole-book preparation for a book over 100 MB; the open warmer and the background reading jobs stay at 100 MB. A 347 MB volume costs the shared cache only the pages read.
+- **Client:** the range reader (`packages/client/src/reading-ranges.ts`) admits books up to 512 MB in its bounded window; the reading room checks each format's limit, opens a PDF over 100 MB through ranges only, and says "This PDF is over 512 MB, the largest RAVAN opens." or "EPUB and comic books open up to 100 MB. This one is larger." The shelf reads "PDF up to 512 MB · EPUB & CBZ up to 100 MB".
+- **Tests:** `tests/backend/reading-large.test.ts`: the limit by format; a 150 MB PDF read from both ends through the real API with no reading job queued; a 150 MB EPUB and a 600 MB PDF refused (413). `tests/e2e/reading-large.spec.ts` (three engines): a 150 MB PDF draws its first page from under 8 MB of reads; the EPUB message. `virtualPdf` moved to `tests/fixtures/reading.ts`. `reading.test.ts`'s oversized PDF is now 513 MB.
+- Verification: see the AGENT.md entry.
+
+### Files changed
+
+`packages/contracts/src/reading.ts`, `packages/client/src/reading-ranges.ts`, `apps/api/src/library/reading.ts`, `apps/web/src/pages/Reading.tsx`, `tests/backend/reading-large.test.ts` (new), `tests/e2e/reading-large.spec.ts` (new), `tests/backend/reading.test.ts`, `tests/backend/book-covers.test.ts`, `tests/fixtures/reading.ts`, `CHANGELOG.md`, `AGENT.md`.
+
+## Raouf: 2026-11-22 (Australia/Sydney) · covers for books over 100 MB
+
+**Scope:** the owner suspected Berserk's book covers were stuck. Branch `audit/backend-2026-11-16`. Not released.
+
+- **Found on production (read-only):** Oyasumi Punpun 13 of 13 covers; Berserk 12 of 42. The 30 without a cover are all over 100 MB (100 to 347 MB) and had never had a cover job; nothing was stuck or failing. The cover planner (`apps/worker/src/main.ts`) and the worker's book route (`sendBookToWorker`) both stopped at the reading limit, `MAX_READING_BYTES` (100 MB), though a cover reads at most 48 MiB of a book (`COVER_READ_BYTES`).
+- **Fix:** `MAX_COVER_BOOK_BYTES` (4 GiB, only a bound on what is believed) for both. The cover read stays capped at 48 MiB.
+- **Test:** `tests/backend/book-covers.test.ts`: a 150 MB PDF, made byte by byte on demand (a real first page and index, an unused stream between), through the API, the Drive mock and the worker: a cover job is planned, the cover is made and listed, and Drive served under 48 MiB. It failed before the change as production did (no job).
+- **Also found, not changed:** the same 100 MB limit refuses to open those 30 Berserk volumes in the reader ("Choose a book up to 100 MB.") and the server refuses their bytes. Raising it is the owner's decision.
+- Verification: `npm run check` clean, Prettier clean, `npx vitest run`: 402 passed, 1 skipped.
+
+### Files changed
+
+`packages/contracts/src/reading.ts`, `apps/worker/src/main.ts`, `apps/api/src/library/reading.ts`, `tests/backend/book-covers.test.ts`, `CHANGELOG.md`, `AGENT.md`.
+
 ## Raouf: 2026-11-22 (Australia/Sydney) · reading room by folder release
 
 **Scope:** release and publish the reading room by folder, approved by the owner.
@@ -7,6 +44,7 @@
 - Live: backend `bfebb5ed7575-2d0f183c` (schema 12, unchanged) and Cloudflare Worker version `7dcc4cdb-fa87-4f0d-bdb5-d7123e681f57`, from commit `bfebb5ed7575`. Record: the maintainer's private notes.
 - Rehearsal on a live copy with the staged routes: Berserk (42) and Oyasumi Punpun (13) as folder cards with covers, all 55 books accounted for, both folders in volume order; the films unchanged.
 - After activation: services active, no restarts, clean journal; Sentinel host checks; 9 of 9 edge checks; live assets pass the Chromium 79 check.
+- Published: sanitized snapshot of private `c5a235d` as public `1a01a5f` on `public/reading-folders-2026-11-22` (with the README and visual-design notes from `011fa01`); secret scan clean.
 
 ## Raouf: 2026-11-22 (Australia/Sydney) · the reading room by folder
 

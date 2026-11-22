@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, useApi } from "../../../../packages/client/src/api.js";
 import {
   MAX_READING_BYTES,
+  readingLimit,
   type ReadingFolder,
   type ReadingItem,
   type ReadingList,
@@ -13,6 +14,8 @@ import { useTitle } from "../router.js";
 import { artworkUrl } from "../../../../packages/ui/src/artwork.js";
 import { Icon } from "../../../../packages/ui/src/Icon.js";
 import "../reading/reading.css";
+/** A book too large to open, with the reason in the reader's words. */
+class TooLarge extends Error {}
 type Selection = {
   item: ReadingItem;
   source: ReadingSource;
@@ -179,11 +182,17 @@ export function Reading({ folder }: { folder?: string } = {}) {
     const job = begin();
     setOpening(item.title);
     try {
-      if (BigInt(item.sizeBytes) > BigInt(MAX_READING_BYTES))
-        throw new Error("Choose a book up to 100 MB.");
-      const blob = item.preparation
-        ? api.readingRanges(item, job.signal)
-        : await api.readingFile(item, job.signal);
+      if (BigInt(item.sizeBytes) > BigInt(readingLimit(item.format)))
+        throw new TooLarge(
+          item.format === "pdf"
+            ? "This PDF is over 512 MB, the largest RAVAN opens."
+            : "EPUB and comic books open up to 100 MB. This one is larger.",
+        );
+      // A PDF over the whole-book limit is only ever read in pieces.
+      const blob =
+        item.preparation || BigInt(item.sizeBytes) > BigInt(MAX_READING_BYTES)
+          ? api.readingRanges(item, job.signal)
+          : await api.readingFile(item, job.signal);
       if (item.preparation) {
         // Opening a page does not wait for job admission or for the worker.
         void api
@@ -226,8 +235,7 @@ export function Reading({ folder }: { folder?: string } = {}) {
     } catch (error) {
       if (!job.signal.aborted)
         setError(
-          error instanceof Error &&
-            error.message === "Choose a book up to 100 MB."
+          error instanceof TooLarge
             ? error.message
             : error instanceof ApiError && [409, 410].includes(error.status)
               ? "This file changed or moved. Sync your Drive folder in Your cinema, then refresh the shelf."
@@ -309,7 +317,7 @@ export function Reading({ folder }: { folder?: string } = {}) {
           <a className="button primary" href="#/settings">
             Manage Drive folder
           </a>
-          <small>EPUB, PDF & CBZ · Up to 100 MB</small>
+          <small>PDF up to 512 MB · EPUB & CBZ up to 100 MB</small>
         </div>
       </header>
       {opening && (

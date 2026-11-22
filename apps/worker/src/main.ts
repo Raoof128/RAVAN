@@ -31,7 +31,7 @@ import {
   sweepArtwork,
 } from "./artwork.js";
 import { extractBookCover, storeBookCover } from "./book-cover.js";
-import { MAX_READING_BYTES } from "../../../packages/contracts/src/reading.js";
+import { MAX_COVER_BOOK_BYTES } from "../../../packages/contracts/src/reading.js";
 /** Bump to make every film's pictures again, for example after a better method. */
 export const ARTWORK_VERSION = 1;
 /**
@@ -117,8 +117,9 @@ export class MediaWorker {
           },
         );
     })();
-    // A cover for each book, made again when the file changes. Covers of books
-    // that are gone are forgotten; their files go with the hourly sweep.
+    // A cover for each book, made again when the file changes, whatever its
+    // size: a cover reads only the parts it needs. Covers of books that are
+    // gone are forgotten; their files go with the hourly sweep.
     this.db.transaction(() => {
       this.db
         .prepare(
@@ -133,7 +134,7 @@ export class MediaWorker {
            AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.unique_key='book-cover-v${BOOK_COVER_VERSION}:'||r.id||':'||r.generation)
            ORDER BY r.name COLLATE NOCASE,r.id LIMIT 100`,
         )
-        .all(MAX_READING_BYTES) as Array<{
+        .all(MAX_COVER_BOOK_BYTES) as Array<{
         fileId: string;
         generation: string;
         sizeBytes: string;

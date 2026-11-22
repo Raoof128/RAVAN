@@ -50,6 +50,7 @@ RAVAN is a private, single-owner cinema: a Fastify API, a media worker, a Cloudf
 - **The reader keeps a mouse selection inside the page.** `containSelection` (`apps/web/src/reading/selection.ts`) corrects a drag that leaves `.reading-viewport`; browsers otherwise select to the end of the chapter. Keep it when changing the reader's layout, and keep the bars outside the scrolling page or remove it with a test that drags past both bars.
 - **Book covers are pictures like films' pictures.** Files live in `<data directory>/artwork`, rows in `reading_covers`, and they are served only by random id at `/api/artwork/:id`. Anything that lists or clears picture files (`sweepArtwork`, the restore scrub in `packages/db/src/backup.ts`) must include `reading_covers`, or covers are deleted as strays.
 - **PDF text is PDF.js's `TextLayer` over the canvas.** Keep `--total-scale-factor` in step with the size the canvas is shown at, and keep the `endOfContent`/`selecting` guard; without it a drag in a gap selects to the end of the page.
+- **Reading limits are by format** (`readingLimit` in `packages/contracts/src/reading.ts`): PDFs up to 512 MB, read only in pieces above 100 MB; EPUB and CBZ up to 100 MB, held whole. Whole-book preparation and warming stay at 100 MB. Covers have their own bound (`MAX_COVER_BOOK_BYTES`).
 - **The reading room is browsed by Drive folder, as the films are.** Both use `apps/api/src/library/folders.ts`; a book's folder is `json_extract(metadata,'$.parents[0]')` from the scan's own record. Folder cards hide folders with none of their kind (no books, or no films).
 - **The reading room is Google Drive only.** Books have their own catalogue and server progress. Do not add device imports or browser-local reading history. Serve bytes only after live folder/access/generation checks; never serve book HTML as a same-origin document.
 - **Browser storage holds the motion flag (`ravan:motion`) and the TV's device credential, nothing else.** Never an MFA secret, a session token or library data.
@@ -466,3 +467,32 @@ Raouf: 2026-11-22 (Australia/Sydney), fortieth entry
 - Verification: rehearsal with the staged routes on a live copy, activation with no viewers or jobs, Sentinel host checks, 12 release tests, 9 of 9 edge checks, live assets checked for Chromium 79.
 - Follow-ups: the owner to check the reading room's folders signed in.
 - Rule: a rehearsal can mount `registerReading` with empty stand-ins for the sync and cache when it only exercises list routes; they serve book bytes only.
+- Published: private `c5a235d` as public `1a01a5f` on `public/reading-folders-2026-11-22` (based on `public/next-episode-2026-11-22`), gitleaks clean.
+
+Raouf: 2026-11-22 (Australia/Sydney), forty-first entry
+
+- Scope: the owner suspected Berserk's covers were stuck.
+- Summary: 30 of 42 Berserk volumes are over 100 MB and were never planned a cover: the planner and the worker's book route used the reading limit. Covers now have their own bound (`MAX_COVER_BOOK_BYTES`, 4 GiB); a cover still reads at most 48 MiB. The reading limit itself still blocks opening those volumes.
+- Files changed: see `CHANGELOG.md`.
+- Verification: `npm run check` clean, Prettier clean, `npx vitest run` 402 passed, 1 skipped; the new 150 MB test failed before the change.
+- Follow-ups: release with the owner's approval (worker and API); the owner to decide on reading books over 100 MB.
+- Rule: a size limit belongs to the operation it protects. The reading limit is about holding a book to read it; a cover reads a bounded part of any book.
+
+Raouf: 2026-11-22 (Australia/Sydney), forty-second entry
+
+- Scope: the owner chose to raise the PDF reading limit to 512 MB, released together with the cover fix.
+- Summary: `readingLimit(format)`; big PDFs open through ranges only and are never prepared or warmed whole; EPUB and CBZ stay at 100 MB. Details in `CHANGELOG.md`.
+- Files changed: see `CHANGELOG.md`.
+- Verification: `npm run check` clean, Prettier clean. `npx vitest run --testTimeout=60000`: 404 passed, 1 skipped (after `reading.test.ts`'s oversized PDF became 513 MB). `npx playwright test --workers=2`: 219 passed, 10 failed, 2 skipped at load averages of 58 to 68; the 10 (none in the reading room) pass run one at a time. The new browser test passes in all three engines (Firefox alone). `npm run check:legacy` passes.
+- Follow-ups: release with the cover fix; confirm on production that the 30 Berserk covers are made and that a volume over 100 MB opens.
+- Rule: a limit copied into the client (`reading-ranges.ts`) must move with the server's; search the whole tree for the constant, not only the server.
+
+Raouf: 2026-11-22 (Australia/Sydney), forty-third entry
+
+- Scope: release the covers for books over 100 MB and the 512 MB PDF limit, approved by the owner.
+- Summary: backend `b3fdb50690ad-b71dfdf7` and Worker `fab7267f-17b5-4e0c-8c13-eb75b589cd17` are live. See the maintainer's private notes.
+- Files changed: the maintainer's private notes, the maintainer's private notes, `CHANGELOG.md`, this file.
+- Verification: rehearsal with the staged worker and routes on a live copy, activation with no viewers or jobs, Berserk covers 12 to 41 of 42 within minutes, 9 of 9 edge checks, live assets checked for Chromium 79, release tests 12 of 12 when run one at a time.
+- Follow-ups: confirm the last Berserk cover; the owner to open a volume over 100 MB signed in.
+- Rule: run each release step only if the one before passed (`set -e`, or `&&` between steps). A failed release test stops the deploy, even when the failure looks like load.
+- Rule: a rehearsal that calls the worker's `queueLibrary` must give it storage in empty temporary folders: planning with storage also sweeps picture files and prunes editions, and must never reach the live folders from a copy of the database.
