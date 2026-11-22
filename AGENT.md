@@ -335,3 +335,33 @@ Raouf: 2026-11-21 (Australia/Sydney), twenty-seventh entry
 - Follow-ups: release (owner's approval, includes migration 11). Confirm `@napi-rs/canvas-linux-x64-gnu` is in the server's `node_modules` before switching. Watch the first cover pass on production for Drive quota and time per book.
 - Rule: run a new picture job's code from `dist` under plain Node before release; `tsx` and the tests resolve modules differently.
 - Rule: never run a regular expression over a whole file from a book or film. Find tags with `indexOf`, cap their number and length, and match patterns only on the short pieces. Test with a large malformed input.
+
+Raouf: 2026-11-21 (Australia/Sydney), twenty-eighth entry
+
+- Scope: release and publish the book covers work, approved by the owner.
+- Summary: backend `7bd893135c64-09f29870` (schema 11) and Worker version `6a997e30` are live; see the maintainer's private notes. A background security review of the first release found a backtracking scan of EPUB packages; fixed and released the same evening. Published as public `50c572d` on `public/book-covers-2026-11-21`.
+- Files changed: the maintainer's private notes, the maintainer's private notes, `docs/reading-room.md`, `CHANGELOG.md`, this file.
+- Verification: rehearsal in the worker's sandbox, covers made by the staged code, 12 release tests, 9 of 9 edge checks twice, Sentinel host checks, clean journal.
+- Follow-ups: find why a PDF cover takes two to four minutes on production; the owner to check covers, PDF selection and the drag fix signed in.
+- Rule: a public doc must not name a private one (the maintainer's private notes, `docs/testing/*.md`); the export refuses it. Only `CHANGELOG.md`, `AGENT.md` and `docs/backend-usage.md` are rewritten automatically.
+- Rule: the activation guard may ignore `book-cover` jobs as it ignores `reading` ones; a stop returns them to the queue.
+
+Raouf: 2026-11-22 (Australia/Sydney), twenty-ninth entry
+
+- Scope: the owner reported that only a few book covers had been made after the covers release.
+- Summary: a read-only look at production found 4 of 13 covers, 9 jobs failed three times, and 12 worker crashes. The API never finished a range response whose last chunk was exactly the body's 64 KiB buffer (`raw-route.ts` aborted, and so destroyed, the body as its source finished); PDF.js reads in 64 KiB pieces. After each 120 second read timeout PDF.js, destroyed mid-load, threw into an unhandled promise and ended the worker process. Fixed both; PDF pages are drawn in their own thread; `BOOK_COVER_VERSION` 2 asks again for missing covers.
+- Files changed: see `CHANGELOG.md`.
+- Verification: `npm run check` clean. New tests fail on the old code and pass: `raw-route.test.ts` (times out before), two PDF cover tests (hung before). Book cover tests 12 of 12. Full suite: 372 passed, 1 skipped, 5 timed out while another session held the machine at load 28; those 4 files pass alone (40 of 40). The built cover code under plain Node makes a cover and keeps a failed read's own error. Reader browser tests in Chromium: 11 passed, 3 failed on 5 second waits at load 43; they mock `/api` in the page and do not reach the changed code.
+- Follow-ups: release (owner's approval). After it, confirm the 9 covers are made and the worker does not restart.
+- Rule: a stream's source must not destroy the stream on normal completion. Test range responses at exactly the stream's high-water mark, fresh and cached.
+- Rule: run PDF.js in Node only in a worker thread. Destroying a loading document throws into an unhandled promise (PDF.js 6.5), which ends the process.
+
+Raouf: 2026-11-22 (Australia/Sydney), thirtieth entry
+
+- Scope: release and publish the cover reads fix, approved by the owner.
+- Summary: backend `98762ef4a832-74b72b75` is live; see the maintainer's private notes. All 13 PDF covers made after activation, zero worker restarts.
+- Files changed: the maintainer's private notes, the maintainer's private notes, `CHANGELOG.md`, this file.
+- Verification: rehearsal with a real failed production PDF, 9 of 9 edge checks, Sentinel host checks, clean journal.
+- Follow-ups: the owner to check covers, PDF selection and the drag fix signed in.
+- Rule: when the live API has a known fault the fix removes, a rehearsal that reads through it must avoid the fault (here, pieces under 64 KiB), or it tests the old API, not the staged code.
+- Rule: build release archives with `COPYFILE_DISABLE=1` so macOS extended attributes stay out of them.

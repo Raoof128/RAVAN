@@ -2,6 +2,8 @@ import { randomBytes } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join, posix } from "node:path";
+import { pathToFileURL } from "node:url";
+import { Worker } from "node:worker_threads";
 import {
   Reader,
   Uint8ArrayWriter,
@@ -225,90 +227,135 @@ function resolve(from: string, href: string | undefined) {
   return safePath(joined) ? joined : undefined;
 }
 
-let pdfjs:
-  Promise<typeof import("pdfjs-dist/legacy/build/pdf.mjs")> | undefined;
+const pdfjsUrl = pathToFileURL(
+  createRequire(import.meta.url).resolve("pdfjs-dist/legacy/build/pdf.mjs"),
+).href;
 const assets = dirname(
   createRequire(import.meta.url).resolve("pdfjs-dist/package.json"),
 );
 
-async function pdfPage(size: number, read: ReadRange, signal: AbortSignal) {
-  // PDF.js for Node draws with @napi-rs/canvas (an optional dependency of
-  // pdfjs-dist). A server without it makes no PDF covers rather than failing.
-  pdfjs ??= import("pdfjs-dist/legacy/build/pdf.mjs");
-  const { getDocument, PDFDataRangeTransport } = await pdfjs;
-  const first = Math.min(size, 256 * 1024);
-  const transport = new PDFDataRangeTransport(
-    size,
-    await read(0, first, signal),
-  );
+/**
+ * Runs in its own thread. PDF.js 6.5 throws into a promise nobody handles when
+ * a document is destroyed while it loads (pdf.worker.mjs, `pdfManagerReady`).
+ * Node ends the process for that, and it ended the whole worker service with
+ * any film encode in it. Here it ends only this thread. Reads are asked of the
+ * parent, which keeps the read limit and the job's own errors.
+ */
+const PDF_THREAD = `
+const { parentPort, workerData } = require("node:worker_threads");
+const waiting = new Map();
+let next = 0;
+const fail = (error) =>
+  parentPort.postMessage({ type: "failed", message: String((error && error.message) || error) });
+parentPort.on("message", (m) => {
+  const entry = waiting.get(m.id);
+  if (!entry) return;
+  waiting.delete(m.id);
+  if (m.bytes) entry.resolve(m.bytes);
+  else entry.reject(new Error("Read failed"));
+});
+const read = (begin, end) =>
+  new Promise((resolve, reject) => {
+    const id = next++;
+    waiting.set(id, { resolve, reject });
+    parentPort.postMessage({ type: "read", id, begin, end });
+  });
+(async () => {
+  const { getDocument, PDFDataRangeTransport } = await import(workerData.pdfjs);
+  const { size, assets, width, height } = workerData;
+  const transport = new PDFDataRangeTransport(size, await read(0, Math.min(size, 262144)));
   transport.requestDataRange = (begin, end) => {
-    read(begin, end, signal).then(
-      (bytes) => {
-        try {
-          transport.onDataRange(begin, bytes);
-        } catch {
-          // An answer PDF.js no longer waits for.
-        }
-      },
-      () => void task.destroy().catch(() => {}),
-    );
+    read(begin, end).then((bytes) => {
+      try {
+        transport.onDataRange(begin, bytes);
+      } catch {
+        // An answer PDF.js no longer waits for.
+      }
+    }, fail);
   };
-  const task = getDocument({
+  const doc = await getDocument({
     range: transport,
-    rangeChunkSize: 64 * 1024,
+    rangeChunkSize: 65536,
     disableAutoFetch: true,
     disableStream: true,
     disableFontFace: true,
     useSystemFonts: false,
     stopAtErrors: false,
-    maxImageSize: 20_000_000,
+    maxImageSize: 20000000,
     canvasMaxAreaInBytes: 32 * 1024 * 1024,
-    cMapUrl: `${assets}/cmaps/`,
+    cMapUrl: assets + "/cmaps/",
     cMapPacked: true,
-    standardFontDataUrl: `${assets}/standard_fonts/`,
-    wasmUrl: `${assets}/wasm/`,
+    standardFontDataUrl: assets + "/standard_fonts/",
+    wasmUrl: assets + "/wasm/",
     verbosity: 0,
+  }).promise;
+  const page = await doc.getPage(1);
+  const natural = page.getViewport({ scale: 1 });
+  const scale = Math.min(4, width / natural.width, height / natural.height);
+  const viewport = page.getViewport({ scale });
+  const w = Math.ceil(viewport.width), h = Math.ceil(viewport.height);
+  const { canvas, context } = doc.canvasFactory.create(w, h);
+  // A page without a background is transparent; paper is white.
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, w, h);
+  await page.render({ canvasContext: context, viewport, canvas: null }).promise;
+  const png = await canvas.encode("png");
+  parentPort.postMessage({ type: "done", png });
+})().catch(fail);
+`;
+
+async function pdfPage(size: number, read: ReadRange, signal: AbortSignal) {
+  signal.throwIfAborted();
+  // PDF.js for Node draws with @napi-rs/canvas (an optional dependency of
+  // pdfjs-dist). A server without it makes no PDF covers rather than failing.
+  const thread = new Worker(PDF_THREAD, {
+    eval: true,
+    workerData: {
+      pdfjs: pdfjsUrl,
+      assets,
+      size,
+      width: PDF_PAGE.width,
+      height: PDF_PAGE.height,
+    },
+    resourceLimits: { maxOldGenerationSizeMb: 512 },
+    stdout: true,
+    stderr: true,
   });
-  const stop = () => void task.destroy().catch(() => {});
-  signal.addEventListener("abort", stop, { once: true });
+  thread.stdout.resume();
+  thread.stderr.resume();
+  let stop = () => {};
   try {
-    const doc = await task.promise;
-    const page = await doc.getPage(1);
-    const natural = page.getViewport({ scale: 1 });
-    const scale = Math.min(
-      4,
-      PDF_PAGE.width / natural.width,
-      PDF_PAGE.height / natural.height,
-    );
-    const viewport = page.getViewport({ scale });
-    const factory = doc.canvasFactory as {
-      create(
-        width: number,
-        height: number,
-      ): {
-        canvas: { encode(format: "png"): Promise<Buffer> };
-        context: CanvasRenderingContext2D;
-      };
-    };
-    const { canvas, context } = factory.create(
-      Math.ceil(viewport.width),
-      Math.ceil(viewport.height),
-    );
-    // A page without a background is transparent; paper is white.
-    context.fillStyle = "#ffffff";
-    context.fillRect(
-      0,
-      0,
-      Math.ceil(viewport.width),
-      Math.ceil(viewport.height),
-    );
-    await page.render({ canvasContext: context, viewport, canvas: null })
-      .promise;
-    signal.throwIfAborted();
-    return new Uint8Array(await canvas.encode("png"));
+    return await new Promise<Uint8Array>((resolve, reject) => {
+      stop = () => reject(signal.reason ?? new Error("Cancelled"));
+      signal.addEventListener("abort", stop, { once: true });
+      thread.on(
+        "message",
+        (m: {
+          type: string;
+          id?: number;
+          begin?: number;
+          end?: number;
+          png?: Uint8Array;
+          message?: string;
+        }) => {
+          if (m.type === "read")
+            // A failed read ends the drawing with that read's own error.
+            read(m.begin!, m.end!, signal).then(
+              (bytes) => thread.postMessage({ id: m.id, bytes }),
+              reject,
+            );
+          else if (m.type === "done") resolve(new Uint8Array(m.png!));
+          else reject(new Error(m.message ?? "PDF page could not be drawn"));
+        },
+      );
+      thread.once("error", reject);
+      thread.once("exit", (code) =>
+        reject(new Error(`PDF drawing ended (${code})`)),
+      );
+    });
   } finally {
     signal.removeEventListener("abort", stop);
-    await task.destroy().catch(() => {});
+    await thread.terminate();
   }
 }
 

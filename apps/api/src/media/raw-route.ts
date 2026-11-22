@@ -71,6 +71,7 @@ export async function sendRaw(
     reply.code(206).header("Content-Range", `bytes ${start}-${end}/${size}`);
   reply.header("Content-Length", (end - start + 1n).toString()).type(mime);
   async function* stream() {
+    let complete = false;
     try {
       if (!first.done) yield first.value;
       while (true) {
@@ -80,8 +81,12 @@ export async function sendRaw(
         if (next.done) break;
         yield next.value;
       }
+      complete = true;
     } finally {
-      controller.abort();
+      // Aborting destroys the body. After the last chunk that would race its
+      // delivery: a final chunk that filled the stream's buffer (64 KiB) was
+      // dropped and the response never finished.
+      if (!complete) controller.abort();
       await iterator.return?.();
       cleanup();
     }

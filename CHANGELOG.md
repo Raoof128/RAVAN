@@ -1,5 +1,28 @@
 # Changelog
 
+## Raouf: 2026-11-22 (Australia/Sydney) · cover reads release
+
+**Scope:** release `98762ef4a832` and publish, approved by the owner.
+
+- Live: backend `98762ef4a832-74b72b75` (schema 11). Web client and Worker unchanged. Record: the maintainer's private notes.
+- Rehearsal made the cover of the largest failed production PDF (50.9 MB) in 1.6 seconds from 0.45 MB of reads. After activation all 13 PDF books have covers; the 9 new jobs completed on their first attempt; zero worker restarts.
+- Verification: 9 of 9 edge checks, Sentinel host checks, clean journal, no rollback.
+
+## Raouf: 2026-11-22 (Australia/Sydney) · book covers stopped after four of thirteen
+
+**Scope:** the owner reported that only a few covers had been made. Branch `audit/backend-2026-11-16`. Not released.
+
+- **Found on production (read-only):** 4 of 13 PDF books had covers; 9 cover jobs had failed three times and were never queued again. `ravan-worker` had crashed 12 times with `Error: Worker was terminated` from PDF.js. A timed replay in the worker's sandbox showed the cause: PDF.js asked the API for 64 KiB just before the file's tail, and the API never answered.
+- **Bug, API (`apps/api/src/media/raw-route.ts`):** when a response's source finished, its `finally` aborted the response controller, whose listener destroys the body. A last chunk that filled the body's 64 KiB buffer was still unwritten, so the response stopped after its headers and never ended. PDF.js reads in 64 KiB pieces, so nearly every cover read past the first hung for the worker's 120 second limit. Any range response could hit it. The controller is now aborted only when the response did not finish.
+- **Bug, worker (`apps/worker/src/book-cover.ts`):** PDF.js 6.5 throws into a promise nobody handles when a document is destroyed while it loads (`pdfManagerReady` in `pdf.worker.mjs`). Node ends the process for that, so a failed or cancelled read during loading ended the whole worker service, with any film encode it was running, and charged the cover job an attempt. The PDF page is now drawn in its own thread; reads are asked of the worker, which keeps the 48 MiB limit and passes each read's own error to the job (a busy API returns the job to the queue). The thread is ended when the cover is made, fails or is cancelled.
+- **Covers asked for again:** `BOOK_COVER_VERSION` is 2, so every book without a cover gets a new job; books with covers keep them.
+- **Tests:** `tests/backend/raw-route.test.ts` (new): range responses through the real block cache, including exactly 64 KiB fresh and cached; it times out on the old route. `tests/backend/book-covers.test.ts`: a read that fails while a PDF loads, and a job cancelled mid-load, each end the cover with their own error and no unhandled rejection; both hung on the old code.
+- Verification: see the AGENT.md entry.
+
+### Files changed
+
+`apps/api/src/media/raw-route.ts`, `apps/worker/src/book-cover.ts`, `apps/worker/src/main.ts`, `tests/backend/raw-route.test.ts` (new), `tests/backend/book-covers.test.ts`, `CHANGELOG.md`, `AGENT.md`.
+
 ## Raouf: 2026-11-21 (Australia/Sydney) · book covers release
 
 **Scope:** release `98e7ee592a7b`, then the scan fix `7bd893135c64`, and publish, approved by the owner.
@@ -7,6 +30,7 @@
 - Live: backend `7bd893135c64-09f29870` (schema 11), Cloudflare Worker version `6a997e30-2dd1-4727-8330-b96810b08a00`. Record: the maintainer's private notes.
 - Verification: rehearsal in the worker's sandbox on a copy of the live database, covers made by the staged code, 12 release tests, 9 of 9 edge checks twice, Sentinel host checks, clean journal, no rollback.
 - Production covers take two to four minutes each for the 13 PDF books; not yet explained.
+- Published: sanitized snapshot of private `bcf099e` as public `50c572d` on `public/book-covers-2026-11-21`; secret scan clean.
 
 ## Raouf: 2026-11-21 (Australia/Sydney) · book covers on the shelf, selectable PDF text, manga pages stay put
 

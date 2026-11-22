@@ -34,8 +34,11 @@ import { extractBookCover, storeBookCover } from "./book-cover.js";
 import { MAX_READING_BYTES } from "../../../packages/contracts/src/reading.js";
 /** Bump to make every film's pictures again, for example after a better method. */
 export const ARTWORK_VERSION = 1;
-/** Bump to make every book's cover again. */
-export const BOOK_COVER_VERSION = 1;
+/**
+ * Bump to look again for every book without a cover. 2: version 1 jobs failed
+ * on production when the API stalled on 64 KiB reads (fixed in raw-route).
+ */
+export const BOOK_COVER_VERSION = 2;
 const sourceSchema = z.strictObject({
   fileId: z.string().regex(/^[A-Za-z0-9_-]{1,160}$/),
   generation: z.string().regex(/^[a-f0-9]{64}$/),

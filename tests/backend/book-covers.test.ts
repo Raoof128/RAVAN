@@ -21,7 +21,7 @@ import {
   storeBookCover,
   type ReadRange,
 } from "../../apps/worker/src/book-cover.js";
-import { MediaWorker } from "../../apps/worker/src/main.js";
+import { BOOK_COVER_VERSION, MediaWorker } from "../../apps/worker/src/main.js";
 import { buildApp } from "../../apps/api/src/app.js";
 import { parseConfig } from "../../apps/api/src/config.js";
 import { issueSession } from "../../apps/api/src/auth/sessions.js";
@@ -193,6 +193,59 @@ it("draws the first page of a PDF from a few ranges of a large file", async () =
   });
   const read = reads.reduce((n, [a, b]) => n + b - a, 0);
   expect(read).toBeLessThan(pdf.length / 4);
+});
+
+it("fails a PDF cover whose read fails while the document loads, and keeps the reason", async () => {
+  // PDF.js 6.5 throws into an unhandled promise when a loading document is
+  // destroyed; in Node that ended the whole worker service. The drawing runs
+  // apart from the worker, and the read's own error reaches the job, so a busy
+  // API returns the job to the queue instead of spending an attempt.
+  class Busy extends Error {}
+  const pdf = new Uint8Array(pdfFixture(7 * 1024 * 1024));
+  let calls = 0;
+  const read: ReadRange = async (a, b) => {
+    if (++calls > 1) throw new Busy("API unavailable");
+    return pdf.slice(a, b);
+  };
+  const rejected: unknown[] = [];
+  const watch = (reason: unknown) => rejected.push(reason);
+  process.on("unhandledRejection", watch);
+  clean.push(() => process.off("unhandledRejection", watch));
+  await expect(
+    extractBookCover("pdf", pdf.length, read, await workspace(), idle()),
+  ).rejects.toBeInstanceOf(Busy);
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  expect(rejected).toEqual([]);
+});
+
+it("stops drawing a PDF cover when its job is cancelled mid-load", async () => {
+  const pdf = new Uint8Array(pdfFixture(7 * 1024 * 1024));
+  const controller = new AbortController();
+  let calls = 0;
+  const read: ReadRange = async (a, b, signal) => {
+    if (++calls === 1) return pdf.slice(a, b);
+    controller.abort(new Error("Cancelled"));
+    return new Promise((_resolve, reject) =>
+      signal.aborted
+        ? reject(signal.reason)
+        : signal.addEventListener("abort", () => reject(signal.reason)),
+    );
+  };
+  const rejected: unknown[] = [];
+  const watch = (reason: unknown) => rejected.push(reason);
+  process.on("unhandledRejection", watch);
+  clean.push(() => process.off("unhandledRejection", watch));
+  await expect(
+    extractBookCover(
+      "pdf",
+      pdf.length,
+      read,
+      await workspace(),
+      controller.signal,
+    ),
+  ).rejects.toThrow("Cancelled");
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  expect(rejected).toEqual([]);
 });
 
 it("reads no more of a book than a cover needs", async () => {
@@ -376,7 +429,7 @@ it("makes a shelf cover through the worker and serves it to the owner only", asy
   ).toEqual([
     {
       kind: "book-cover",
-      unique_key: `book-cover-v1:volume:${item.generation}`,
+      unique_key: `book-cover-v${BOOK_COVER_VERSION}:volume:${item.generation}`,
     },
   ]);
   expect(await worker.runNextJob(idle(), "artwork")).toBe("completed");
