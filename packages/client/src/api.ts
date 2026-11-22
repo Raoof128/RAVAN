@@ -3,6 +3,7 @@ import { createContext, useContext } from "react";
 import {
   MAX_READING_BYTES,
   type ReadingItem,
+  type ReadingList,
   type ReadingPreparation,
   type ReadingPosition,
 } from "../../contracts/src/reading.js";
@@ -86,9 +87,9 @@ export function createApiClient(baseUrl: string) {
     }
   }
   return {
-    reading(q = "", offset = 0) {
-      return request<{ items: ReadingItem[]; nextOffset: number | null }>(
-        `/api/reading?${new URLSearchParams({ q, offset: String(offset) })}`,
+    reading(q = "", offset = 0, folder?: string) {
+      return request<ReadingList>(
+        `/api/reading?${new URLSearchParams({ q, offset: String(offset), ...(folder ? { folder } : {}) })}`,
       );
     },
     readingPreparation(item: ReadingItem, enqueue = false) {

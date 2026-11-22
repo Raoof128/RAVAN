@@ -1,5 +1,41 @@
 # Changelog
 
+## Raouf: 2026-11-22 (Australia/Sydney) · reading room by folder release
+
+**Scope:** release and publish the reading room by folder, approved by the owner.
+
+- Live: backend `bfebb5ed7575-2d0f183c` (schema 12, unchanged) and Cloudflare Worker version `7dcc4cdb-fa87-4f0d-bdb5-d7123e681f57`, from commit `bfebb5ed7575`. Record: the maintainer's private notes.
+- Rehearsal on a live copy with the staged routes: Berserk (42) and Oyasumi Punpun (13) as folder cards with covers, all 55 books accounted for, both folders in volume order; the films unchanged.
+- After activation: services active, no restarts, clean journal; Sentinel host checks; 9 of 9 edge checks; live assets pass the Chromium 79 check.
+
+## Raouf: 2026-11-22 (Australia/Sydney) · the reading room by folder
+
+**Scope:** the owner asked for the reading room to be foldered like the films, so a series in a Drive folder shows as one folder, not every book on one shelf. Branch `audit/backend-2026-11-16`. Not released.
+
+- **Found on production (read-only):** the 55 books sit in two Drive folders, Berserk (42 PDFs) and Oyasumi Punpun (13 PDFs), and all showed on one shelf.
+- **API (`GET /api/reading?folder=`):** as `/api/movies` does: the top (`root`) and any folder list their own books, the folders inside them as cards (books counted through the folders within; the cover of the first book that has one; a folder with no books, such as a film folder, has no card), and the way back. The top also lists the books being read, wherever they are filed. A search inside a folder looks through it and the folders in it; from the top, without a folder, through every book. Until a scan has recorded the folders, the top is every book, as before. No schema change: a book's folder is the parent in the Drive record the scan already stores.
+- **Shared folder code (`apps/api/src/library/folders.ts`):** the place lookup and the way back, used by the films and the reading room alike.
+- **Web:** `#/reading/folder/<id>`. A folder is drawn as a stack of volumes, its first book's cover in front and the edges of the rest behind, fanning a little on hover; "Continue reading" leads the top; a folder's page has its name, the way back and a search of that folder. Chromium 79 too.
+- **Tests:** `tests/backend/reading-folders.test.ts` (4): the top with cards, counts, cover and books being read; a folder and its way back; searching a folder and everywhere; the flat shelf before folders are recorded. `tests/e2e/reading-folders.spec.ts`: cards, opening a folder, back, and a search from the top asking for every book.
+- **Not done:** the order of "Continue reading" is by name; the reading room keeps no time of reading.
+- Verification: see the AGENT.md entry.
+
+### Files changed
+
+`apps/api/src/library/folders.ts` (new), `apps/api/src/library/reading.ts`, `apps/api/src/library/routes.ts`, `packages/contracts/src/reading.ts`, `packages/client/src/api.ts`, `apps/web/src/pages/Reading.tsx`, `apps/web/src/main.tsx`, `apps/web/src/reading/reading.css`, `tests/backend/reading-folders.test.ts` (new), `tests/e2e/reading-folders.spec.ts` (new), `CHANGELOG.md`, `AGENT.md`.
+
+## Raouf: 2026-11-22 (Australia/Sydney) · documents brought up to date after the release
+
+**Scope:** the owner asked to update all logs and Zurvan after the next-episode and player-controls release.
+
+- `README.md` names the next-episode feature, titles following Drive renames, and RAVAN's own player controls.
+- `docs/visual-design.md` describes the player's design: the copper seek line with the macron playhead, the drawn ring, the intermission, the Up next panel and the rail.
+- Zurvan: the release record and the controls design ingested, claims recorded, index and graph rebuilt.
+
+### Files changed
+
+`README.md`, `docs/visual-design.md`, `CHANGELOG.md`, `AGENT.md`.
+
 ## Raouf: 2026-11-22 (Australia/Sydney) · next episode and player controls release
 
 **Scope:** release and publish the next-episode, Drive-title and player-controls work, approved by the owner.
@@ -7,6 +43,7 @@
 - Live: backend `0b5f319bd4ae-9e5c2d44` (schema 12) and Cloudflare Worker version `8c6d623e-5b12-470e-a258-89872a81687a`, from commit `0b5f319bd4ae`. Record: the maintainer's private notes.
 - Rehearsal on a copy of the live database: 32 titles renamed to their Drive names, nothing else changed; Fire Force (24) and Pluto (8) chained episode to episode by the staged API; the Anime folder of films has none.
 - After activation: all 40 films in Drive show their Drive names; services active, no restarts, clean journal; 9 of 9 edge checks; live assets pass the Chromium 79 check.
+- Published: sanitized snapshot of private `4b3d05f` as public `791dfed` on `public/next-episode-2026-11-22`; secret scan clean.
 
 ## Raouf: 2026-11-22 (Australia/Sydney) · RAVAN's own player controls
 

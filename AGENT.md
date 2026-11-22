@@ -50,6 +50,7 @@ RAVAN is a private, single-owner cinema: a Fastify API, a media worker, a Cloudf
 - **The reader keeps a mouse selection inside the page.** `containSelection` (`apps/web/src/reading/selection.ts`) corrects a drag that leaves `.reading-viewport`; browsers otherwise select to the end of the chapter. Keep it when changing the reader's layout, and keep the bars outside the scrolling page or remove it with a test that drags past both bars.
 - **Book covers are pictures like films' pictures.** Files live in `<data directory>/artwork`, rows in `reading_covers`, and they are served only by random id at `/api/artwork/:id`. Anything that lists or clears picture files (`sweepArtwork`, the restore scrub in `packages/db/src/backup.ts`) must include `reading_covers`, or covers are deleted as strays.
 - **PDF text is PDF.js's `TextLayer` over the canvas.** Keep `--total-scale-factor` in step with the size the canvas is shown at, and keep the `endOfContent`/`selecting` guard; without it a drag in a gap selects to the end of the page.
+- **The reading room is browsed by Drive folder, as the films are.** Both use `apps/api/src/library/folders.ts`; a book's folder is `json_extract(metadata,'$.parents[0]')` from the scan's own record. Folder cards hide folders with none of their kind (no books, or no films).
 - **The reading room is Google Drive only.** Books have their own catalogue and server progress. Do not add device imports or browser-local reading history. Serve bytes only after live folder/access/generation checks; never serve book HTML as a same-origin document.
 - **Browser storage holds the motion flag (`ravan:motion`) and the TV's device credential, nothing else.** Never an MFA secret, a session token or library data.
 - **A control whose action is running stays focusable.** Use `ActionButton` and `usePending`; do not set `disabled` on it. When an action removes the focused control, move focus somewhere deliberate.
@@ -438,3 +439,30 @@ Raouf: 2026-11-22 (Australia/Sydney), thirty-seventh entry
 - Follow-ups: the owner to try full screen and an episode ending into the next on the C1.
 - Rule: a release whose lock adds only development packages may reuse the installed `node_modules`; compare the lock's production entries (packages without `dev`, and the root without `devDependencies`) instead of the whole file.
 - Rule: the unattended scan does nothing when Drive reports no change, so a rule that changes how existing rows are read from Drive needs a migration to apply it, or it waits for a manual refresh.
+- Published: private `4b3d05f` as public `791dfed` on `public/next-episode-2026-11-22` (based on `public/lg-c1-2026-11-22`), gitleaks clean.
+
+Raouf: 2026-11-22 (Australia/Sydney), thirty-eighth entry
+
+- Scope: the owner asked to update all logs and Zurvan after the next-episode and player-controls release.
+- Summary: README and the visual design document describe next episode, titles following Drive and the new controls; Zurvan has the release record, the design note and claims from them.
+- Files changed: `README.md`, `docs/visual-design.md`, `CHANGELOG.md`, this file.
+- Verification: Prettier clean; Zurvan search returns the new claims after the rebuild.
+- Follow-ups: the owner to try full screen and an episode ending into the next on the C1. These document changes reach the public repository with the next published snapshot.
+
+Raouf: 2026-11-22 (Australia/Sydney), thirty-ninth entry
+
+- Scope: the owner asked for the reading room to be foldered like the films.
+- Summary: `/api/reading?folder=` lists a folder's books, its folders as cards and the way back, and at the top the books being read; the web reading room browses `#/reading/folder/<id>`, folders drawn as stacks of volumes. Production's 55 books sit in Berserk (42) and Oyasumi Punpun (13). No schema change. Details in `CHANGELOG.md`.
+- Files changed: see `CHANGELOG.md`.
+- Verification: `npm run check` clean, Prettier clean. `npx vitest run`: 64 of 65 files passed; `formats.test.ts` timed out at 15 s with the machine's load average near 31 and passes alone with a longer limit (20 of 20), and touches no changed code. `npx playwright test --workers=2`: 223 passed, 3 failed, 2 skipped, at load averages of 31 to 55; the three pass when run again (two together, the WebKit fade test alone). `npm run check:legacy` passes. Screens checked at 1440 and 390 px.
+- Follow-ups: release (API and web together) with the owner's approval. The disk ran out during the browser run (ENOSPC on the volume holding Claude Code's temporary files; mostly other projects' session files); 2.7 GB were free afterwards. Nothing was deleted.
+- Rule: under heavy load, run the browser suite with `--workers=2` and confirm any failure alone before calling it a regression.
+
+Raouf: 2026-11-22 (Australia/Sydney), fortieth entry
+
+- Scope: release and publish the reading room by folder, approved by the owner.
+- Summary: backend `bfebb5ed7575-2d0f183c` (schema 12) and Worker `7dcc4cdb-fa87-4f0d-bdb5-d7123e681f57` are live. See the maintainer's private notes.
+- Files changed: the maintainer's private notes, the maintainer's private notes, `CHANGELOG.md`, this file.
+- Verification: rehearsal with the staged routes on a live copy, activation with no viewers or jobs, Sentinel host checks, 12 release tests, 9 of 9 edge checks, live assets checked for Chromium 79.
+- Follow-ups: the owner to check the reading room's folders signed in.
+- Rule: a rehearsal can mount `registerReading` with empty stand-ins for the sync and cache when it only exercises list routes; they serve book bytes only.

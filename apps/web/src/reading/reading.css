@@ -769,3 +769,66 @@ body.reading-open .site-header {
 .reader-panel > .reading-preparation {
   margin-block: 1rem;
 }
+
+/* ---- Folders, as the films have them ----
+   A folder is a stack of volumes: its first book's cover in front, the edges
+   of the rest behind. Chromium 79 as well: no inset, gap or aspect-ratio
+   written by hand; only transform moves. */
+.reading-folder-title {
+  font-size: clamp(2.4rem, 4.6vw, 4.4rem);
+  font-variant-numeric: lining-nums;
+  overflow-wrap: anywhere;
+}
+.reading-continue {
+  margin-bottom: 44px;
+}
+.reading-continue h2 {
+  margin-bottom: 22px;
+  font: 400 1.9rem/1.2 var(--serif);
+}
+.reading-folder {
+  color: inherit;
+  text-decoration: none;
+}
+/* The edges reach into the shelf's gap, so a folder is a book's size. */
+.reading-stack {
+  position: relative;
+  display: block;
+}
+.reading-stack .reading-cover {
+  position: relative;
+  z-index: 1;
+}
+.reading-stack-edge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  border-left: 7px double #ffffff1c;
+  background: #3a3b36;
+  box-shadow: 3px 6px 14px #0005;
+  transition: transform 0.25s ease;
+}
+.reading-stack-edge:first-child {
+  transform: translate(14px, -14px);
+  opacity: 0.55;
+}
+.reading-stack-edge:nth-child(2) {
+  transform: translate(7px, -7px);
+  opacity: 0.8;
+}
+.reading-folder:hover .reading-stack-edge:first-child,
+.reading-folder:focus .reading-stack-edge:first-child {
+  transform: translate(18px, -16px) rotate(2deg);
+}
+.reading-folder:hover .reading-stack-edge:nth-child(2),
+.reading-folder:focus .reading-stack-edge:nth-child(2) {
+  transform: translate(9px, -8px) rotate(1deg);
+}
+.reading-folder .reading-book-caption small {
+  color: var(--muted);
+}
+:root[data-motion="reduce"] .reading-stack-edge {
+  transition: none;
+}

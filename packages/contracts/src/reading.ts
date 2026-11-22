@@ -17,6 +17,32 @@ export type ReadingItem = {
   /** The book's cover, made by the server from the book. */
   coverUrl?: string;
 };
+/** A Drive folder of books, shown as one card that opens to them. */
+export type ReadingFolder = {
+  id: string;
+  name: string;
+  /** Books in the folder and the folders inside it. */
+  books: number;
+  /** The cover of its first book that has one. */
+  coverUrl?: string;
+};
+/** One page of the reading room, or of a folder in it. */
+export type ReadingList = {
+  items: ReadingItem[];
+  nextOffset: number | null;
+  /** Set when a folder is browsed. The top is "root". */
+  folder?: {
+    id: string;
+    name: string;
+    /** "root" for a folder at the top, null at the top itself. */
+    parentId: string | null;
+    parentName?: string;
+  };
+  /** The folders inside it, with the first page. */
+  folders?: ReadingFolder[];
+  /** Books being read anywhere, with the top's first page. */
+  reading?: ReadingItem[];
+};
 export function readingFormat(
   name: string,
   mimeType: string,

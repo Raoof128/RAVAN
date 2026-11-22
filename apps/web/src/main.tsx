@@ -140,6 +140,7 @@ function App({ api }: { api: ApiClient }) {
   const movieId = routeParam(route, "/movie/");
   const playerId = routeParam(route, "/player/");
   const folderId = routeParam(route, "/folder/");
+  const readingFolder = routeParam(route, "/reading/folder/");
   const [session, setSession] = useState<SessionState>(),
     [error, setError] = useState(false),
     [retry, setRetry] = useState(0),
@@ -273,7 +274,11 @@ function App({ api }: { api: ApiClient }) {
               </a>
               <a
                 href="#/reading"
-                aria-current={route === "/reading" ? "page" : undefined}
+                aria-current={
+                  route === "/reading" || readingFolder !== undefined
+                    ? "page"
+                    : undefined
+                }
               >
                 Reading room
               </a>
@@ -359,6 +364,9 @@ function App({ api }: { api: ApiClient }) {
                 <Watchlist />
               ) : route === "/reading" ? (
                 <Reading />
+              ) : readingFolder !== undefined ? (
+                // A screen of its own per folder, as the films have.
+                <Reading folder={readingFolder} key={readingFolder} />
               ) : movieId !== undefined ? (
                 <Detail id={movieId} />
               ) : playerId !== undefined ? (

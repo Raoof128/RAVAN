@@ -8,12 +8,15 @@ import { z } from "zod";
 import type { Database } from "../../../../packages/db/src/open.js";
 import {
   MAX_READING_BYTES,
+  type ReadingFolder,
   type ReadingItem,
+  type ReadingList,
 } from "../../../../packages/contracts/src/reading.js";
 import { driveId } from "../drive/client.js";
 import { type LibrarySync, sourceGone } from "../drive/sync.js";
 import type { BlockCache } from "../media/cache.js";
 import { parseReadingSlices, readSlices } from "./reading-slices.js";
+import { folderParam, folderPlace, placeFolder, subtree } from "./folders.js";
 import { sendRaw } from "../media/raw-route.js";
 import {
   describePreparation,
@@ -125,53 +128,130 @@ export function registerReading(
   let active = 0;
   const warmer = new OpenWarmer(db, cache);
   app.addHook("onClose", async () => warmer.stop());
+  // A book's Drive folder, as the scan recorded the file.
+  const parentOf = "json_extract(r.metadata,'$.parents[0]')";
+  const bookColumns = `SELECT r.id,r.name,r.format,r.generation,r.size_bytes,r.section,r.fraction,j.state AS job_state,cv.picture_id AS cover_id,
+        (SELECT COALESCE(SUM(c.size_bytes),0) FROM cache_blocks c WHERE c.source_id=r.id AND c.generation=r.generation AND c.state='ready') AS cached_bytes
+        FROM reading_items r LEFT JOIN jobs j ON j.unique_key='reading:'||r.id||':'||r.generation
+        LEFT JOIN reading_covers cv ON cv.item_id=r.id AND cv.generation=r.generation`;
+  type BookRow = {
+    id: string;
+    name: string;
+    format: ReadingItem["format"];
+    generation: string;
+    size_bytes: string;
+    section: number;
+    fraction: number;
+    job_state: string | null;
+    cover_id: string | null;
+    cached_bytes: number;
+  };
+  const book = (r: BookRow): ReadingItem => ({
+    id: r.id,
+    name: r.name,
+    title: r.name.replace(/\.(epub|pdf|cbz)$/i, "") || r.name,
+    format: r.format,
+    generation: r.generation,
+    sizeBytes: r.size_bytes,
+    position: { section: r.section, fraction: r.fraction },
+    preparation: describePreparation(
+      r.cached_bytes,
+      Number(r.size_bytes),
+      r.job_state,
+    ),
+    // Made by the worker from this generation of the book.
+    ...(r.cover_id ? { coverUrl: `/api/artwork/${r.cover_id}` } : {}),
+  });
+  /**
+   * The folders inside one, as cards: how many books each holds, counting
+   * the folders in it, and the cover of its first book that has one. A
+   * folder with no books (a folder of films) has no card here.
+   */
+  function bookFolders(parent: string): ReadingFolder[] {
+    const children = db
+      .prepare(
+        "SELECT id,name FROM library_folders WHERE parent_id=? ORDER BY name COLLATE NOCASE,id LIMIT 500",
+      )
+      .all(parent) as Array<{ id: string; name: string }>;
+    const count = db.prepare(
+      `${subtree} SELECT COUNT(*) n FROM reading_items r WHERE r.available=1 AND ${parentOf} IN (SELECT id FROM tree)`,
+    );
+    const cover = db.prepare(
+      `${subtree} SELECT cv.picture_id id FROM reading_items r JOIN reading_covers cv ON cv.item_id=r.id AND cv.generation=r.generation AND cv.picture_id IS NOT NULL WHERE r.available=1 AND ${parentOf} IN (SELECT id FROM tree) ORDER BY r.name COLLATE NOCASE,r.id LIMIT 1`,
+    );
+    const cards: ReadingFolder[] = [];
+    for (const child of children) {
+      const books = (count.get(child.id) as { n: number }).n;
+      if (!books) continue;
+      const art = cover.get(child.id) as { id: string } | undefined;
+      cards.push({
+        id: child.id,
+        name: child.name,
+        books,
+        ...(art ? { coverUrl: `/api/artwork/${art.id}` } : {}),
+      });
+    }
+    return cards;
+  }
   app.get("/api/reading", async (request, reply) => {
     const query = z
       .object({
         q: z.string().max(200).default(""),
         offset: z.coerce.number().int().min(0).max(100000).default(0),
+        folder: folderParam,
       })
       .safeParse(request.query);
     if (!query.success) return reply.code(400).send({ error: "invalid_query" });
-    const rows = db
-      .prepare(
-        `SELECT r.id,r.name,r.format,r.generation,r.size_bytes,r.section,r.fraction,j.state AS job_state,cv.picture_id AS cover_id,
-        (SELECT COALESCE(SUM(c.size_bytes),0) FROM cache_blocks c WHERE c.source_id=r.id AND c.generation=r.generation AND c.state='ready') AS cached_bytes
-        FROM reading_items r LEFT JOIN jobs j ON j.unique_key='reading:'||r.id||':'||r.generation
-        LEFT JOIN reading_covers cv ON cv.item_id=r.id AND cv.generation=r.generation
-        WHERE r.available=1 AND instr(lower(r.name),lower(?))>0 ORDER BY r.name COLLATE NOCASE,r.id LIMIT 61 OFFSET ?`,
-      )
-      .all(query.data.q, query.data.offset) as Array<{
-      id: string;
-      name: string;
-      format: ReadingItem["format"];
-      generation: string;
-      size_bytes: string;
-      section: number;
-      fraction: number;
-      job_state: string | null;
-      cover_id: string | null;
-      cached_bytes: number;
-    }>;
-    return {
-      items: rows.slice(0, 60).map((r): ReadingItem => ({
-        id: r.id,
-        name: r.name,
-        title: r.name.replace(/\.(epub|pdf|cbz)$/i, "") || r.name,
-        format: r.format,
-        generation: r.generation,
-        sizeBytes: r.size_bytes,
-        position: { section: r.section, fraction: r.fraction },
-        preparation: describePreparation(
-          r.cached_bytes,
-          Number(r.size_bytes),
-          r.job_state,
-        ),
-        // Made by the worker from this generation of the book.
-        ...(r.cover_id ? { coverUrl: `/api/artwork/${r.cover_id}` } : {}),
-      })),
-      nextOffset: rows.length > 60 ? query.data.offset + 60 : null,
+    const { q, offset } = query.data;
+    // Browsing by folder, as the films are; without a folder (or before a
+    // scan has recorded the folders) every book is one shelf.
+    const folder = query.data.folder
+      ? placeFolder(db, query.data.folder)
+      : undefined;
+    if (folder === null)
+      return reply.code(404).send({ error: "folder_not_found" });
+    const match = "instr(lower(r.name),lower(?))>0";
+    const order = "ORDER BY r.name COLLATE NOCASE,r.id LIMIT 61 OFFSET ?";
+    const rows = (
+      !folder
+        ? db
+            .prepare(`${bookColumns} WHERE r.available=1 AND ${match} ${order}`)
+            .all(q, offset)
+        : q
+          ? // A search in a folder looks there and in the folders inside it.
+            db
+              .prepare(
+                `${subtree} ${bookColumns} WHERE r.available=1 AND ${parentOf} IN (SELECT id FROM tree) AND ${match} ${order}`,
+              )
+              .all(folder.id, q, offset)
+          : db
+              .prepare(
+                `${bookColumns} WHERE r.available=1 AND ${parentOf}=? ${order}`,
+              )
+              .all(folder.id, offset)
+    ) as BookRow[];
+    const list: ReadingList = {
+      items: rows.slice(0, 60).map(book),
+      nextOffset: rows.length > 60 ? offset + 60 : null,
     };
+    if (folder) {
+      list.folder = folderPlace(db, folder);
+      if (!q && !offset) {
+        list.folders = bookFolders(folder.id);
+        // Books being read, wherever they are filed, lead the top.
+        if (folder.parent_id === null) {
+          const reading = (
+            db
+              .prepare(
+                `${bookColumns} WHERE r.available=1 AND (r.section>0 OR r.fraction>0) ORDER BY r.name COLLATE NOCASE,r.id LIMIT 6`,
+              )
+              .all() as BookRow[]
+          ).map(book);
+          if (reading.length) list.reading = reading;
+        }
+      }
+    }
+    return list;
   });
   app.put<{ Params: { id: string } }>(
     "/api/reading/:id/progress",

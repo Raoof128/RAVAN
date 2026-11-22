@@ -8,6 +8,8 @@
 - Folder-scoped library discovery over read-only Google Drive access.
 - Browsing by folder: each folder in the Drive folder, such as a series with its episodes, shows as one card that opens to its own films. A search from the top looks through every folder.
 - Automatic browser compatibility, by what your browser reports it can play: the original directly (MP4, WebM or Matroska; H.264, HEVC including HDR, AV1, VP9), a repackaged copy with the picture untouched, or H.264/AAC conversion. HDR10/HLG sources become SDR editions only for browsers that cannot decode them.
+- Series: films named as episodes in Drive (`Show - S03E01`) know the next one in their folder. Near the end of an episode the next one is offered, and at the end it plays after a ten-second count that can be stopped, or turned off for good in Settings. Titles follow renames in Drive until you edit them in RAVAN.
+- RAVAN's own player controls in every browser: a seek line drawn as the copper line of the wordmark, a click in the middle of the picture to play or pause, a paused film shown as an intermission with its title and the time to go, picture in picture where offered, and full screen that keeps the menus and the next-episode panel.
 - Quality choices from 480p to 4K without upscaling, multiple audio choices, up to 64 text-subtitle tracks, seeking, watchlists, and saved playback position.
 - Private media tickets, byte-range delivery, encrypted metadata backups, and bounded background processing on a CPU-only server.
 - A browser reading room for EPUB books, PDF documents and CBZ manga from the connected Google Drive folder, with search, saved position, text sizing and right-to-left navigation. See [reader usage and format limits](docs/reading-room.md).
