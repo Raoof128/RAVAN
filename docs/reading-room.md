@@ -1,12 +1,14 @@
 # Reading room
 
-RAVĀN's browser client reads DRM-free EPUB books, PDFs and CBZ manga exclusively from the connected Google Drive folder.
+The RAVĀN website and paired iPhone or iPad app read DRM-free EPUB books, PDFs and CBZ manga from the connected Google Drive folder.
 
 ## Use it
 
 Run the API and web client as described in the README. Sign in, then choose **Reading room** in the navigation.
 
-- **Google Drive:** put EPUB, PDF or CBZ files anywhere below the existing connected library folder. Sync in **Your cinema**. Search the shelf by title or filename and open a book. Reading positions are saved on the server and available when opening the same book on another browser. Simultaneous readers use the last saved position.
+On iPhone or iPad, choose **Connect to RAVĀN**. Copy the temporary code, open **Your cinema → Pair a screen** on the website, and select the Reading Room permission before approving the device. Return to the app and open **Reading Room**. [Apple pairing guide](../apps/apple/README.md)
+
+- **Google Drive:** put EPUB, PDF or CBZ files anywhere below the existing connected library folder. Sync in **Your cinema**. Search the shelf by title or filename and open a book. Reading positions are saved on the server and available when opening the same book on the website or in the paired app. Simultaneous readers use the last saved position.
 - Use **Next** or **Previous** to turn. Select the page counter to browse six pages at a time or type a page number. PDF and CBZ previews appear on demand. Closing the index keeps your place. Arrow keys work while focus is in the reading area; right-to-left mode reverses their direction and the page controls. CBZ starts in right-to-left mode.
 - PDFs and manga open in **Whole page**, which fits the complete page in the space between the title and navigation controls. Choose **Fit width** to enlarge the artwork and scroll through a page.
 - The shelf shows each book's own cover once the server has made it (see Covers). Until then, and for a book without one, it shows a drawn cover with the title.
@@ -17,11 +19,11 @@ The development preview at `http://127.0.0.1:5173/?preview=1#/reading` shows an 
 
 ## Scope and limits
 
-- Maximum input: 100 MiB. ZIP archives: 5,000 entries, 32 MiB per extracted entry and 512 MiB declared total. EPUB chapters: 4 MiB markup, 40 MiB of raster images, at most 100 distinct images per chapter (an image used twice is extracted once). Extraction also checks actual output, rather than trusting declared sizes.
+- PDFs open up to 512 MiB. The reader fetches PDFs over 100 MiB in ranges. EPUB and CBZ open up to 100 MiB. ZIP archives allow 5,000 entries, 32 MiB per extracted entry and 512 MiB declared total. EPUB chapters: 4 MiB markup, 40 MiB of raster images, at most 100 distinct images per chapter (an image used twice is extracted once). Extraction also checks actual output, rather than trusting declared sizes.
 - EPUB uses the publication's spine order and saves chapter plus scroll fraction. It preserves basic text structure, tables and local raster images, while removing publisher CSS, scripts, forms, hyperlinks, external resources and SVG. Fixed layouts, interactive content, footnote links and publisher pagination are not preserved. EPUBs with encrypted resources, including obfuscated fonts, are rejected. Custom/external XML document declarations are unsupported.
 - CBZ supports PNG, JPEG, WebP, GIF and AVIF pages in natural filename order. Image decoding depends on the browser. CBR/RAR, MOBI/AZW and DRM are not supported.
 - PDFs use PDF.js with a local worker, fonts, character maps and image decoders. The interface renders pages and lays PDF.js's text layer over each one, so its text can be selected, copied and read by assistive technology. It does not execute document JavaScript or interactive forms. Password-protected documents are rejected; scanned pages without text have no built-in OCR.
-- Reading is available in the authenticated browser client. The experimental television client has no reader interface.
+- Reading is available on the authenticated website and in the paired Apple app. The Files edition supports local films. The experimental television client has no reader interface.
 
 Migration 9 added the reading catalogue and requested a fresh library scan, so previously skipped books are discovered; film data is preserved. Migration 10 adds an index for the shelf's preparation figures. Migration 11 adds `reading_covers`. Replaced book bytes reset progress; a rename alone preserves it when Drive supplies a stable checksum or revision. All reading positions are stored on the server; there is no device-file import or browser-local reading history.
 
