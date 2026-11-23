@@ -259,6 +259,47 @@ test("losing the connection is said plainly, and unsaid when it returns", async 
   ).toHaveCount(0);
 });
 
+test("the task bar follows the current screen and leaves the picture clear", async ({
+  page,
+  browserName,
+}) => {
+  await cinema(page);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+  const bar = page.getByRole("navigation", { name: "Main navigation" });
+  const library = bar.getByRole("link", { name: "Library" });
+  const saved = bar.getByRole("link", { name: "Watchlist" });
+  await expect(bar.getByRole("link")).toHaveCount(4);
+  await expect(library).toHaveAttribute("aria-current", "page");
+  await library.focus();
+  await page.keyboard.press(browserName === "webkit" ? "Alt+Tab" : "Tab");
+  await expect(saved).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(saved).toHaveAttribute("aria-current", "page");
+  await expect(
+    page.locator(".movie-caption").first().getByRole("heading", { level: 2 }),
+  ).toBeVisible();
+  expect(
+    await bar.evaluate(
+      (el) => getComputedStyle(el, "::before").transitionDuration,
+    ),
+  ).toBe("0s");
+  await page.setViewportSize({ width: 320, height: 680 });
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await expect(saved).toBeInViewport();
+  expect(await bar.evaluate((el) => getComputedStyle(el).position)).toBe(
+    "fixed",
+  );
+  await bar.getByRole("link", { name: "Your cinema" }).click();
+  await expect(page.getByLabel("Device pairing code")).toBeVisible();
+  await page.goto("/#/player/film-0");
+  await expect(page.locator("main h1")).toBeVisible();
+  expect(await bar.evaluate((el) => getComputedStyle(el).position)).toBe(
+    "relative",
+  );
+});
+
 test("a field explains what it needs in words, and removing a TV looks like what it is", async ({
   page,
 }) => {
@@ -283,4 +324,42 @@ test("a field explains what it needs in words, and removing a TV looks like what
   await expect(
     page.getByRole("button", { name: "Remove Living room" }),
   ).toBeFocused();
+});
+
+test("the owner explicitly grants watchlist access to each paired screen", async ({
+  page,
+  browserName,
+}) => {
+  await cinema(page);
+  const approvals: unknown[] = [];
+  await page.route("**/api/pairing/approve", async (route) => {
+    approvals.push(route.request().postDataJSON());
+    await route.fulfill({ status: 204 });
+  });
+  await page.goto("/#/settings");
+  const code = page.getByLabel("Device pairing code");
+  const permission = page.getByRole("checkbox", {
+    name: "Allow this device to change the watchlist",
+  });
+  const approve = page.getByRole("button", { name: "Approve this device" });
+
+  await expect(permission).not.toBeChecked();
+  await code.focus();
+  await code.pressSequentially("abcd efgh");
+  const tab = browserName === "webkit" ? "Alt+Tab" : "Tab";
+  await page.keyboard.press(tab);
+  await expect(permission).toBeFocused();
+  await page.keyboard.press(tab);
+  await expect(approve).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect.poll(() => approvals.length).toBe(1);
+  expect(approvals[0]).toEqual({ code: "ABCDEFGH" });
+
+  await expect(code).toHaveValue("");
+  await code.fill("JKMN PQRS");
+  await permission.check();
+  await approve.click();
+  await expect.poll(() => approvals.length).toBe(2);
+  expect(approvals[1]).toEqual({ code: "JKMNPQRS", watchlistWrite: true });
+  await expect(permission).not.toBeChecked();
 });

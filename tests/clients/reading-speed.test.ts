@@ -191,7 +191,7 @@ it("keeps neighbouring pages loaded, releases what it drops and retries a failur
 
 it("keeps four PDF slice batches in flight", async () => {
   const size = 8 * RANGE_BYTES;
-  const { bytes, held, flush } = server(size);
+  const { bytes, log, held } = server(size);
   const ranges = new ReadingRanges(
     size,
     "/book?generation=g",
@@ -201,7 +201,17 @@ it("keeps four PDF slice batches in flight", async () => {
   const read = ranges.pdfSlices.read(0, length);
   await new Promise((resolve) => setTimeout(resolve, 5));
   expect(held.length).toBe(PDF_SLICE_CONCURRENCY);
-  await flush();
+  // Later batches appear only after the client consumes the first four bodies.
+  // Release each new request until the mock has actually delivered all six.
+  await expect
+    .poll(
+      () => {
+        held.splice(0).forEach((release) => release());
+        return log.slices.length;
+      },
+      { interval: 10, timeout: 10000 },
+    )
+    .toBe(6);
   expect(
     Buffer.from(await read).equals(Buffer.from(bytes.subarray(0, length))),
   ).toBe(true);

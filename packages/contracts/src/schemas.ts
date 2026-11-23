@@ -28,6 +28,8 @@ export const capabilitiesSchema = z.strictObject({
 export const playbackSchema = z.strictObject({
   movieId: idSchema,
   profileId: idSchema,
+  editionId: idSchema.optional(),
+  generation: idSchema.optional(),
   startMs: milliseconds.default(0),
   replaceSessionId: idSchema.optional(),
   quality: z
@@ -48,4 +50,33 @@ export const metadataSchema = z.strictObject({
   title: z.string().trim().min(1).max(300),
   year: z.number().int().min(1888).max(2200).optional(),
   description: z.string().max(5000).optional(),
+});
+
+// Responses can grow optional fields without changing the protocol major.
+export const discoveryV1Schema = z.object({
+  protocolMajor: z.literal(1),
+  instanceId: z.uuid(),
+  profiles: z.array(idSchema),
+  mediaOrigins: z
+    .array(
+      z.url().refine((value) => {
+        const url = new URL(value);
+        return url.protocol === "https:" && url.origin === value;
+      }),
+    )
+    .min(1),
+  features: z.record(z.string(), z.boolean()),
+});
+export const nativePreparationSchema = z.object({
+  state: z.enum([
+    "queued",
+    "probing",
+    "preparing",
+    "ready",
+    "failed",
+    "invalidated",
+    "evicted",
+  ]),
+  progressPercent: z.number().min(0).max(100).optional(),
+  reasonCode: z.string().optional(),
 });

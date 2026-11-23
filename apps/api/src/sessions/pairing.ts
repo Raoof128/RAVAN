@@ -95,7 +95,7 @@ export class PairingService {
       pollIntervalMs: 5000,
     };
   }
-  approve(code: string) {
+  approve(code: string, watchlistWrite = false) {
     this.db.transaction(() => {
       const row = this.db
         .prepare("SELECT * FROM pairing_requests WHERE code_hash=?")
@@ -107,8 +107,10 @@ export class PairingService {
       const name = (JSON.parse(row.delivery_ciphertext!) as { name: string })
         .name;
       this.db
-        .prepare("INSERT INTO devices(id,name,token_hash) VALUES(?,?,?)")
-        .run(device, name, hash(credential));
+        .prepare(
+          "INSERT INTO devices(id,name,token_hash,watchlist_write) VALUES(?,?,?,?)",
+        )
+        .run(device, name, hash(credential), Number(watchlistWrite));
       const nonce = randomBytes(12),
         cipher = createCipheriv("aes-256-gcm", this.key, nonce);
       cipher.setAAD(Buffer.from(row.id));

@@ -1,3 +1,4 @@
+import { rememberPreparation } from "../media/native-preparations.js";
 import { randomUUID } from "node:crypto";
 import type { Database } from "../../../../packages/db/src/open.js";
 import type {
@@ -33,6 +34,7 @@ type Row = {
   revoked_at: number | null;
   web_session_hash: string | null;
   device_id: string | null;
+  edition_id: string | null;
   ticket_hash: string;
   asset_id: string | null;
   label: string;
@@ -130,9 +132,17 @@ export class PlaybackService {
   ): Promise<PlaybackResult> {
     const sources = this.db
       .prepare(
-        "SELECT id FROM source_files WHERE movie_id=? AND available=1 ORDER BY id",
+        `SELECT s.id,s.generation,e.id editionId FROM source_files s
+      LEFT JOIN editions e ON e.source_id=s.id AND e.movie_id=s.movie_id AND e.generation=s.generation
+      WHERE s.movie_id=? AND s.available=1 AND (? IS NULL OR e.id=?) AND (? IS NULL OR s.generation=?) ORDER BY s.id`,
       )
-      .all(movieId) as { id: string }[];
+      .all(
+        movieId,
+        options?.editionId ?? null,
+        options?.editionId ?? null,
+        options?.generation ?? null,
+        options?.generation ?? null,
+      ) as Array<{ id: string; generation: string; editionId: string | null }>;
     if (sources.length !== 1)
       return {
         kind: "unsupported",
@@ -141,6 +151,11 @@ export class PlaybackService {
           : "This source is unavailable.",
       };
     const source = await this.verify(sources[0]!.id);
+    if (source.generation !== sources[0]!.generation)
+      return {
+        kind: "unsupported",
+        reason: "This edition has changed. Refresh the film.",
+      };
     const plan = await this.plan(source, profile, {
       ...options,
       startMs,
@@ -152,15 +167,48 @@ export class PlaybackService {
         kind: "unsupported",
         reason: plan.reason ?? "Unsupported format.",
       };
-    if (plan.mode === "prepare")
-      return {
-        kind: "preparing",
-        jobId: plan.assetId,
-        progress: plan.progress,
-        reason: plan.reason,
-        phase: plan.phase,
-      };
+    const preparing = (
+      jobId: string,
+      reason?: string,
+      phase = plan.phase,
+    ): PlaybackResult => ({
+      kind: "preparing",
+      jobId,
+      reason,
+      phase,
+      progress: plan.progress,
+      ...(profile === "apple-sdr-v1" && sources[0]!.editionId
+        ? {
+            preparationId: rememberPreparation(
+              this.db,
+              who,
+              movieId,
+              sources[0]!.editionId,
+              source,
+              options ?? {},
+              jobId,
+            ),
+          }
+        : {}),
+    });
     return this.db.transaction(() => {
+      // Verification and planning can yield while the film is reassigned or the screen is revoked.
+      if (
+        !this.db
+          .prepare(
+            "SELECT 1 FROM source_files WHERE id=? AND movie_id=? AND generation=? AND available=1",
+          )
+          .get(source.fileId, movieId, source.generation) ||
+        (who.deviceId &&
+          !this.db
+            .prepare("SELECT 1 FROM devices WHERE id=? AND revoked_at IS NULL")
+            .get(who.deviceId))
+      )
+        return {
+          kind: "unsupported" as const,
+          reason: "This source or device is unavailable.",
+        };
+      if (plan.mode === "prepare") return preparing(plan.assetId, plan.reason);
       const now = this.now();
       // The worker can evict between planning and this transaction. Never issue
       // a ticket to an artifact that has already been reclaimed.
@@ -172,12 +220,15 @@ export class PlaybackService {
           )
           .get(plan.assetId, source.fileId, source.generation)
       )
-        return {
-          kind: "preparing" as const,
-          jobId: plan.assetId,
-          reason: "Preparing this edition again.",
-          phase: "retrying" as const,
-        };
+        return preparing(
+          (
+            this.db
+              .prepare("SELECT id FROM jobs WHERE unique_key=?")
+              .get("browser:" + plan.assetId) as { id: string } | undefined
+          )?.id ?? plan.assetId,
+          "Preparing this edition again.",
+          "retrying",
+        );
       const previous = this.db
         .prepare(
           "SELECT * FROM playback_sessions WHERE revoked_at IS NULL AND lease_until>? AND expires_at>? LIMIT 1",
@@ -202,7 +253,7 @@ export class PlaybackService {
       ).n;
       this.db
         .prepare(
-          "INSERT INTO playback_sessions(id,ticket_hash,movie_id,source_id,generation,device_id,web_session_hash,epoch,lease_until,access_until,expires_at,asset_id,label) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+          "INSERT INTO playback_sessions(id,ticket_hash,movie_id,source_id,generation,device_id,web_session_hash,epoch,lease_until,access_until,expires_at,asset_id,label,edition_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         )
         .run(
           id,
@@ -218,6 +269,7 @@ export class PlaybackService {
           now + 21600000,
           plan.mode === "prepared" ? plan.assetId : null,
           plan.label ?? "Original",
+          sources[0]!.editionId,
         );
       this.tickets.set(id, ticket);
       return {
@@ -418,6 +470,15 @@ export class PlaybackService {
           event.ended ? 1 : 0,
           this.now(),
         );
+      this.db
+        .prepare("DELETE FROM progress_editions WHERE movie_id=?")
+        .run(row.movie_id);
+      if (row.edition_id)
+        this.db
+          .prepare(
+            "INSERT INTO progress_editions(movie_id,edition_id,generation) VALUES(?,?,?)",
+          )
+          .run(row.movie_id, row.edition_id, row.generation);
       return "accepted";
     })();
   }

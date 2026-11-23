@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#101313" />
     <meta name="color-scheme" content="dark" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" sizes="any" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta
       name="description"
       content="RAVAN. Every Story Flows. Your own private cinema, from your collection to your favourite screen."
@@ -20,6 +22,7 @@
     <style>
       html {
         background: #101313;
+        color: #f3f0e8;
       }
       #boot {
         position: fixed;
@@ -88,11 +91,10 @@
         transform: translateX(-100%);
         animation: boot-flow 1.9s cubic-bezier(0.65, 0, 0.35, 1) infinite;
       }
-      #boot svg {
+      #boot img {
         display: block;
         width: 44px;
-        height: 46px;
-        fill: #f3f0e8;
+        height: 44px;
       }
       @keyframes boot-in {
         to {
@@ -124,11 +126,7 @@
     <div id="boot" role="status">
       <div>
         <i></i>
-        <svg viewBox="22 19 42 42" aria-hidden="true" focusable="false">
-          <path
-            d="M24 59V21h16c13 0 20 5 20 15 0 7-4 11-11 13l12 10H48L34 46v13Zm10-31v12h6c7 0 10-2 10-6s-3-6-10-6Z"
-          />
-        </svg>
+        <img src="/brand/ravan-copper-mark.webp" width="44" height="44" alt="" />
       </div>
       <p>Opening your cinema</p>
       <p class="late">Still opening. Reload the page if this continues.</p>

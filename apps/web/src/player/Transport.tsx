@@ -363,11 +363,6 @@ export function Transport({
           <button
             type="button"
             className="transport-time"
-            aria-label={
-              remaining
-                ? `${lengthWords(media.span - media.time)} to go. Show time watched`
-                : `${lengthWords(media.time)} watched. Show time to go`
-            }
             onClick={() => setRemaining((r) => !r)}
           >
             {remaining
@@ -378,6 +373,11 @@ export function Transport({
                 {` / ${clockText(media.span)}`}
               </span>
             )}
+            <span className="sr-only">
+              {remaining
+                ? ". Time remaining. Show time watched"
+                : ". Time watched. Show time to go"}
+            </span>
           </button>
           <span className="transport-spacer" />
           {next && onNext && (

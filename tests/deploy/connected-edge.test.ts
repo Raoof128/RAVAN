@@ -153,3 +153,26 @@ it("overwrites client forwarding identity with the Cloudflare connection address
     ).status,
   ).toBe(200);
 });
+it("publishes only deployment-configured media origins for native clients", async () => {
+  vi.stubGlobal("fetch", async () =>
+    Response.json({
+      protocolMajor: 1,
+      mediaOrigins: ["https://unexpected.example"],
+    }),
+  );
+  const response = await worker.fetch(
+    new Request(env.PUBLIC_ORIGIN + "/api/capabilities"),
+    env,
+  );
+  expect(await response.json()).toEqual({
+    protocolMajor: 1,
+    mediaOrigins: [env.PUBLIC_ORIGIN, env.PRIVATE_ORIGIN],
+  });
+  const frontend = await worker.fetch(
+    new Request(env.PUBLIC_ORIGIN + "/api/capabilities"),
+    { RELEASE: "frontend" },
+  );
+  expect(
+    ((await frontend.json()) as { protocolMajor?: number }).protocolMajor,
+  ).toBeUndefined();
+});

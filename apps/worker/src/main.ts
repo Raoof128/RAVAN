@@ -1,3 +1,4 @@
+import { advanceNativePreparations } from "../../api/src/media/native-preparations.js";
 import { pathToFileURL } from "node:url";
 import { availableParallelism } from "node:os";
 import { join } from "node:path";
@@ -169,6 +170,7 @@ export class MediaWorker {
         capacityBytes: this.storage.capacityBytes,
       },
     );
+    await advanceNativePreparations(this.db, planner);
     const capabilities = storedCapabilities(this.db);
     const planned = new Set<string>();
     for (const source of sources) {
@@ -371,6 +373,7 @@ export class MediaWorker {
             format: z.enum(["mp4", "hls"]).default("mp4"),
             // Every audio track, each its own stream (HLS only).
             allAudio: z.boolean().default(false),
+            nativeCaptions: z.boolean().default(false),
             id: z.string().regex(ASSET_ID),
           })
           .parse(JSON.parse(job.payload));
@@ -448,6 +451,7 @@ export class MediaWorker {
             preset: this.storage.preset,
             format: data.format,
             allAudio: data.allAudio,
+            nativeCaptions: data.nativeCaptions,
             // Enough exists to start watching while the rest is produced.
             playable: () => {
               this.db

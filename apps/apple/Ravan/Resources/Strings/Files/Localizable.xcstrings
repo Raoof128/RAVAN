@@ -1,0 +1,976 @@
+{
+  "sourceLanguage": "en-AU",
+  "strings": {
+    "A study of the shore at first light, told in three tides.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A study of the shore at first light, told in three tides."
+          }
+        }
+      }
+    },
+    "Access to the file has changed. Use Locate file to grant access again.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Access to the file has changed. Use Locate file to grant access again."
+          }
+        }
+      }
+    },
+    "Another activity is using audio. When it finishes, tap Play again.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Another activity is using audio. When it finishes, tap Play again."
+          }
+        }
+      }
+    },
+    "Applies on this device when the film includes your chosen language.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Applies on this device when the film includes your chosen language."
+          }
+        }
+      }
+    },
+    "Audio": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio"
+          }
+        }
+      }
+    },
+    "Audio and captions": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio and captions"
+          }
+        }
+      }
+    },
+    "Audio could not start. Check your audio output, then tap Play again.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio could not start. Check your audio output, then tap Play again."
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        }
+      }
+    },
+    "Captions": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Captions"
+          }
+        }
+      }
+    },
+    "Check your device storage and reopen your cinema.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check your device storage and reopen your cinema."
+          }
+        }
+      }
+    },
+    "Choose Locate file on its screening card if access changes. Select the original file to keep its saved position and watchlist choice.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose Locate file on its screening card if access changes. Select the original file to keep its saved position and watchlist choice."
+          }
+        }
+      }
+    },
+    "Choose Open a Film in Files, then select a video. An H.264 MP4 with AAC audio is a good choice. To watch offline, download the film to your device in Files first.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose Open a Film in Files, then select a video. An H.264 MP4 with AAC audio is a good choice. To watch offline, download the film to your device in Files first."
+          }
+        }
+      }
+    },
+    "Choose a title to see its screening card.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a title to see its screening card."
+          }
+        }
+      }
+    },
+    "Choose another film from your library.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose another film from your library."
+          }
+        }
+      }
+    },
+    "Choose the file again in Files and check that it has downloaded to this device.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose the file again in Files and check that it has downloaded to this device."
+          }
+        }
+      }
+    },
+    "Clear history": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear history"
+          }
+        }
+      }
+    },
+    "Clear search": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear search"
+          }
+        }
+      }
+    },
+    "Clear viewing history": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear viewing history"
+          }
+        }
+      }
+    },
+    "Clear viewing history in Your Cinema to reset local viewing positions. Choose Forget this film on its screening card to remove the file reference and its activity.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear viewing history in Your Cinema to reset local viewing positions. Choose Forget this film on its screening card to remove the file reference and its activity."
+          }
+        }
+      }
+    },
+    "Clear viewing history?": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear viewing history?"
+          }
+        }
+      }
+    },
+    "Close player": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close player"
+          }
+        }
+      }
+    },
+    "Continue watching": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue watching"
+          }
+        }
+      }
+    },
+    "Destinations": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Destinations"
+          }
+        }
+      }
+    },
+    "Done": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        }
+      }
+    },
+    "During playback, tap the picture to show controls. Open the system language menu to choose among the tracks included with the film.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "During playback, tap the picture to show controls. Open the system language menu to choose among the tracks included with the film."
+          }
+        }
+      }
+    },
+    "English": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "English"
+          }
+        }
+      }
+    },
+    "English and Persian": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "English and Persian"
+          }
+        }
+      }
+    },
+    "File access needs to be restored": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File access needs to be restored"
+          }
+        }
+      }
+    },
+    "File needs locating": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File needs locating"
+          }
+        }
+      }
+    },
+    "Files": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Files"
+          }
+        }
+      }
+    },
+    "Film could not be opened": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Film could not be opened"
+          }
+        }
+      }
+    },
+    "Film unavailable": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Film unavailable"
+          }
+        }
+      }
+    },
+    "Films in Files": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Films in Files"
+          }
+        }
+      }
+    },
+    "Films on this device": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Films on this device"
+          }
+        }
+      }
+    },
+    "Find a film again": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find a film again"
+          }
+        }
+      }
+    },
+    "Forget film": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forget film"
+          }
+        }
+      }
+    },
+    "Forget this film": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forget this film"
+          }
+        }
+      }
+    },
+    "Forget this film?": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forget this film?"
+          }
+        }
+      }
+    },
+    "History and privacy": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "History and privacy"
+          }
+        }
+      }
+    },
+    "Included with RAVĀN": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Included with RAVĀN"
+          }
+        }
+      }
+    },
+    "Library": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Library"
+          }
+        }
+      }
+    },
+    "Library unavailable": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Library unavailable"
+          }
+        }
+      }
+    },
+    "Locate file": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Locate file"
+          }
+        }
+      }
+    },
+    "No films on this device": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No films on this device"
+          }
+        }
+      }
+    },
+    "No films on this device match “%@”.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No films on this device match “%@”."
+          }
+        }
+      }
+    },
+    "No saved films on this device": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No saved films on this device"
+          }
+        }
+      }
+    },
+    "No viewing history on this device": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No viewing history on this device"
+          }
+        }
+      }
+    },
+    "OK": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        }
+      }
+    },
+    "On this device": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On this device"
+          }
+        }
+      }
+    },
+    "Open a Film in Files": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a Film in Files"
+          }
+        }
+      }
+    },
+    "Open a film": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a film"
+          }
+        }
+      }
+    },
+    "Open a film and choose Save to Watchlist.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a film and choose Save to Watchlist."
+          }
+        }
+      }
+    },
+    "Open a film from Files and pick up where you left off.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a film from Files and pick up where you left off."
+          }
+        }
+      }
+    },
+    "Opening film…": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opening film…"
+          }
+        }
+      }
+    },
+    "Original surf soundtrack": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Original surf soundtrack"
+          }
+        }
+      }
+    },
+    "Paused at %@": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused at %@"
+          }
+        }
+      }
+    },
+    "Persian": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Persian"
+          }
+        }
+      }
+    },
+    "Play": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play"
+          }
+        }
+      }
+    },
+    "Play Sample Film": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play Sample Film"
+          }
+        }
+      }
+    },
+    "Play from beginning": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play from beginning"
+          }
+        }
+      }
+    },
+    "Playback help": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playback help"
+          }
+        }
+      }
+    },
+    "Playback languages": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playback languages"
+          }
+        }
+      }
+    },
+    "Playback was interrupted. Reopen the film, or choose another copy in Files.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playback was interrupted. Reopen the film, or choose another copy in Files."
+          }
+        }
+      }
+    },
+    "Plays Tide Almanac with English and Persian captions.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plays Tide Almanac with English and Persian captions."
+          }
+        }
+      }
+    },
+    "Privacy policy": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy policy"
+          }
+        }
+      }
+    },
+    "RAVĀN stores a reference to each file you choose, its title, your watchlist choice and your viewing position on this device. Your Files provider may download the film when you open it.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RAVĀN stores a reference to each file you choose, its title, your watchlist choice and your viewing position on this device. Your Files provider may download the film when you open it."
+          }
+        }
+      }
+    },
+    "RAVĀN will remove its bookmark, watchlist entry and saved position. Your original file stays in Files.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RAVĀN will remove its bookmark, watchlist entry and saved position. Your original file stays in Files."
+          }
+        }
+      }
+    },
+    "Ravān": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ravān"
+          }
+        }
+      }
+    },
+    "Remove from Watchlist": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove from Watchlist"
+          }
+        }
+      }
+    },
+    "Resume at %@": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resume at %@"
+          }
+        }
+      }
+    },
+    "Running time": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Running time"
+          }
+        }
+      }
+    },
+    "Sample film": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sample film"
+          }
+        }
+      }
+    },
+    "Save to Watchlist": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save to Watchlist"
+          }
+        }
+      }
+    },
+    "Saved on this device": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved on this device"
+          }
+        }
+      }
+    },
+    "Search": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search"
+          }
+        }
+      }
+    },
+    "Search library": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search library"
+          }
+        }
+      }
+    },
+    "Search watchlist": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search watchlist"
+          }
+        }
+      }
+    },
+    "Select a film": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select a film"
+          }
+        }
+      }
+    },
+    "Source": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source"
+          }
+        }
+      }
+    },
+    "Subtitles": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subtitles"
+          }
+        }
+      }
+    },
+    "System default": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System default"
+          }
+        }
+      }
+    },
+    "The bundled sample could not be opened.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The bundled sample could not be opened."
+          }
+        }
+      }
+    },
+    "The player could not seek to the saved position. Try Play from beginning.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The player could not seek to the saved position. Try Play from beginning."
+          }
+        }
+      }
+    },
+    "The system player cannot play this film. Choose a compatible video such as an H.264 MP4.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The system player cannot play this film. Choose a compatible video such as an H.264 MP4."
+          }
+        }
+      }
+    },
+    "The system player is temporarily unavailable. Tap Play again in a moment.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The system player is temporarily unavailable. Tap Play again in a moment."
+          }
+        }
+      }
+    },
+    "This clears saved positions for films in Files and the sample on this device. Your Watchlist is kept.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This clears saved positions for films in Files and the sample on this device. Your Watchlist is kept."
+          }
+        }
+      }
+    },
+    "This film could not be opened. Download it in Files or use Locate file to select it again.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This film could not be opened. Download it in Files or use Locate file to select it again."
+          }
+        }
+      }
+    },
+    "This film is stored online. Reconnect and download it in Files to watch it offline.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This film is stored online. Reconnect and download it in Files to watch it offline."
+          }
+        }
+      }
+    },
+    "Tide Almanac · Sample film": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tide Almanac · Sample film"
+          }
+        }
+      }
+    },
+    "Try again": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try again"
+          }
+        }
+      }
+    },
+    "Watchlist": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Watchlist"
+          }
+        }
+      }
+    },
+    "Your Cinema": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your Cinema"
+          }
+        }
+      }
+    },
+    "Your Files provider is downloading this film. Open it again when the download finishes.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your Files provider is downloading this film. Open it again when the download finishes."
+          }
+        }
+      }
+    },
+    "Your cinema": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your cinema"
+          }
+        }
+      }
+    },
+    "Your cinema could not save this change. Check the free space on your device and try again.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your cinema could not save this change. Check the free space on your device and try again."
+          }
+        }
+      }
+    },
+    "Your controls": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your controls"
+          }
+        }
+      }
+    },
+    "Your private cinema": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your private cinema"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

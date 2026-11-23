@@ -48,6 +48,9 @@ it("encrypts a consistent WAL snapshot and restores metadata plus revoked-device
   );
   const db = new Sqlite(restored, { readonly: true });
   try {
+    expect(db.prepare("SELECT id FROM server_identity").get()).not.toEqual(
+      f.db.prepare("SELECT id FROM server_identity").get(),
+    );
     expect(db.prepare("SELECT title FROM movies").get()).toEqual({
       title: "PRIVATE TEST FILM",
     });

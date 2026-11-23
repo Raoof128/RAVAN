@@ -263,7 +263,7 @@ it("reports the library as the server describes it and confirms before removing 
   fireEvent.click(screen.getByRole("button", { name: "Remove Living room" }));
   await waitFor(() => expect(api.revokeDevice).toHaveBeenCalledWith("tv"));
   expect(await screen.findByText(/Living room removed/)).toBeTruthy();
-  expect(screen.getByText("No paired televisions yet.")).toBeTruthy();
+  expect(screen.getByText("No paired screens yet.")).toBeTruthy();
 });
 
 it("applies the reduced-motion preference when it is saved, and only then", async () => {

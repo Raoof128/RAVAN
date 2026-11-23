@@ -6,6 +6,7 @@ import {
   type ReactNode,
   type Ref,
 } from "react";
+import ravanMark from "./art/ravan-copper-mark.webp";
 
 /** The copper line carrying a current: a wait with no measured length. */
 export function Flow({ className = "" }: { className?: string }) {
@@ -31,15 +32,13 @@ export function FlowProgress({
   );
 }
 
-/** The mark from the favicon; its macron is the line that moves. */
+/** The emblem stays still while the progress line shows activity. */
 export function Opening({ words }: { words: string }) {
   return (
     <div className="opening" role="status">
       <div className="opening-mark">
         <Flow />
-        <svg viewBox="22 19 42 42" aria-hidden="true" focusable="false">
-          <path d="M24 59V21h16c13 0 20 5 20 15 0 7-4 11-11 13l12 10H48L34 46v13Zm10-31v12h6c7 0 10-2 10-6s-3-6-10-6Z" />
-        </svg>
+        <img src={ravanMark} width="44" height="44" alt="" />
       </div>
       <p className="opening-words">{words}</p>
     </div>

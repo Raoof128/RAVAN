@@ -60,15 +60,17 @@ export function Poster({
  * A folder of the library, such as a series with its episodes inside: one
  * card, one link, opening to the folder's own screen.
  */
-export function FolderCard({ folder }: { folder: Folder }) {
+export function FolderCard({
+  folder,
+  heading: Heading = "h3",
+}: {
+  folder: Folder;
+  heading?: "h2" | "h3";
+}) {
   const count = `${folder.films} ${folder.films === 1 ? "film" : "films"}`;
   return (
     <article className="movie-card folder-card">
-      <a
-        href={`#/folder/${encodeURIComponent(folder.id)}`}
-        className="poster-link"
-        aria-label={`Open the folder ${folder.name}, ${count}`}
-      >
+      <div className="card-art">
         <Poster
           movie={{
             id: folder.id,
@@ -83,34 +85,52 @@ export function FolderCard({ folder }: { folder: Folder }) {
           <Icon name="folder" size={14} />
           Folder
         </span>
-      </a>
+      </div>
       <div className="movie-caption">
-        <h3>{folder.name}</h3>
+        <Heading className="card-title" aria-label={folder.name}>
+          <a
+            className="poster-link"
+            href={`#/folder/${encodeURIComponent(folder.id)}`}
+            aria-label={`Open the folder ${folder.name}, ${count}`}
+          >
+            {folder.name}
+          </a>
+        </Heading>
         <span>{count}</span>
       </div>
     </article>
   );
 }
 /**
- * One film in a grid. The poster is the card's only link and covers the whole
+ * One film in a grid. The title is the card's only link and covers the whole
  * card, so a keyboard or switch user stops once per film rather than twice.
  */
-export function MovieCard({ movie }: { movie: Movie }) {
+export function MovieCard({
+  movie,
+  heading: Heading = "h3",
+}: {
+  movie: Movie;
+  heading?: "h2" | "h3";
+}) {
   const paused = movie.available && movie.resumeMs > 0;
   return (
     <article className="movie-card">
-      <a
-        href={`#/movie/${encodeURIComponent(movie.id)}`}
-        className="poster-link"
-        aria-label={`View ${movie.title}`}
-      >
+      <div className="card-art">
         <Poster movie={movie} />
         <span className="poster-open">
           <Icon name="arrow-up-right" />
         </span>
-      </a>
+      </div>
       <div className="movie-caption">
-        <h3>{movie.title}</h3>
+        <Heading className="card-title" aria-label={movie.title}>
+          <a
+            className="poster-link"
+            href={`#/movie/${encodeURIComponent(movie.id)}`}
+            aria-label={`View ${movie.title}`}
+          >
+            {movie.title}
+          </a>
+        </Heading>
         {movie.year ? <span>{movie.year}</span> : null}
       </div>
       {!movie.available ? (

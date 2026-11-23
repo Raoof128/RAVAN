@@ -172,6 +172,7 @@ export function Library({
   // The hero carries the page's first heading. Without one, the list's does.
   const hero = featured !== null && featured !== undefined;
   const Heading = hero || (!saved && !folder && !query && first) ? "h2" : "h1";
+  const cardHeading = Heading === "h1" ? "h2" : "h3";
   const parentHref =
     !place?.parentId || place.parentId === "root"
       ? "#/library"
@@ -417,10 +418,14 @@ export function Library({
               aria-busy={loading || undefined}
             >
               {shelves.map((f) => (
-                <FolderCard folder={f} key={`folder-${f.id}`} />
+                <FolderCard
+                  folder={f}
+                  heading={cardHeading}
+                  key={`folder-${f.id}`}
+                />
               ))}
               {items.map((movie) => (
-                <MovieCard movie={movie} key={movie.id} />
+                <MovieCard movie={movie} heading={cardHeading} key={movie.id} />
               ))}
             </div>
             {cursor && (

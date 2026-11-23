@@ -406,8 +406,8 @@ export function Settings() {
             )}
           </Panel>
           <Panel
-            title="Bring the big screen"
-            lead="Open RAVAN on your TV, then enter its pairing code here."
+            title="Pair a screen"
+            lead="Open RAVAN on your device and enter its pairing code here."
           >
             <form
               className="form-stack"
@@ -420,7 +420,10 @@ export function Settings() {
                     "pairing",
                     async () => {
                       await api.approvePairing(
-                        String(data.get("code")).trim().toUpperCase(),
+                        String(data.get("code"))
+                          .replace(/\s/g, "")
+                          .toUpperCase(),
+                        data.has("watchlistWrite"),
                       );
                       form.reset();
                       deviceEdits.current++;
@@ -429,14 +432,14 @@ export function Settings() {
                         .then(setDevices)
                         .catch(() => {});
                     },
-                    "TV approved. Continue on your television.",
-                    "That code wasn’t accepted. Codes expire quickly: check the one on the TV now and enter it again.",
+                    "Device approved. Continue on your screen.",
+                    "That code wasn’t accepted. Codes expire quickly: check the one on your device and enter it again.",
                   ),
                 );
               }}
             >
               <label>
-                TV pairing code
+                Device pairing code
                 <input
                   name="code"
                   className="code-input"
@@ -444,20 +447,28 @@ export function Settings() {
                   autoCapitalize="characters"
                   autoCorrect="off"
                   spellCheck={false}
-                  placeholder="ABCD1234"
-                  maxLength={8}
-                  minLength={8}
+                  placeholder="ABCD EFGH"
+                  pattern={
+                    "\\s*[A-HJ-NP-Za-hj-np-z2-9]{4}\\s*[A-HJ-NP-Za-hj-np-z2-9]{4}\\s*"
+                  }
                   required
                   onInvalid={(e) =>
                     e.currentTarget.setCustomValidity(
-                      "Enter the eight characters shown on the TV.",
+                      "Enter the eight characters shown on the device.",
                     )
                   }
                   onInput={(e) => e.currentTarget.setCustomValidity("")}
                 />
               </label>
-              <ActionButton pending={pairBusy} pendingLabel="Approving the TV">
-                Approve this TV
+              <label className="checkbox">
+                <input type="checkbox" name="watchlistWrite" /> Allow this
+                device to change the watchlist
+              </label>
+              <ActionButton
+                pending={pairBusy}
+                pendingLabel="Approving this device"
+              >
+                Approve this device
               </ActionButton>
               <Outcome note={notes.pairing} />
             </form>
@@ -465,7 +476,7 @@ export function Settings() {
               Paired screens
             </h3>
             {devices.length === 0 ? (
-              <p className="fine-print">No paired televisions yet.</p>
+              <p className="fine-print">No paired screens yet.</p>
             ) : (
               <ul className="device-list">
                 {devices.map((d) => (
@@ -548,8 +559,8 @@ export function Settings() {
           Sign out
         </ActionButton>
         <p className="fine-print">
-          Signs this browser out. Paired televisions stay connected until you
-          remove them above.
+          Signs this browser out. Paired devices stay connected until you remove
+          them above.
         </p>
 
         <Outcome note={notes.account} />

@@ -1,4 +1,4 @@
-import type { Probe } from "../../../worker/src/probe.js";
+import { pictureMs, type Probe } from "../../../worker/src/probe.js";
 import { textSubtitles } from "../../../worker/src/compatibility.js";
 import { artworkDirectory, readArtwork } from "../../../worker/src/artwork.js";
 import {
@@ -54,7 +54,7 @@ function card(row: MovieRow): MovieCard {
     id: row.id,
     title: row.title,
     ...(row.year !== null ? { year: row.year } : {}),
-    resumeMs: row.resume_ms,
+    resumeMs: Math.round(row.resume_ms),
     available: Boolean(row.available),
     ...(row.poster_id
       ? {
@@ -129,42 +129,62 @@ export function registerCatalogue(
     const episode = episodeOf(id);
     const editions = db
       .prepare(
-        "SELECT e.id,e.label,e.state,e.source_id sourceId,COALESCE(s.available,0) available FROM editions e LEFT JOIN source_files s ON s.id=e.source_id WHERE e.movie_id=? ORDER BY e.id",
+        `
+      SELECT e.id,e.label,e.state,e.source_id sourceId,e.generation,
+        COALESCE(s.available,0) available,t.metadata
+      FROM editions e LEFT JOIN source_files s ON s.id=e.source_id AND s.movie_id=e.movie_id AND s.generation=e.generation
+      LEFT JOIN tracks t ON t.edition_id=e.id AND t.kind='probe' AND json_extract(t.metadata,'$.generation')=e.generation
+      WHERE e.movie_id=? ORDER BY e.id`,
       )
       .all(id) as Array<{
       id: string;
       label: string;
       state: string;
       sourceId: string;
+      generation: string;
       available: number;
+      metadata: string | null;
     }>;
-    const probeRow = db
+    const scoped = editions.map(({ metadata, available, ...edition }) => {
+      const probe: Probe | undefined = metadata
+        ? JSON.parse(metadata).probe
+        : undefined;
+      return {
+        ...edition,
+        available: Boolean(available),
+        ...(probe
+          ? {
+              durationMs: Math.round(pictureMs(probe)),
+              audioTracks: probe.audio.map((track, index) => ({
+                index,
+                language: trackLanguage(track.language),
+                label: audioLabel(track, index),
+              })),
+              subtitleTracks: probe.subtitles.map((track, index) => ({
+                language: trackLanguage(track.language),
+                label: trackName(track, index).replace(/^Audio /, "Subtitles "),
+                text: textSubtitles.has(track.codec),
+              })),
+            }
+          : {}),
+      };
+    });
+    const first = scoped.find((e) => e.audioTracks);
+    const resume = db
       .prepare(
-        "SELECT t.metadata FROM tracks t JOIN editions e ON e.id=t.edition_id WHERE e.movie_id=? AND t.kind='probe' LIMIT 1",
+        "SELECT edition_id resumeEditionId,generation resumeGeneration FROM progress_editions WHERE movie_id=?",
       )
-      .get(id) as { metadata: string } | undefined;
-    const probe = probeRow
-      ? (JSON.parse(probeRow.metadata) as { probe: Probe }).probe
-      : undefined;
+      .get(id) as
+      { resumeEditionId: string; resumeGeneration: string } | undefined;
     return {
-      audioTracks: probe?.audio.map((a, index) => ({
-        index,
-        language: trackLanguage(a.language),
-        label: audioLabel(a, index),
-      })),
-      subtitleTracks: probe?.subtitles.map((s, index) => ({
-        language: trackLanguage(s.language),
-        label: trackName(s, index).replace(/^Audio /, "Subtitles "),
-        text: textSubtitles.has(s.codec),
-      })),
+      ...resume,
+      audioTracks: first?.audioTracks,
+      subtitleTracks: first?.subtitleTracks,
       ...card(row),
       ...(episode ? { episode } : {}),
       description: row.description,
       saved: Boolean(row.saved),
-      editions: editions.map((e) => ({
-        ...e,
-        available: Boolean(e.available),
-      })),
+      editions: scoped,
       tracks: db
         .prepare(
           "SELECT t.id,t.kind,t.codec,t.language FROM tracks t JOIN editions e ON e.id=t.edition_id WHERE e.movie_id=? AND t.kind<>'probe'",
@@ -207,6 +227,64 @@ export function registerCatalogue(
     }
     return cards;
   }
+  app.get("/api/continue-watching", async (request, reply) => {
+    const query = z
+      .strictObject({ cursor: z.string().min(1).max(512).optional() })
+      .safeParse(request.query);
+    if (!query.success) return reply.code(400).send({ error: "invalid_query" });
+    let timestamp = Number.MAX_SAFE_INTEGER,
+      after = "";
+    if (query.data.cursor) {
+      try {
+        const raw = Buffer.from(query.data.cursor, "base64url");
+        if (raw.toString("base64url") !== query.data.cursor) throw Error();
+        [timestamp, after] = z
+          .tuple([z.number().int().nonnegative(), idSchema])
+          .parse(JSON.parse(raw.toString()));
+      } catch {
+        return reply.code(400).send({ error: "invalid_cursor" });
+      }
+    }
+    // Attributed progress belongs to one generation. Unattributed legacy progress
+    // is safe to resume only when exactly one source is available.
+    const rows = db
+      .prepare(
+        `SELECT films.*, p.updated_at played, t.metadata
+      FROM progress p JOIN (${selection}) films ON films.id=p.movie_id
+      LEFT JOIN progress_editions a ON a.movie_id=p.movie_id
+      JOIN source_files s ON s.movie_id=p.movie_id AND s.available=1
+      LEFT JOIN editions e ON e.source_id=s.id AND e.generation=s.generation AND e.movie_id=s.movie_id
+      LEFT JOIN tracks t ON t.id='probe-'||s.id AND json_extract(t.metadata,'$.generation')=s.generation
+      WHERE p.ended=0 AND p.position_ms>0
+      AND ((a.edition_id=e.id AND a.generation=s.generation) OR (a.movie_id IS NULL AND (SELECT count(*) FROM source_files other WHERE other.movie_id=p.movie_id AND other.available=1)=1))
+      AND (p.updated_at<? OR (p.updated_at=? AND p.movie_id>?))
+      ORDER BY p.updated_at DESC,p.movie_id LIMIT 41`,
+      )
+      .all(timestamp, timestamp, after) as (MovieRow & {
+      played: number;
+      metadata: string | null;
+    })[];
+    const items = rows.slice(0, 40).map((row) => {
+      const probe: Probe | undefined = row.metadata
+        ? JSON.parse(row.metadata).probe
+        : undefined;
+      return {
+        ...card(row),
+        lastPlayedAtMs: row.played,
+        ...(probe?.video ? { durationMs: Math.round(pictureMs(probe)) } : {}),
+      };
+    });
+    const last = items.at(-1);
+    return {
+      items,
+      nextCursor:
+        rows.length > 40 && last
+          ? Buffer.from(
+              JSON.stringify([last.lastPlayedAtMs, last.id]),
+            ).toString("base64url")
+          : null,
+    };
+  });
   app.get("/api/movies", async (request, reply) => {
     const query = z
       .strictObject({

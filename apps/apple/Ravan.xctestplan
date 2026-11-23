@@ -1,0 +1,41 @@
+{
+  "configurations": [
+    {
+      "id": "AF4C975B-D38C-42D7-A750-36F2F79C2BB2",
+      "name": "Cinema",
+      "options": {}
+    }
+  ],
+  "defaultOptions": {
+    "commandLineArgumentEntries": [
+      {
+        "argument": "--ravan-isolated-test",
+        "enabled": true
+      }
+    ],
+    "targetForVariableExpansion": {
+      "containerPath": "container:Ravan.xcodeproj",
+      "identifier": "765B65753EB8B209F149C2F9",
+      "name": "Ravan"
+    }
+  },
+  "testTargets": [
+    {
+      "target": {
+        "containerPath": "container:Ravan.xcodeproj",
+        "identifier": "261B5EC9FCB767A4304DD1EA",
+        "name": "RavanTests"
+      },
+      "parallelizable": false
+    },
+    {
+      "target": {
+        "containerPath": "container:Ravan.xcodeproj",
+        "identifier": "4ACD79A064C4FC1F73F3BE9E",
+        "name": "RavanUITests"
+      },
+      "parallelizable": false
+    }
+  ],
+  "version": 1
+}

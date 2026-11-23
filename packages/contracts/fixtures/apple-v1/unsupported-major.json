@@ -1,0 +1,14 @@
+{
+  "protocolMajor": 2,
+  "instanceId": "6dbeb3f2-19e7-42ee-b599-24874290ea5f",
+  "profiles": ["apple-sdr-v1"],
+  "mediaOrigins": ["https://cinema.example", "https://media.example"],
+  "features": {
+    "continueWatching": true,
+    "watchlistWrite": true,
+    "editionSelection": true,
+    "preparationStatus": true,
+    "selfRevocation": true
+  },
+  "futureField": "ignored"
+}

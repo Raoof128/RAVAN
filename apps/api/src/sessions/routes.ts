@@ -1,3 +1,4 @@
+import { preparationStatus } from "../media/native-preparations.js";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { Database } from "../../../../packages/db/src/open.js";
@@ -25,6 +26,32 @@ export function registerSessions(
   library: LibrarySync,
   cache: BlockCache,
 ) {
+  app.get("/api/capabilities", async (_request, reply) => {
+    if (
+      !config.encryptionKey ||
+      !config.ownerSubject ||
+      !config.clientId ||
+      !config.clientSecret ||
+      !config.origin.startsWith("https://")
+    )
+      return reply.code(503).send({ error: "server_not_configured" });
+    const { id } = db
+      .prepare("SELECT id FROM server_identity WHERE singleton=1")
+      .get() as { id: string };
+    return {
+      protocolMajor: 1,
+      instanceId: id,
+      profiles: ["apple-sdr-v1"],
+      mediaOrigins: [new URL(config.origin).origin],
+      features: {
+        continueWatching: true,
+        watchlistWrite: true,
+        editionSelection: true,
+        preparationStatus: true,
+        selfRevocation: true,
+      },
+    };
+  });
   const planner = new MediaPlanner(
     db,
     Boolean(config.workerKey),
@@ -44,7 +71,13 @@ export function registerSessions(
         {
           id: profile,
           platform:
-            profile === "web" ? "web" : profile === "lg-c1" ? "webos" : "tizen",
+            profile === "apple-sdr-v1"
+              ? "apple"
+              : profile === "web"
+                ? "web"
+                : profile === "lg-c1"
+                  ? "webos"
+                  : "tizen",
           verified: false,
         },
         options,
@@ -70,6 +103,17 @@ export function registerSessions(
       return { items: await planner.pictureChoices(source[0]!) };
     },
   );
+  app.get<{ Params: { id: string } }>(
+    "/api/preparations/:id",
+    async (request, reply) => {
+      const status =
+        /^[a-f0-9]{64}$/.test(request.params.id) &&
+        preparationStatus(db, principal(db, request), request.params.id);
+      if (!status)
+        return reply.code(404).send({ error: "preparation_unavailable" });
+      return status;
+    },
+  );
   app.post("/api/playback", async (request, reply) => {
     const body = playbackSchema.safeParse(request.body);
     if (!body.success)
@@ -88,6 +132,8 @@ export function registerSessions(
         body.data.replaceSessionId,
         {
           quality: body.data.quality,
+          editionId: body.data.editionId,
+          generation: body.data.generation,
           audioTrack: body.data.audioTrack,
           forceCompatible: body.data.forceCompatible,
           capabilities: body.data.capabilities,
@@ -258,12 +304,15 @@ export function registerSessions(
     { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } },
     async (request, reply) => {
       const body = z
-        .strictObject({ code: z.string().regex(/^[A-HJ-NP-Z2-9]{8}$/) })
+        .strictObject({
+          code: z.string().regex(/^[A-HJ-NP-Z2-9]{8}$/),
+          watchlistWrite: z.boolean().default(false),
+        })
         .safeParse(request.body);
       if (!body.success || !pairing)
         return reply.code(400).send({ error: "pairing_unavailable" });
       try {
-        pairing.approve(body.data.code);
+        pairing.approve(body.data.code, body.data.watchlistWrite);
         return reply.code(204).send();
       } catch {
         return reply.code(400).send({ error: "pairing_unavailable" });
@@ -284,7 +333,12 @@ export function registerSessions(
         return reply.code(400).send({ error: "pairing_unavailable" });
       try {
         return pairing.poll(body.data.id, body.data.pollSecret);
-      } catch {
+      } catch (error) {
+        if (error instanceof Error && error.message === "Poll too quickly")
+          return reply
+            .header("Retry-After", "5")
+            .code(429)
+            .send({ error: "try_later" });
         return reply.code(400).send({ error: "pairing_unavailable" });
       }
     },
@@ -306,6 +360,13 @@ export function registerSessions(
     const who = principal(db, request);
     if (!who.deviceId)
       return reply.code(400).send({ error: "pairing_unavailable" });
+    revokeDevice(db, who.deviceId);
+    return reply.code(204).send();
+  });
+  app.delete("/api/devices/self", async (request, reply) => {
+    const who = principal(db, request);
+    if (!who.deviceId)
+      return reply.code(403).send({ error: "device_required" });
     revokeDevice(db, who.deviceId);
     return reply.code(204).send();
   });

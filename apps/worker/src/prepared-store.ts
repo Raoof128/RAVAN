@@ -13,6 +13,7 @@ import { createHash } from "node:crypto";
 import type { Database } from "../../../packages/db/src/open.js";
 import { HLS_FILE } from "./hls.js";
 export const CAPACITY = 20 * 1024 ** 3;
+export const APPLE_MP4_RECIPE = "apple-sdr-v1-mp4-text-2";
 export const ASSET_ID = /^[a-f0-9]{64}$/;
 export function assetId(
   source: string,

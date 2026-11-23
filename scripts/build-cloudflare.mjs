@@ -87,6 +87,7 @@ try {
       if (
         !entry.isFile() ||
         (entry.name !== "_headers" &&
+          entry.name !== "favicon.ico" &&
           !/^LICENSE(?:_[A-Z0-9_]+)?$/.test(entry.name) &&
           !allowed.has(extname(path)))
       )

@@ -1,0 +1,872 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		09F48099D518597579CC2CE8 /* YourCinemaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D56F0FB009C6ACA9E9FDE3C5 /* YourCinemaView.swift */; };
+		0BC7FFA9224EFBA596471A3A /* FixtureCinema.swift in Sources */ = {isa = PBXBuildFile; fileRef = 058AC656E13E283A15FF02B0 /* FixtureCinema.swift */; };
+		0E976AAFE9FD2CCE8F33B1DB /* CinemaJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB95CCA7B64D5CA89ABF80AE /* CinemaJourneyTests.swift */; };
+		156282BF02267D02AB531D30 /* PairedContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEE5D619A9E8AC9EEC632734 /* PairedContractTests.swift */; };
+		185DE7C3AB463BDFE20181E4 /* TideAlmanac.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 71619826F44C2C27756675D1 /* TideAlmanac.mp4 */; };
+		21593D75AE7894A9306D619A /* CinemaRemotePlayback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F0D416A0167B21EAE22864C /* CinemaRemotePlayback.swift */; };
+		21BA28C404E8A324BD06DF68 /* PlaybackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCC8D9DCA0007758C4CF0DDF /* PlaybackCoordinator.swift */; };
+		33EE524F5F82E09D3A6321C3 /* ServerConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92F05CF301318E7C108615A3 /* ServerConnectionView.swift */; };
+		3965BC3C6C57D84564A2E1EA /* RavanRibbon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 89770C0E14443E8E3E7136C8 /* RavanRibbon.icon */; };
+		3BD6F3237FB8A69F2926B8E4 /* CinemaCollectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC8311C543D40FFC4B792ED3 /* CinemaCollectionView.swift */; };
+		46C52E3E5AD41135155142B9 /* CinemaTaskBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = EED93331499A87B7F9E7E865 /* CinemaTaskBar.swift */; };
+		4A2FBCE212A233F247763D38 /* PairedJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1717C0348AF4C8D4EF7D51 /* PairedJourneyTests.swift */; };
+		4AE549E53C84A6038527B2D2 /* CinemaAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ED71484D9B3105C51372551 /* CinemaAPI.swift */; };
+		4ECCE9E191A09BC79DFB9E2C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 25C0472347FDEA0431E41F69 /* PrivacyInfo.xcprivacy */; };
+		576C5D567F3AAE8AA84654CB /* RavanApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E95FB8939F35D6763E2B873C /* RavanApp.swift */; };
+		5927E18580079985AAC76C83 /* CinemaRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 273E7FABC5FB3ED03F9D6173 /* CinemaRootView.swift */; };
+		5A56C1E64BE907DE7CB69D10 /* Cormorant-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 6CA0530ECBDB7F0906DA588E /* Cormorant-LICENSE.txt */; };
+		5C8DF016B0A61D5AE8D29FAD /* LocalScreeningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B251D5CB8B3588AAE11D405D /* LocalScreeningView.swift */; };
+		605931A95B206B1D712ACB47 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 919096304587EAF1EAD5BD8A /* Localizable.xcstrings */; };
+		65AAF342B186C6CBF03BE507 /* ServerCatalogue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63E0CE3D953B67757C64D3AC /* ServerCatalogue.swift */; };
+		71CA8E82A12919EFE226E152 /* PairedMediaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6DA515A3CCE8C1789355BD4 /* PairedMediaTests.swift */; };
+		734E1C9ACF4CAEB5A49CF866 /* CormorantGaramond-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 9935C26A65FC2D3CE3D133C5 /* CormorantGaramond-Regular.ttf */; };
+		9831AB958C726E9838706875 /* PairedCinema.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6BA47A502DA5ACB79D9548F /* PairedCinema.swift */; };
+		AA98D35316C48BDA8A0A02AA /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 7A2616D3A69512663C616DE8 /* Localizable.xcstrings */; };
+		B3FDC19AC04791A3BE349B5F /* apple-v1 in Resources */ = {isa = PBXBuildFile; fileRef = 1C393FAC3BF03EA559629E6E /* apple-v1 */; };
+		B84904C93B34245A9626B07B /* CompactNavigationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A98066AECB468E195AF848AF /* CompactNavigationTests.swift */; };
+		BB3DA24DA69C0DAFDC172054 /* CinemaMedia.swift in Sources */ = {isa = PBXBuildFile; fileRef = A361A863D0F0E844DCC91518 /* CinemaMedia.swift */; };
+		C955BAC7AF859EC061976B31 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B285C7E3769AF4B8AD1A3F1D /* Assets.xcassets */; };
+		CA4E386E3100DCA1A1397F11 /* LocalLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55F021E674EBB3F038599923 /* LocalLibrary.swift */; };
+		D42D79A2929B7430335D5993 /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A43B737AA36EDCB589BCCF /* WelcomeView.swift */; };
+		E209B2C3039D563C3B57A8FE /* LocalCinemaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBAB8429F57399D6F551ADA1 /* LocalCinemaTests.swift */; };
+		EB85415308806DDC30DF0A27 /* CinemaTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8FDA98AC58B75A4777A434A /* CinemaTheme.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		7ACA1335564F6E99DC03C790 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2F16CDA0F7664BAC70E1E84D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 765B65753EB8B209F149C2F9;
+			remoteInfo = Ravan;
+		};
+		82B8F4A99AC51F6822CBC116 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2F16CDA0F7664BAC70E1E84D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 765B65753EB8B209F149C2F9;
+			remoteInfo = Ravan;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		058AC656E13E283A15FF02B0 /* FixtureCinema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureCinema.swift; sourceTree = "<group>"; };
+		084BE01AE190C041E2CE5E3A /* RavanTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = RavanTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		110E5F87E50AEA7691DA024B /* Ravan.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Ravan.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1A1717C0348AF4C8D4EF7D51 /* PairedJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairedJourneyTests.swift; sourceTree = "<group>"; };
+		1C393FAC3BF03EA559629E6E /* apple-v1 */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "apple-v1"; path = "../../packages/contracts/fixtures/apple-v1"; sourceTree = SOURCE_ROOT; };
+		25C0472347FDEA0431E41F69 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		273E7FABC5FB3ED03F9D6173 /* CinemaRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CinemaRootView.swift; sourceTree = "<group>"; };
+		55F021E674EBB3F038599923 /* LocalLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalLibrary.swift; sourceTree = "<group>"; };
+		63E0CE3D953B67757C64D3AC /* ServerCatalogue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerCatalogue.swift; sourceTree = "<group>"; };
+		6CA0530ECBDB7F0906DA588E /* Cormorant-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Cormorant-LICENSE.txt"; sourceTree = "<group>"; };
+		7140BC76B3C2448A14694043 /* RavanUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = RavanUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		71619826F44C2C27756675D1 /* TideAlmanac.mp4 */ = {isa = PBXFileReference; path = TideAlmanac.mp4; sourceTree = "<group>"; };
+		7A2616D3A69512663C616DE8 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		7ED71484D9B3105C51372551 /* CinemaAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CinemaAPI.swift; sourceTree = "<group>"; };
+		89770C0E14443E8E3E7136C8 /* RavanRibbon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = RavanRibbon.icon; sourceTree = "<group>"; };
+		919096304587EAF1EAD5BD8A /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		92F05CF301318E7C108615A3 /* ServerConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConnectionView.swift; sourceTree = "<group>"; };
+		9935C26A65FC2D3CE3D133C5 /* CormorantGaramond-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "CormorantGaramond-Regular.ttf"; sourceTree = "<group>"; };
+		9F0D416A0167B21EAE22864C /* CinemaRemotePlayback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CinemaRemotePlayback.swift; sourceTree = "<group>"; };
+		A361A863D0F0E844DCC91518 /* CinemaMedia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CinemaMedia.swift; sourceTree = "<group>"; };
+		A6DA515A3CCE8C1789355BD4 /* PairedMediaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairedMediaTests.swift; sourceTree = "<group>"; };
+		A98066AECB468E195AF848AF /* CompactNavigationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompactNavigationTests.swift; sourceTree = "<group>"; };
+		B251D5CB8B3588AAE11D405D /* LocalScreeningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalScreeningView.swift; sourceTree = "<group>"; };
+		B285C7E3769AF4B8AD1A3F1D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B6BA47A502DA5ACB79D9548F /* PairedCinema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairedCinema.swift; sourceTree = "<group>"; };
+		BB95CCA7B64D5CA89ABF80AE /* CinemaJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CinemaJourneyTests.swift; sourceTree = "<group>"; };
+		BBAB8429F57399D6F551ADA1 /* LocalCinemaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalCinemaTests.swift; sourceTree = "<group>"; };
+		BEE5D619A9E8AC9EEC632734 /* PairedContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairedContractTests.swift; sourceTree = "<group>"; };
+		CCC8D9DCA0007758C4CF0DDF /* PlaybackCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackCoordinator.swift; sourceTree = "<group>"; };
+		D56F0FB009C6ACA9E9FDE3C5 /* YourCinemaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YourCinemaView.swift; sourceTree = "<group>"; };
+		E8FDA98AC58B75A4777A434A /* CinemaTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CinemaTheme.swift; sourceTree = "<group>"; };
+		E95FB8939F35D6763E2B873C /* RavanApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RavanApp.swift; sourceTree = "<group>"; };
+		EED93331499A87B7F9E7E865 /* CinemaTaskBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CinemaTaskBar.swift; sourceTree = "<group>"; };
+		F0A43B737AA36EDCB589BCCF /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
+		FC8311C543D40FFC4B792ED3 /* CinemaCollectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CinemaCollectionView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		088571EF770720874CE2434C /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				6CA0530ECBDB7F0906DA588E /* Cormorant-LICENSE.txt */,
+				9935C26A65FC2D3CE3D133C5 /* CormorantGaramond-Regular.ttf */,
+				25C0472347FDEA0431E41F69 /* PrivacyInfo.xcprivacy */,
+				71619826F44C2C27756675D1 /* TideAlmanac.mp4 */,
+				E24A03DA45AD87B5C8259EE3 /* Strings */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		0A576BF4F25BD4744287ADAE /* Ravan */ = {
+			isa = PBXGroup;
+			children = (
+				B285C7E3769AF4B8AD1A3F1D /* Assets.xcassets */,
+				E95FB8939F35D6763E2B873C /* RavanApp.swift */,
+				89770C0E14443E8E3E7136C8 /* RavanRibbon.icon */,
+				EA82EBAAB84305729DC1A7D4 /* LocalLibrary */,
+				3B7663B2CC88281F91C48A47 /* Paired */,
+				C48C2592E9A768244CC2AC9C /* Playback */,
+				088571EF770720874CE2434C /* Resources */,
+				DCD899D0E27FC1B6277AF1CA /* UI */,
+			);
+			path = Ravan;
+			sourceTree = "<group>";
+		};
+		1FBB3353215D5CDFF763EFBC /* packages */ = {
+			isa = PBXGroup;
+			children = (
+				D010A76F429732100985B54B /* contracts */,
+			);
+			path = packages;
+			sourceTree = "<group>";
+		};
+		29E5BBE90D7DC1AF6B11D544 /* fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				1C393FAC3BF03EA559629E6E /* apple-v1 */,
+			);
+			path = fixtures;
+			sourceTree = "<group>";
+		};
+		3B7663B2CC88281F91C48A47 /* Paired */ = {
+			isa = PBXGroup;
+			children = (
+				7ED71484D9B3105C51372551 /* CinemaAPI.swift */,
+				A361A863D0F0E844DCC91518 /* CinemaMedia.swift */,
+				9F0D416A0167B21EAE22864C /* CinemaRemotePlayback.swift */,
+				058AC656E13E283A15FF02B0 /* FixtureCinema.swift */,
+				B6BA47A502DA5ACB79D9548F /* PairedCinema.swift */,
+				63E0CE3D953B67757C64D3AC /* ServerCatalogue.swift */,
+				92F05CF301318E7C108615A3 /* ServerConnectionView.swift */,
+			);
+			path = Paired;
+			sourceTree = "<group>";
+		};
+		4FA9BC9B9A30EA7A8B950007 /* Mov */ = {
+			isa = PBXGroup;
+			children = (
+				1FBB3353215D5CDFF763EFBC /* packages */,
+			);
+			name = Mov;
+			path = ../..;
+			sourceTree = "<group>";
+		};
+		69D82A251B2713580457B172 /* Files */ = {
+			isa = PBXGroup;
+			children = (
+				7A2616D3A69512663C616DE8 /* Localizable.xcstrings */,
+			);
+			path = Files;
+			sourceTree = "<group>";
+		};
+		6B3E542EBB50CD307A9A0255 /* RavanUITests */ = {
+			isa = PBXGroup;
+			children = (
+				BB95CCA7B64D5CA89ABF80AE /* CinemaJourneyTests.swift */,
+				A98066AECB468E195AF848AF /* CompactNavigationTests.swift */,
+				1A1717C0348AF4C8D4EF7D51 /* PairedJourneyTests.swift */,
+			);
+			path = RavanUITests;
+			sourceTree = "<group>";
+		};
+		6C781B1E22DC270793A2DB55 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				110E5F87E50AEA7691DA024B /* Ravan.app */,
+				084BE01AE190C041E2CE5E3A /* RavanTests.xctest */,
+				7140BC76B3C2448A14694043 /* RavanUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		7699265F2B5B393FB18AC176 /* RavanTests */ = {
+			isa = PBXGroup;
+			children = (
+				BBAB8429F57399D6F551ADA1 /* LocalCinemaTests.swift */,
+				BEE5D619A9E8AC9EEC632734 /* PairedContractTests.swift */,
+				A6DA515A3CCE8C1789355BD4 /* PairedMediaTests.swift */,
+			);
+			path = RavanTests;
+			sourceTree = "<group>";
+		};
+		7EEDD8A9992244050F64069A /* Paired */ = {
+			isa = PBXGroup;
+			children = (
+				919096304587EAF1EAD5BD8A /* Localizable.xcstrings */,
+			);
+			path = Paired;
+			sourceTree = "<group>";
+		};
+		9FCD88B86CD04FFE89F6613C = {
+			isa = PBXGroup;
+			children = (
+				4FA9BC9B9A30EA7A8B950007 /* Mov */,
+				0A576BF4F25BD4744287ADAE /* Ravan */,
+				7699265F2B5B393FB18AC176 /* RavanTests */,
+				6B3E542EBB50CD307A9A0255 /* RavanUITests */,
+				6C781B1E22DC270793A2DB55 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		C48C2592E9A768244CC2AC9C /* Playback */ = {
+			isa = PBXGroup;
+			children = (
+				CCC8D9DCA0007758C4CF0DDF /* PlaybackCoordinator.swift */,
+			);
+			path = Playback;
+			sourceTree = "<group>";
+		};
+		D010A76F429732100985B54B /* contracts */ = {
+			isa = PBXGroup;
+			children = (
+				29E5BBE90D7DC1AF6B11D544 /* fixtures */,
+			);
+			path = contracts;
+			sourceTree = "<group>";
+		};
+		DCD899D0E27FC1B6277AF1CA /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				FC8311C543D40FFC4B792ED3 /* CinemaCollectionView.swift */,
+				273E7FABC5FB3ED03F9D6173 /* CinemaRootView.swift */,
+				EED93331499A87B7F9E7E865 /* CinemaTaskBar.swift */,
+				E8FDA98AC58B75A4777A434A /* CinemaTheme.swift */,
+				B251D5CB8B3588AAE11D405D /* LocalScreeningView.swift */,
+				F0A43B737AA36EDCB589BCCF /* WelcomeView.swift */,
+				D56F0FB009C6ACA9E9FDE3C5 /* YourCinemaView.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		E24A03DA45AD87B5C8259EE3 /* Strings */ = {
+			isa = PBXGroup;
+			children = (
+				69D82A251B2713580457B172 /* Files */,
+				7EEDD8A9992244050F64069A /* Paired */,
+			);
+			path = Strings;
+			sourceTree = "<group>";
+		};
+		EA82EBAAB84305729DC1A7D4 /* LocalLibrary */ = {
+			isa = PBXGroup;
+			children = (
+				55F021E674EBB3F038599923 /* LocalLibrary.swift */,
+			);
+			path = LocalLibrary;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		261B5EC9FCB767A4304DD1EA /* RavanTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 53BB215472F596A46A2734B2 /* Build configuration list for PBXNativeTarget "RavanTests" */;
+			buildPhases = (
+				7B2EFD6A6B5C543C8B5BB5DA /* Sources */,
+				48C4144FA2D828CE581B9C0D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8892543C1B88611AC681C580 /* PBXTargetDependency */,
+			);
+			name = RavanTests;
+			packageProductDependencies = (
+			);
+			productName = RavanTests;
+			productReference = 084BE01AE190C041E2CE5E3A /* RavanTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		4ACD79A064C4FC1F73F3BE9E /* RavanUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 85277BAABCB4A9AE29852641 /* Build configuration list for PBXNativeTarget "RavanUITests" */;
+			buildPhases = (
+				3CE0D04C843DE27AA333EE19 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				2310002AB559FC3320EC7C92 /* PBXTargetDependency */,
+			);
+			name = RavanUITests;
+			packageProductDependencies = (
+			);
+			productName = RavanUITests;
+			productReference = 7140BC76B3C2448A14694043 /* RavanUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		765B65753EB8B209F149C2F9 /* Ravan */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F809048F7AF29F727041DBC6 /* Build configuration list for PBXNativeTarget "Ravan" */;
+			buildPhases = (
+				455DBC78565822075BAA0D2E /* Sources */,
+				B6327154B6673C1C758691D8 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Ravan;
+			packageProductDependencies = (
+			);
+			productName = Ravan;
+			productReference = 110E5F87E50AEA7691DA024B /* Ravan.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		2F16CDA0F7664BAC70E1E84D /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					4ACD79A064C4FC1F73F3BE9E = {
+						TestTargetID = 765B65753EB8B209F149C2F9;
+					};
+				};
+			};
+			buildConfigurationList = 2F23750DA5516140EA9AA8D8 /* Build configuration list for PBXProject "Ravan" */;
+			developmentRegion = "en-AU";
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				"en-AU",
+			);
+			mainGroup = 9FCD88B86CD04FFE89F6613C;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 6C781B1E22DC270793A2DB55 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				765B65753EB8B209F149C2F9 /* Ravan */,
+				261B5EC9FCB767A4304DD1EA /* RavanTests */,
+				4ACD79A064C4FC1F73F3BE9E /* RavanUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		48C4144FA2D828CE581B9C0D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B3FDC19AC04791A3BE349B5F /* apple-v1 in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B6327154B6673C1C758691D8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C955BAC7AF859EC061976B31 /* Assets.xcassets in Resources */,
+				5A56C1E64BE907DE7CB69D10 /* Cormorant-LICENSE.txt in Resources */,
+				734E1C9ACF4CAEB5A49CF866 /* CormorantGaramond-Regular.ttf in Resources */,
+				AA98D35316C48BDA8A0A02AA /* Localizable.xcstrings in Resources */,
+				605931A95B206B1D712ACB47 /* Localizable.xcstrings in Resources */,
+				4ECCE9E191A09BC79DFB9E2C /* PrivacyInfo.xcprivacy in Resources */,
+				3965BC3C6C57D84564A2E1EA /* RavanRibbon.icon in Resources */,
+				185DE7C3AB463BDFE20181E4 /* TideAlmanac.mp4 in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		3CE0D04C843DE27AA333EE19 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0E976AAFE9FD2CCE8F33B1DB /* CinemaJourneyTests.swift in Sources */,
+				B84904C93B34245A9626B07B /* CompactNavigationTests.swift in Sources */,
+				4A2FBCE212A233F247763D38 /* PairedJourneyTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		455DBC78565822075BAA0D2E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4AE549E53C84A6038527B2D2 /* CinemaAPI.swift in Sources */,
+				3BD6F3237FB8A69F2926B8E4 /* CinemaCollectionView.swift in Sources */,
+				BB3DA24DA69C0DAFDC172054 /* CinemaMedia.swift in Sources */,
+				21593D75AE7894A9306D619A /* CinemaRemotePlayback.swift in Sources */,
+				5927E18580079985AAC76C83 /* CinemaRootView.swift in Sources */,
+				46C52E3E5AD41135155142B9 /* CinemaTaskBar.swift in Sources */,
+				EB85415308806DDC30DF0A27 /* CinemaTheme.swift in Sources */,
+				0BC7FFA9224EFBA596471A3A /* FixtureCinema.swift in Sources */,
+				CA4E386E3100DCA1A1397F11 /* LocalLibrary.swift in Sources */,
+				5C8DF016B0A61D5AE8D29FAD /* LocalScreeningView.swift in Sources */,
+				9831AB958C726E9838706875 /* PairedCinema.swift in Sources */,
+				21BA28C404E8A324BD06DF68 /* PlaybackCoordinator.swift in Sources */,
+				576C5D567F3AAE8AA84654CB /* RavanApp.swift in Sources */,
+				65AAF342B186C6CBF03BE507 /* ServerCatalogue.swift in Sources */,
+				33EE524F5F82E09D3A6321C3 /* ServerConnectionView.swift in Sources */,
+				D42D79A2929B7430335D5993 /* WelcomeView.swift in Sources */,
+				09F48099D518597579CC2CE8 /* YourCinemaView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7B2EFD6A6B5C543C8B5BB5DA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E209B2C3039D563C3B57A8FE /* LocalCinemaTests.swift in Sources */,
+				156282BF02267D02AB531D30 /* PairedContractTests.swift in Sources */,
+				71CA8E82A12919EFE226E152 /* PairedMediaTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		2310002AB559FC3320EC7C92 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 765B65753EB8B209F149C2F9 /* Ravan */;
+			targetProxy = 7ACA1335564F6E99DC03C790 /* PBXContainerItemProxy */;
+		};
+		8892543C1B88611AC681C580 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 765B65753EB8B209F149C2F9 /* Ravan */;
+			targetProxy = 82B8F4A99AC51F6822CBC116 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		1112BB936FE1C254076EAA18 /* StoreFiles */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = RavanRibbon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				EXCLUDED_SOURCE_FILE_NAMES = "$(inherited) */Strings/Paired/Localizable.xcstrings";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = AppInfo.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "RAVĀN";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = au.ravan.cinema;
+				PRODUCT_NAME = Ravan;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = StoreFiles;
+		};
+		1DB482772B8CC49141851D26 /* PersonalPaired */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG PAIRED";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = PersonalPaired;
+		};
+		2A63D186F03077214BB6FF07 /* PersonalPaired */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = RavanRibbon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				EXCLUDED_SOURCE_FILE_NAMES = "$(inherited) */Strings/Files/Localizable.xcstrings";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = AppInfo.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "RAVĀN";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Connect to the personal cinema server you choose on your network.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = au.ravan.cinema.personal;
+				PRODUCT_NAME = Ravan;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = PersonalPaired;
+		};
+		38CD4E9ADFF7BAA7E1913800 /* StorePaired */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) PAIRED";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = StorePaired;
+		};
+		648BEA7F169C61054A621D4C /* PersonalPaired */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = au.ravan.cinema.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Ravan.app/Ravan";
+			};
+			name = PersonalPaired;
+		};
+		70E6D2EF65A9B122A76E530A /* StorePaired */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = au.ravan.cinema.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Ravan.app/Ravan";
+			};
+			name = StorePaired;
+		};
+		7B534AABE21A703DA54A4E7D /* PersonalPaired */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = au.ravan.cinema.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Ravan;
+			};
+			name = PersonalPaired;
+		};
+		7E99EF772562883E96E2E1FF /* StoreFiles */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = au.ravan.cinema.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Ravan;
+			};
+			name = StoreFiles;
+		};
+		836A0408B6FF8B094CD522DC /* StorePaired */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = au.ravan.cinema.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Ravan;
+			};
+			name = StorePaired;
+		};
+		B4572FC11D43F3EAF5D03A39 /* StorePaired */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = RavanRibbon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				EXCLUDED_SOURCE_FILE_NAMES = "$(inherited) */Strings/Files/Localizable.xcstrings";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = AppInfo.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "RAVĀN";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Connect to the personal cinema server you choose on your network.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = au.ravan.cinema;
+				PRODUCT_NAME = Ravan;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = StorePaired;
+		};
+		C19BB44E35F3417CF76A1426 /* StoreFiles */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = au.ravan.cinema.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Ravan.app/Ravan";
+			};
+			name = StoreFiles;
+		};
+		F45E02029A2ECF255AE65354 /* StoreFiles */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = StoreFiles;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		2F23750DA5516140EA9AA8D8 /* Build configuration list for PBXProject "Ravan" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1DB482772B8CC49141851D26 /* PersonalPaired */,
+				F45E02029A2ECF255AE65354 /* StoreFiles */,
+				38CD4E9ADFF7BAA7E1913800 /* StorePaired */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = PersonalPaired;
+		};
+		53BB215472F596A46A2734B2 /* Build configuration list for PBXNativeTarget "RavanTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				648BEA7F169C61054A621D4C /* PersonalPaired */,
+				C19BB44E35F3417CF76A1426 /* StoreFiles */,
+				70E6D2EF65A9B122A76E530A /* StorePaired */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = PersonalPaired;
+		};
+		85277BAABCB4A9AE29852641 /* Build configuration list for PBXNativeTarget "RavanUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7B534AABE21A703DA54A4E7D /* PersonalPaired */,
+				7E99EF772562883E96E2E1FF /* StoreFiles */,
+				836A0408B6FF8B094CD522DC /* StorePaired */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = PersonalPaired;
+		};
+		F809048F7AF29F727041DBC6 /* Build configuration list for PBXNativeTarget "Ravan" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2A63D186F03077214BB6FF07 /* PersonalPaired */,
+				1112BB936FE1C254076EAA18 /* StoreFiles */,
+				B4572FC11D43F3EAF5D03A39 /* StorePaired */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = PersonalPaired;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 2F16CDA0F7664BAC70E1E84D /* Project object */;
+}

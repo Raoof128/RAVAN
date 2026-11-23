@@ -27,6 +27,8 @@ const deviceReadRoutes = new Set([
   "/api/movies",
   "/api/movies/:id",
   "/api/preferences",
+  "/api/continue-watching",
+  "/api/preparations/:id",
   "/api/artwork/:id",
 ]);
 const deviceRoutes = new Set([
@@ -217,7 +219,13 @@ export function registerAuth(
   });
   app.get("/api/session", async (request) => {
     const device = findDevice(db, request);
-    if (device) return { authenticated: true, configured, deviceId: device.id };
+    if (device)
+      return {
+        authenticated: true,
+        configured,
+        deviceId: device.id,
+        permissions: device.watchlist_write ? ["watchlist:write"] : [],
+      };
     const session = findSession(db, request);
     if (session)
       return { authenticated: true, configured, csrfToken: session.csrf };
@@ -239,11 +247,16 @@ export function registerAuth(
   // handler while its raw URL does not start with "/api/".
   app.addHook("preHandler", async (request, reply) => {
     const route = request.routeOptions.url ?? "";
+    if (request.method === "GET" && route === "/api/capabilities") return;
     if (!route.startsWith("/api/") || publicApiRoutes.has(route)) return;
     const device = findDevice(db, request);
     if (device) {
       const allowed =
         (request.method === "GET" && deviceReadRoutes.has(route)) ||
+        (request.method === "DELETE" && route === "/api/devices/self") ||
+        (request.method === "PUT" &&
+          route === "/api/watchlist/:id" &&
+          device.watchlist_write === 1) ||
         deviceRoutes.has(route);
       if (allowed) return;
       return reply.code(403).send({ error: "owner_required" });

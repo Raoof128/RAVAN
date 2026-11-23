@@ -1,4 +1,12 @@
-import { mkdir, rm, rename, stat, readFile, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  rm,
+  rename,
+  stat,
+  statfs,
+  readFile,
+  writeFile,
+} from "node:fs/promises";
 import { join } from "node:path";
 import { runProcess } from "./process.js";
 import { pictureMs, probeMedia, type Probe } from "./probe.js";
@@ -10,6 +18,7 @@ import {
   type Quality,
 } from "./compatibility.js";
 import { trackLanguage, trackName } from "./tracks.js";
+import iso639 from "./iso-639-2.json" with { type: "json" };
 export { trackLanguage, trackName } from "./tracks.js";
 import {
   directoryBytes,
@@ -52,6 +61,24 @@ export function captionsTooDense(text: string): boolean {
   }
   return false;
 }
+// MP4 stores a three-letter language in its media header. Map the alpha-2
+// and bibliographic aliases using the Library of Congress ISO 639-2 registry:
+// https://www.loc.gov/standards/iso639-2/ISO-639-2_utf-8.txt
+const mp4Codes: Readonly<Record<string, string>> = iso639;
+function mp4Language(value: string): string {
+  if (value.length > 128) return "und";
+  try {
+    const locale = new Intl.Locale(value);
+    const base = value.split("-", 1)[0]!.toLowerCase();
+    // Preserve a specific three-letter language even if ICU groups it under
+    // a macrolanguage. Script and region cannot fit in this MP4 field.
+    if (/^[a-z]{3}$/.test(base)) return mp4Codes[base] ?? base;
+    return mp4Codes[locale.language ?? ""] ?? "und";
+  } catch {
+    return "und";
+  }
+}
+
 export async function prepareBrowser(
   source: string,
   output: string,
@@ -82,6 +109,8 @@ export async function prepareBrowser(
      * switch between them. Only for "hls", and only with more than one track.
      */
     allAudio?: boolean;
+    /** MP4 recipe with validated timed text in the native media-selection group. */
+    nativeCaptions?: boolean;
     verify: () => Promise<void>;
   },
 ) {
@@ -278,6 +307,12 @@ export async function prepareBrowser(
       "-1",
       ...pictureArgs,
       ...(selected ? audioCodec(selected) : []),
+      ...(selected && options.nativeCaptions
+        ? [
+            "-metadata:s:a:0",
+            "language=" + mp4Language(selected.language ?? "und"),
+          ]
+        : []),
       ...(streaming
         ? [
             // Segments must start on a keyframe. A copied picture is cut at the
@@ -440,6 +475,91 @@ export async function prepareBrowser(
       if (captionsTooDense(text))
         await rm(join(partial, c.file), { force: true });
       else kept.push(c);
+    }
+    if (options.nativeCaptions && kept.length) {
+      // Only mux caption files that passed the same cue-density and size checks as
+      // web playback. Inputs here are local, server-generated files in a private directory.
+      const video = join(partial, "video.mp4");
+      const output = join(partial, "captioned.mp4");
+      const space = await statfs(partial, { bigint: true });
+      const limit = Math.min(
+        options.maxBytes,
+        Number(space.bavail * space.bsize) - 256 * 1024 ** 2,
+      );
+      if (limit < bytes) throw Error("Output budget exceeded");
+      await runProcess(
+        "ffmpeg",
+        [
+          "-nostdin",
+          "-v",
+          "error",
+          "-protocol_whitelist",
+          "file",
+          "-f",
+          "mov",
+          "-i",
+          video,
+          ...kept.flatMap((c) => [
+            "-protocol_whitelist",
+            "file",
+            "-f",
+            "webvtt",
+            "-i",
+            join(partial, c.file),
+          ]),
+          "-map",
+          "0:v:0",
+          "-map",
+          "0:a?",
+          ...kept.flatMap((c, i) => [
+            "-map",
+            String(i + 1) + ":s:0",
+            "-metadata:s:s:" + i,
+            "language=" + mp4Language(c.language),
+            "-metadata:s:s:" + i,
+            "handler_name=" + c.label,
+            "-disposition:s:" + i,
+            "0",
+          ]),
+          "-map_metadata",
+          "-1",
+          "-c:v",
+          "copy",
+          "-c:a",
+          "copy",
+          ...(selected
+            ? [
+                "-metadata:s:a:0",
+                "language=" + mp4Language(selected.language ?? "und"),
+              ]
+            : []),
+          "-c:s",
+          "mov_text",
+          "-t",
+          filmSeconds,
+          "-movflags",
+          "+faststart",
+          "-fs",
+          String(limit),
+          "-f",
+          "mp4",
+          output,
+        ],
+        signal,
+        48 * 3600000,
+      );
+      const packaged = await probeMedia(output, signal);
+      const packagedBytes = (await stat(output)).size;
+      if (
+        !packaged.video ||
+        !complete(pictureMs(packaged)) ||
+        packagedBytes >= limit ||
+        packaged.subtitles.length !== kept.length ||
+        packaged.subtitles.some((t) => t.codec !== "mov_text")
+      )
+        throw Error("Native media package failed validation");
+      await rename(output, video);
+      bytes = packagedBytes;
     }
     await options.verify();
     signal.throwIfAborted();

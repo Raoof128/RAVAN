@@ -55,6 +55,16 @@ const shapes = {
     </>
   ),
   settings: <path d="M3 7h7m4 0h7M3 17h11m4 0h3M10 4v6m4 4v6" />,
+  film: (
+    <>
+      <rect x="3" y="4.5" width="18" height="15" rx="2" />
+      <path d="M7.5 5v14m9-14v14M3 9.5h4m-4 5h4m10-5h4m-4 5h4" />
+    </>
+  ),
+  bookmark: <path d="M6 5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16l-6-4-6 4z" />,
+  book: (
+    <path d="M12 6v14M3 4.5c3.3-.5 6 .1 9 2 3-1.9 5.7-2.5 9-2v14c-3.3-.5-6 .1-9 2-3-1.9-5.7-2.5-9-2z" />
+  ),
   index: (
     <>
       <rect x="3" y="4" width="7" height="16" rx="1" />

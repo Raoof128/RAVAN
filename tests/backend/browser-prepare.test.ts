@@ -132,6 +132,55 @@ it.each(["libx264", "mpeg4", "libvpx-vp9"])(
     expect(probe.durationMs).toBeGreaterThan(1900);
   },
 );
+it("writes native track languages for ISO codes, regional tags and malformed metadata", async () => {
+  const f = await fixture("libx264", false, 3);
+  const signal = new AbortController().signal;
+  const source = join(f.dir, "languages.mkv");
+  await runProcess(
+    "ffmpeg",
+    [
+      "-v",
+      "error",
+      "-i",
+      f.input,
+      "-map",
+      "0",
+      "-c",
+      "copy",
+      "-metadata:s:a:0",
+      "language=fr-CA",
+      "-metadata:s:s:0",
+      "language=de",
+      "-metadata:s:s:1",
+      "language=zh-Hant-TW",
+      "-metadata:s:s:2",
+      "language=invalid_tag",
+      source,
+    ],
+    signal,
+    15000,
+  );
+  const probe = await probeMedia(source, signal);
+  expect(probe.audio[0]?.language).toBe("fr-CA");
+  expect(probe.subtitles.map((s) => s.language)).toEqual([
+    "de",
+    "zh-Hant-TW",
+    "invalid_tag",
+  ]);
+  const out = join(f.dir, "native");
+  await prepareBrowser(source, out, probe, "auto", 0, signal, {
+    maxBytes: 8 * 1024 ** 2,
+    verify: async () => {},
+    nativeCaptions: true,
+  });
+  const native = await probeMedia(join(out, "video.mp4"), signal);
+  expect(native.audio[0]?.language).toBe("fra");
+  expect(native.subtitles.map((s) => s.language)).toEqual([
+    "deu",
+    "zho",
+    "und",
+  ]);
+});
 it.skipIf(
   !execFileSync("ffmpeg", ["-hide_banner", "-filters"], {
     encoding: "utf8",

@@ -36,11 +36,13 @@ export function trackName(
     ? language
     : `Audio ${position + 1}`;
 }
+// Both the catalogue and HLS writer accept the same bounded, plain tags.
+// A film may give both a script and region (for example "zh-Hant-TW").
+export const safeTrackLanguage =
+  /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}|-[A-Za-z]{4}-(?:[A-Za-z]{2}|[0-9]{3}))?$/;
 /** A language code the player can use, or "und". */
 export function trackLanguage(language?: string) {
-  return language && /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(language)
-    ? language
-    : "und";
+  return language && safeTrackLanguage.test(language) ? language : "und";
 }
 const channelNames: Record<number, string> = {
   1: "mono",

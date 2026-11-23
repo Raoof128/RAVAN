@@ -17,6 +17,8 @@ import {
   type ApiClient,
 } from "../../../packages/client/src/api.js";
 import type { SessionState } from "../../../packages/contracts/src/index.js";
+import ravanMark from "../../../packages/ui/src/art/ravan-copper-mark.webp";
+import { Icon } from "../../../packages/ui/src/Icon.js";
 import { StatusPanel } from "../../../packages/ui/src/StatusPanel.js";
 import {
   ActionButton,
@@ -31,6 +33,7 @@ import { Watchlist } from "./pages/Watchlist.js";
 import "../../../packages/ui/src/tokens.css";
 import "../../../packages/ui/src/loading.css";
 import "./cinema.css";
+import "./taskbar.css";
 // The first screen is the library or the sign-in page. Everything else is
 // fetched when it is first opened, and warmed once the browser is idle.
 const pages = {
@@ -101,6 +104,12 @@ class ScreenBoundary extends Component<
   }
 }
 const signedOut = "ravan:signed-out";
+const destinations = [
+  { route: "/library", label: "Library", icon: "film" },
+  { route: "/watchlist", label: "Watchlist", icon: "bookmark" },
+  { route: "/reading", label: "Reading room", icon: "book" },
+  { route: "/settings", label: "Your cinema", icon: "settings" },
+] as const;
 /**
  * A session can end while a page is open: it expires, or the owner signs out
  * in another tab. Any request that then comes back 401 says so once, and the
@@ -141,6 +150,11 @@ function App({ api }: { api: ApiClient }) {
   const playerId = routeParam(route, "/player/");
   const folderId = routeParam(route, "/folder/");
   const readingFolder = routeParam(route, "/reading/folder/");
+  const activeDestination =
+    destinations.find((item) => item.route === route)?.route ??
+    (readingFolder !== undefined ? "/reading" : "/library");
+  const currentLocation =
+    movieId !== undefined || playerId !== undefined ? "location" : "page";
   const [session, setSession] = useState<SessionState>(),
     [error, setError] = useState(false),
     [retry, setRetry] = useState(0),
@@ -244,8 +258,10 @@ function App({ api }: { api: ApiClient }) {
       )}
       <header
         className={`site-header${authenticated ? " site-header-browse" : ""}`}
+        data-player={playerId !== undefined || undefined}
       >
         <a href="#/library" className="wordmark" aria-label="RAVĀN home">
+          <img src={ravanMark} width="32" height="32" alt="" />
           RAVĀN
         </a>
         <span className="brand-caption">
@@ -255,39 +271,25 @@ function App({ api }: { api: ApiClient }) {
         </span>
         {authenticated ? (
           <>
-            <nav aria-label="Main navigation">
-              <a
-                href="#/library"
-                aria-current={
-                  route === "/library" || folderId !== undefined
-                    ? "page"
-                    : undefined
-                }
-              >
-                Library
-              </a>
-              <a
-                href="#/watchlist"
-                aria-current={route === "/watchlist" ? "page" : undefined}
-              >
-                Watchlist
-              </a>
-              <a
-                href="#/reading"
-                aria-current={
-                  route === "/reading" || readingFolder !== undefined
-                    ? "page"
-                    : undefined
-                }
-              >
-                Reading room
-              </a>
-              <a
-                href="#/settings"
-                aria-current={route === "/settings" ? "page" : undefined}
-              >
-                Your cinema
-              </a>
+            <nav
+              className="taskbar"
+              aria-label="Main navigation"
+              data-destination={activeDestination.slice(1)}
+            >
+              {destinations.map((item) => (
+                <a
+                  key={item.route}
+                  href={`#${item.route}`}
+                  aria-current={
+                    item.route === activeDestination
+                      ? currentLocation
+                      : undefined
+                  }
+                >
+                  <Icon name={item.icon} size={18} />
+                  <span>{item.label}</span>
+                </a>
+              ))}
             </nav>
             {!isPreview && (
               <ActionButton

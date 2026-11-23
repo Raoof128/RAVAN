@@ -352,7 +352,7 @@ nav a[aria-current]:after {
   min-width: 0;
   animation: enter 0.4s both;
 }
-.poster-link {
+.card-art {
   display: block;
   position: relative;
   overflow: hidden;
@@ -430,16 +430,8 @@ nav a[aria-current]:after {
   transform: translateY(8px);
   transition: 0.2s;
 }
-/* Separate rules: a browser without :focus-visible drops a whole list. */
-.poster-link:hover .poster-open {
-  opacity: 1;
-  transform: translateY(0);
-}
-.poster-link:focus-visible .poster-open {
-  opacity: 1;
-  transform: translateY(0);
-}
-[data-focus-visible="fallback"] .poster-link:focus .poster-open {
+.movie-card:hover .poster-open,
+.movie-card:focus-within .poster-open {
   opacity: 1;
   transform: translateY(0);
 }
@@ -466,7 +458,7 @@ nav a[aria-current]:after {
   gap: 8px;
   margin-top: 14px;
 }
-.movie-caption h3 {
+.movie-caption .card-title {
   font-size: 0.8rem;
   font-weight: 500;
   line-height: 1.5;
@@ -833,7 +825,7 @@ nav a[aria-current]:after {
   .poster-title {
     font-size: 1.9333rem;
   }
-  .movie-caption h3 {
+  .movie-caption .card-title {
     font-size: 0.8rem;
   }
   .movie-caption > span {
@@ -895,7 +887,7 @@ nav a[aria-current]:after {
 }
 .feature h1,
 .poster-title,
-.movie-caption h3,
+.movie-caption .card-title,
 .detail-copy h1 {
   overflow-wrap: anywhere;
 }
@@ -1060,9 +1052,11 @@ nav a[aria-current]:after {
   animation: none;
 }
 .poster-link {
-  position: static;
+  color: inherit;
+  text-decoration: none;
 }
 .poster-link:after {
+  z-index: 1;
   content: "";
   position: absolute;
   top: 0;
@@ -1070,7 +1064,7 @@ nav a[aria-current]:after {
   bottom: 0;
   left: 0;
 }
-.poster-link .poster {
+.card-art .poster {
   border-radius: 3px;
 }
 /* Percentage margins resolve against the card's width, and the poster is
@@ -1082,10 +1076,10 @@ nav a[aria-current]:after {
   margin-top: calc(150% - 46px);
   pointer-events: none;
 }
-.movie-card:hover .movie-caption h3 {
+.movie-card:hover .movie-caption .card-title {
   color: var(--focus);
 }
-.movie-caption h3 {
+.movie-caption .card-title {
   transition: color var(--dur-quick) linear;
 }
 .movie-meta {

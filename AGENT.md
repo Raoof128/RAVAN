@@ -496,3 +496,9 @@ Raouf: 2026-11-22 (Australia/Sydney), forty-third entry
 - Follow-ups: confirm the last Berserk cover; the owner to open a volume over 100 MB signed in.
 - Rule: run each release step only if the one before passed (`set -e`, or `&&` between steps). A failed release test stops the deploy, even when the failure looks like load.
 - Rule: a rehearsal that calls the worker's `queueLibrary` must give it storage in empty temporary folders: planning with storage also sweeps picture files and prunes editions, and must never reach the live folders from a copy of the database.
+
+## Apple client
+
+Build the SwiftUI project with the iPhoneOS SDK and use a connected physical device for hardware testing. See [the build guide](apps/apple/README.md) for the three configurations and isolated fixtures.
+
+The paired build stores device credentials in a device-only Keychain item. The Files build excludes pairing at compile time. An authenticated preparation-status request reads progress without creating a playback lease. Deploy schema 13 with its matching API and worker.

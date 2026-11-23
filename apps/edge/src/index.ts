@@ -140,6 +140,20 @@ export default {
             },
           ),
         );
+        if (
+          request.method === "GET" &&
+          path === "/api/capabilities" &&
+          upstream.ok
+        ) {
+          const discovery = (await upstream.json()) as {
+            protocolMajor: number;
+          };
+          // Only deployment configuration decides where a player may follow media.
+          return json({
+            ...discovery,
+            mediaOrigins: [...new Set([publicOrigin!, origin!])],
+          });
+        }
         const responseHeaders = new Headers(upstream.headers);
         responseHeaders.delete("server");
         responseHeaders.delete("x-powered-by");

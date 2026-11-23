@@ -129,6 +129,8 @@ test("opens Drive EPUB, blocks active content, adjusts text and resumes server-s
   await expect(
     page.getByRole("heading", { name: "The quiet chapter" }),
   ).toBeVisible();
+  const navigation = page.getByRole("navigation", { name: "Main navigation" });
+  await expect(navigation).toBeHidden();
   await page.getByRole("button", { name: "Reading settings" }).click();
   await page.getByLabel("Text size").selectOption("28");
   await page.keyboard.press("Escape");
@@ -138,6 +140,7 @@ test("opens Drive EPUB, blocks active content, adjusts text and resumes server-s
     page.getByRole("heading", { name: "A second morning" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Back to reading room" }).click();
+  await expect(navigation).toBeVisible();
   await expect.poll(() => saves.length).toBeGreaterThan(0);
   await page.reload();
   await page.getByRole("button", { name: /A small story.*Continue/ }).click();

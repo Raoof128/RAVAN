@@ -282,30 +282,22 @@ body {
 .poster-grid {
   gap: 24px;
 }
-.poster-link {
+.card-art {
   border-radius: 3px;
   box-shadow: 0 14px 30px #0003;
   transition:
     transform 0.25s ease,
     box-shadow 0.25s ease;
 }
-/* Separate rules: a browser without :focus-visible drops a whole list. */
-.poster-link:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 19px 40px #0006;
-}
-.poster-link:focus-visible {
-  transform: translateY(-6px);
-  box-shadow: 0 19px 40px #0006;
-}
-[data-focus-visible="fallback"] .poster-link:focus {
+.movie-card:hover .card-art,
+.movie-card:focus-within .card-art {
   transform: translateY(-6px);
   box-shadow: 0 19px 40px #0006;
 }
 .movie-caption {
   margin-top: 16px;
 }
-.movie-caption h3 {
+.movie-caption .card-title {
   font-size: 0.8667rem;
 }
 .movie-caption > span {
@@ -583,7 +575,7 @@ body {
     gap: 5px;
     flex-wrap: wrap;
   }
-  .movie-caption h3 {
+  .movie-caption .card-title {
     font-size: 0.8rem;
   }
   .movie-meta {
@@ -618,21 +610,16 @@ body {
     transition: none !important;
     scroll-behavior: auto !important;
   }
-  .poster-link:hover {
-    transform: none;
-  }
-  .poster-link:focus-visible {
-    transform: none;
-  }
-  [data-focus-visible="fallback"] .poster-link:focus {
+  .movie-card:hover .card-art,
+  .movie-card:focus-within .card-art {
     transform: none;
   }
 }
 
 /* RAVĀN: flowing stories, a restrained typographic signature. */
 .site-header .wordmark {
-  font: 500 2.1333rem/1 var(--body);
-  letter-spacing: 0.14em;
+  font: 400 2.1333rem/1 var(--serif);
+  letter-spacing: 0.09em;
   top: 0;
 }
 .page-footer > span:first-child {
@@ -1051,9 +1038,15 @@ body {
   display: inline-flex;
   align-items: center;
 }
+.site-header .wordmark img {
+  width: clamp(24px, 2.4vw, 34px);
+  height: auto;
+  flex: none;
+}
 .site-header .wordmark {
   display: inline-flex;
   align-items: center;
+  gap: 0.32em;
   min-height: 44px;
 }
 .shell-notice {
@@ -1571,7 +1564,7 @@ body {
 .brand-caption {
   font-size: 0.6667rem;
 }
-.movie-caption h3 {
+.movie-caption .card-title {
   font-size: 0.9333rem;
 }
 .movie-caption > span,
@@ -1670,7 +1663,7 @@ body {
     font-size: 0.6667rem;
     letter-spacing: 0.14em;
   }
-  .movie-caption h3 {
+  .movie-caption .card-title {
     font-size: 0.8667rem;
   }
   .movie-meta {
@@ -2255,7 +2248,6 @@ button.danger:hover {
   max-width: calc(100% - 36px);
   padding: 10px;
   border: 1px solid var(--line);
-  border-left: 2px solid var(--accent);
   border-radius: 3px;
   background: #090c0be8;
   box-shadow: 0 18px 40px #0008;

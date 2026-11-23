@@ -83,6 +83,11 @@ test("the opening screen covers the session check and leaves the moment it is an
   await page.goto("/");
   const boot = page.locator("#boot");
   await expect(boot).toBeVisible();
+  await expect
+    .poll(() =>
+      boot.locator("img").evaluate((img: HTMLImageElement) => img.naturalWidth),
+    )
+    .toBeGreaterThan(0);
   await expect(boot.getByText("Opening your cinema")).toBeVisible();
   // Nothing behind it can be reached while it is up.
   await expect(

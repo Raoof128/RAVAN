@@ -67,7 +67,8 @@ test("Back retains a film from the second catalogue page", async ({ page }) => {
   await page.goto("http://127.0.0.1:5174/");
   await page.getByRole("button", { name: "More films", exact: true }).click();
   const item = page.locator('[data-focus-id="movie-late"]');
-  await item.click();
+  await expect(item).toBeFocused();
+  await page.keyboard.press("Enter");
   await expect(
     page.getByRole("heading", { name: "The forty-first film" }),
   ).toBeVisible();

@@ -61,6 +61,10 @@ async function film(dir: string) {
       "3:s",
       "-c:v",
       "libx264",
+      "-threads:v",
+      "1",
+      "-preset",
+      "ultrafast",
       "-g",
       "48",
       "-pix_fmt",
@@ -72,6 +76,8 @@ async function film(dir: string) {
       "-metadata:s:a:0",
       "language=eng",
       "-metadata:s:a:1",
+      "language=fas",
+      "-metadata:s:s:0",
       "language=fas",
       "-t",
       "20",
@@ -224,6 +230,76 @@ it("prepares a film in two languages and plays every part of it over HTTP", asyn
         capabilities: { video: ["h264"], audio: ["aac"], containers: ["mp4"] },
       },
     });
+  const pair = async (name: string) => {
+    const challenge = (
+      await app.inject({
+        method: "POST",
+        url: "/api/pairing",
+        payload: { name },
+      })
+    ).json();
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/pairing/approve",
+          headers,
+          payload: { code: challenge.code },
+        })
+      ).statusCode,
+    ).toBe(204);
+    const approval = (
+      await app.inject({
+        method: "POST",
+        url: "/api/pairing/poll",
+        payload: { id: challenge.id, pollSecret: challenge.pollSecret },
+      })
+    ).json();
+    const bearer = { authorization: "Bearer " + approval.credential };
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/pairing/ack",
+          headers: bearer,
+          payload: { id: challenge.id },
+        })
+      ).statusCode,
+    ).toBe(204);
+    return bearer;
+  };
+  const phone = await pair("Fixture phone");
+  const tablet = await pair("Fixture tablet");
+  const apple = (
+    editionId?: string,
+    generation?: string,
+    device = phone,
+    startMs = 0,
+    replaceSessionId?: string,
+  ) =>
+    app.inject({
+      method: "POST",
+      url: "/api/playback",
+      headers: device,
+      payload: {
+        movieId: movie!.id,
+        profileId: "apple-sdr-v1",
+        startMs,
+        replaceSessionId,
+        editionId,
+        generation,
+        audioTrack: 1,
+      },
+    });
+  const initial = await apple("source-film");
+  expect(initial.statusCode).toBe(202);
+  const statusUrl = "/api/preparations/" + initial.json().preparationId;
+  const status = async () =>
+    (await app.inject({ url: statusUrl, headers: phone })).json();
+  expect(await status()).toEqual({ state: "queued" });
+  expect((await apple("source-film")).json().preparationId).toBe(
+    initial.json().preparationId,
+  );
   const first = await play();
   expect([first.statusCode, first.json().phase]).toEqual([202, "inspecting"]);
   expect(await worker.runNextJob(idle(), "probe")).toBe("completed");
@@ -294,6 +370,124 @@ it("prepares a film in two languages and plays every part of it over HTTP", asyn
     ).statusCode,
   ).toBe(204);
   expect((await fetch(base + "video.m3u8")).status).toBe(403);
+
+  // A completed probe must become the native rendition without another Play.
+  await worker.queueLibrary();
+  expect(await status()).toMatchObject({ state: "queued" });
+  expect(await worker.runNextJob(idle(), "prepare")).toBe("completed");
+  expect(await status()).toEqual({ state: "ready" });
+  expect(await status()).toEqual({ state: "ready" });
+  expect(db.prepare("SELECT count(*) n FROM playback_sessions").get()).toEqual({
+    n: 1,
+  });
+  const stranger = issueSession(db, "owner");
+  expect(
+    (
+      await app.inject({
+        url: statusUrl,
+        headers: { cookie: "mov_session=" + stranger.token },
+      })
+    ).statusCode,
+  ).toBe(404);
+  expect((await apple("missing")).statusCode).toBe(422);
+  expect((await apple("source-film", "outdated")).statusCode).toBe(422);
+  const remote = await apple("source-film");
+  expect(remote.statusCode).toBe(200);
+  const url = remote.json().session.mediaUrl as string;
+  expect(url).toMatch(/video\.mp4$/);
+  const range = await fetch(address + url, {
+    headers: { Range: "bytes=100-199" },
+  });
+  expect(range.status).toBe(206);
+  expect((await range.arrayBuffer()).byteLength).toBe(100);
+  const nativeFilm = await probeMedia(address + url, idle());
+  expect(nativeFilm.audio.map((t) => t.language)).toEqual(["fas"]);
+  expect(nativeFilm.subtitles).toMatchObject([
+    { codec: "mov_text", language: "fas" },
+  ]);
+  const lease = remote.json().session;
+  const progress = {
+    sessionId: lease.id,
+    epoch: lease.epoch,
+    sequence: 1,
+    positionMs: 9500,
+    ended: false,
+  };
+  expect(
+    (
+      await app.inject({
+        method: "POST",
+        url: "/api/progress",
+        headers: phone,
+        payload: progress,
+      })
+    ).json(),
+  ).toEqual({ status: "accepted" });
+  const renewed = await app.inject({
+    method: "POST",
+    url: "/api/playback/" + lease.id + "/heartbeat",
+    headers: phone,
+  });
+  expect(renewed.json()).toMatchObject({
+    id: lease.id,
+    epoch: lease.epoch,
+    startMs: 0,
+  });
+  const resume = (
+    await app.inject({ url: "/api/continue-watching", headers: tablet })
+  ).json().items[0];
+  expect(resume).toMatchObject({ id: movie!.id, resumeMs: 9500 });
+  const conflict = await apple(
+    "source-film",
+    undefined,
+    tablet,
+    resume.resumeMs,
+  );
+  expect(conflict.statusCode).toBe(409);
+  expect(conflict.json().sessionId).toBe(lease.id);
+  const takeover = await apple(
+    "source-film",
+    undefined,
+    tablet,
+    resume.resumeMs,
+    conflict.json().sessionId,
+  );
+  expect(takeover.statusCode).toBe(200);
+  expect(takeover.json().session.startMs).toBe(9500);
+  expect(
+    (
+      await app.inject({
+        method: "POST",
+        url: "/api/progress",
+        headers: phone,
+        payload: { ...progress, sequence: 2, positionMs: 0 },
+      })
+    ).json(),
+  ).toEqual({ status: "stale" });
+  expect((await fetch(address + url)).status).toBe(403);
+  expect(
+    (
+      await app.inject({
+        method: "DELETE",
+        url: "/api/devices/self",
+        headers: tablet,
+      })
+    ).statusCode,
+  ).toBe(204);
+  expect((await fetch(address + takeover.json().session.mediaUrl)).status).toBe(
+    403,
+  );
+  db.prepare(
+    "UPDATE prepared_assets SET state='evicted' WHERE format='mp4'",
+  ).run();
+  expect(await status()).toEqual({ state: "evicted" });
+  db.prepare(
+    "UPDATE source_files SET generation='new-content' WHERE id='film'",
+  ).run();
+  expect(await status()).toEqual({
+    state: "invalidated",
+    reasonCode: "source_changed",
+  });
 }, 60000);
 
 it("resumes interrupted book preparation and serves an authenticated range from the worker's cache", async () => {
@@ -475,6 +669,8 @@ it("resumes interrupted book preparation and serves an authenticated range from 
     stop.abort();
     holdMiddle = false;
     unblock();
+    // Wait for the lease to be released before afterEach closes SQLite on an assertion failure.
+    await running;
   }
   workerDb.close();
   workerDb = openDatabase(join(dataDir, "mov.sqlite"));

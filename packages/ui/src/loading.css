@@ -104,11 +104,10 @@ progress.flow-progress::-moz-progress-bar {
   width: 30px;
   margin: 0 auto 7px 3px;
 }
-.opening-mark svg {
+.opening-mark img {
   display: block;
   width: 44px;
-  height: 46px;
-  fill: var(--text);
+  height: 44px;
 }
 .opening-words {
   margin-top: 28px;

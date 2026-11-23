@@ -9,9 +9,10 @@ export function findDevice(db: Database, request: FastifyRequest) {
   if (!match) return;
   return db
     .prepare(
-      "SELECT id,name FROM devices WHERE token_hash=? AND revoked_at IS NULL",
+      "SELECT id,name,watchlist_write FROM devices WHERE token_hash=? AND revoked_at IS NULL",
     )
-    .get(hash(match[1]!)) as { id: string; name: string } | undefined;
+    .get(hash(match[1]!)) as
+    { id: string; name: string; watchlist_write: number } | undefined;
 }
 export function principal(db: Database, request: FastifyRequest): Principal {
   const device = findDevice(db, request);
@@ -31,6 +32,9 @@ export function owns(
 }
 export function revokeDevice(db: Database, id: string) {
   db.transaction(() => {
+    db.prepare("DELETE FROM native_preparations WHERE principal=?").run(
+      "device:" + id,
+    );
     db.prepare("UPDATE devices SET revoked_at=? WHERE id=?").run(
       Date.now(),
       id,

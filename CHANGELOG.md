@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-23 · Apple cinema client
+
+Added a universal SwiftUI app with a Files library, native playback, a captioned sample film and optional single-owner server pairing. Schema 13 scopes device watchlist grants, edition-specific film progress and native preparation jobs. The worker packages compatible SDR video and timed text for the Apple player. See the [Apple build guide](apps/apple/README.md).
+
+The website and Apple app now share a copper film-ribbon identity and animated navigation with reduced-motion support. The interface audit covers the phone, browser and TV, including playback recovery, keyboard access and touch targets.
+
 ## Raouf: 2026-11-22 (Australia/Sydney) · big books release
 
 **Scope:** release the covers for books over 100 MB and the 512 MB PDF limit, approved by the owner.

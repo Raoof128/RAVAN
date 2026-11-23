@@ -10,6 +10,7 @@ import {
 } from "../../../worker/src/compatibility.js";
 import {
   assetId,
+  APPLE_MP4_RECIPE,
   CAPACITY,
   editionBytes,
   roomPlan,
@@ -72,7 +73,7 @@ export function choosePlayback(
   capabilities?: ClientCapabilities,
   file?: FileHint,
 ): { mode: "direct" | "prepare" | "unsupported"; reason?: string } {
-  if (!(profile in profiles))
+  if (!Object.hasOwn(profiles, profile))
     return {
       mode: "unsupported",
       reason: "This device profile is not supported.",
@@ -284,7 +285,7 @@ export class MediaPlanner {
     options: PlanOptions = {},
     background = false,
   ): Promise<PlaybackPlan> {
-    if (!(profile.id in profiles))
+    if (!Object.hasOwn(profiles, profile.id))
       return {
         mode: "unsupported",
         assetId: source.fileId,
@@ -360,8 +361,25 @@ export class MediaPlanner {
       };
     // An older probe does not say which audio track is the default, so it cannot
     // support the wider direct-play rules. Plan it the conservative way.
+    const native = profile.id === "apple-sdr-v1";
     const capabilities =
-      record.version === PROBE_VERSION ? options.capabilities : undefined;
+      !native && record.version === PROBE_VERSION
+        ? options.capabilities
+        : undefined;
+    if (
+      native &&
+      (quality === "1440p" ||
+        quality === "2160p" ||
+        (quality === "original" &&
+          ((probe.video?.height ?? 0) > 1080 ||
+            (probe.video?.width ?? 0) > 1920)))
+    ) {
+      return {
+        mode: "unsupported",
+        assetId: source.fileId,
+        reason: "Choose Auto or a quality up to 1080p for this device.",
+      };
+    }
     const file = this.db
       .prepare("SELECT name,mime_type mimeType FROM source_files WHERE id=?")
       .get(source.fileId) as FileHint | undefined;
@@ -412,7 +430,7 @@ export class MediaPlanner {
         q,
         audio,
         force,
-        conversion.variant,
+        native ? APPLE_MP4_RECIPE : conversion.variant,
       ),
       oneTrack: assetId(
         source.fileId,
@@ -573,6 +591,7 @@ export class MediaPlanner {
       return {
         mode: "unsupported",
         assetId: id,
+        waitingForCapacity: true,
         reason:
           "The server is already preparing other films. Try again when one has finished.",
       };
@@ -603,6 +622,7 @@ export class MediaPlanner {
           id,
           format: streamed ? "hls" : "mp4",
           ...(allAudio ? { allAudio: true } : {}),
+          ...(native ? { nativeCaptions: true } : {}),
           ...(capabilities ? { video: capabilities.video } : {}),
         },
         priority,

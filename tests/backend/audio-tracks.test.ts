@@ -127,6 +127,16 @@ it("names tracks from the film, in words, and keeps labels safe", () => {
   expect(trackName({ language: "und" }, 0)).toBe("Audio 1");
   expect(trackLanguage("fas")).toBe("fas");
   expect(trackLanguage("pt-BR")).toBe("pt-BR");
+  const traditional = trackLanguage("zh-Hant-TW");
+  expect(traditional).toBe("zh-Hant-TW");
+  expect(
+    parseMaster(
+      writeMaster(
+        [{ name: "Chinese", language: traditional, default: true }],
+        3500000,
+      ),
+    ).renditions[0]?.language,
+  ).toBe(traditional);
   expect(trackLanguage('en",x')).toBe("und");
   expect(trackLanguage(undefined)).toBe("und");
 });

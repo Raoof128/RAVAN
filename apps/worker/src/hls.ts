@@ -1,5 +1,6 @@
 import { lstat, readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { safeTrackLanguage } from "./tracks.js";
 
 /**
  * A prepared edition written as HLS: a playlist, one initialization segment and
@@ -106,7 +107,6 @@ export type AudioRendition = {
 // Names come from the film's own metadata: letters, digits and a little
 // punctuation only, so they cannot break out of the quoted attribute.
 const safeName = /^[\p{L}\p{M}\p{N} .,()'&+-]{1,48}$/u;
-const safeLanguage = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})?$/;
 const master = {
   head: ["#EXTM3U", "#EXT-X-VERSION:7", "#EXT-X-INDEPENDENT-SEGMENTS"],
   media:
@@ -123,7 +123,7 @@ export function writeMaster(
   const lines = [
     ...master.head,
     ...renditions.map((r, i) => {
-      if (!safeName.test(r.name) || !safeLanguage.test(r.language))
+      if (!safeName.test(r.name) || !safeTrackLanguage.test(r.language))
         throw new Error("Unsafe audio label");
       return `#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="${r.name}",LANGUAGE="${r.language}",DEFAULT=${r.default ? "YES" : "NO"},AUTOSELECT=YES,URI="audio-${i}.m3u8"`;
     }),
@@ -150,7 +150,7 @@ export function parseMaster(input: string): {
       !m ||
       Number(m[4]) !== renditions.length ||
       !safeName.test(m[1]!) ||
-      !safeLanguage.test(m[2]!)
+      !safeTrackLanguage.test(m[2]!)
     )
       throw new Error("Unexpected audio rendition");
     renditions.push({ name: m[1]!, language: m[2]!, default: m[3] === "YES" });

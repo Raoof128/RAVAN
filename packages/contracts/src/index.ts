@@ -20,6 +20,8 @@ export type PictureChoice = {
   films?: number;
 };
 export type PlaybackOptions = {
+  editionId?: string;
+  generation?: string;
   quality?: Quality;
   audioTrack?: number;
   forceCompatible?: boolean;
@@ -38,13 +40,14 @@ export type RangeDecision =
   | { kind: "unsatisfiable" };
 export type DeviceProfile = {
   id: string;
-  platform: "web" | "tizen" | "webos";
+  platform: "web" | "tizen" | "webos" | "apple";
   verified: boolean;
 };
 export type PlaybackPlan = {
   mode: "direct" | "prepared" | "prepare" | "unsupported";
   assetId: string;
   reason?: string;
+  waitingForCapacity?: boolean;
   progress?: number;
   /** Set with mode "prepare": the step the preparation is at. */
   phase?: PreparationPhase;
@@ -162,6 +165,8 @@ export type EpisodeInfo = {
   next?: MovieCard & { season?: number; episode: number };
 };
 export type MovieDetail = MovieCard & {
+  resumeEditionId?: string;
+  resumeGeneration?: string;
   episode?: EpisodeInfo;
   audioTracks?: Array<{ index: number; language: string; label: string }>;
   /**
@@ -176,6 +181,10 @@ export type MovieDetail = MovieCard & {
     label: string;
     state: string;
     sourceId: string;
+    generation?: string;
+    audioTracks?: MovieDetail["audioTracks"];
+    subtitleTracks?: MovieDetail["subtitleTracks"];
+    durationMs?: number;
     available: boolean;
   }>;
   tracks: Array<{
@@ -210,6 +219,7 @@ export type PlaybackResult =
   | {
       kind: "preparing";
       jobId: string;
+      preparationId?: string;
       /** Percent of the film converted so far, as reported by the worker. */
       progress?: number;
       reason?: string;

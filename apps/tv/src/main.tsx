@@ -134,6 +134,7 @@ function TV({ api }: { api: ApiClient }) {
     [opening, setOpening] = useState<string>(),
     [moreBusy, setMoreBusy] = useState(false);
   const pageRef = useRef(page);
+  const nextFilmFocus = useRef<string | undefined>(undefined);
   const loadedRevision = useRef<number | null>(null);
   const resumePositions = useRef(new Map<string, number>());
   pageRef.current = page;
@@ -151,10 +152,20 @@ function TV({ api }: { api: ApiClient }) {
       }),
     [],
   );
+  const canRetryPairing = page === "pair" && Boolean(message);
   useEffect(() => {
-    const timer = setTimeout(() => restoreFocus(page), 100);
-    return () => clearTimeout(timer);
-  }, [page, items, code]);
+    restoreFocus(page);
+  }, [page, loaded, canRetryPairing]);
+  useEffect(() => {
+    const id = nextFilmFocus.current;
+    nextFilmFocus.current = undefined;
+    if (page === "library" && id) {
+      // Match the data value directly: catalogue identifiers can contain CSS punctuation.
+      Array.from(document.querySelectorAll<HTMLButtonElement>(".tv-movie"))
+        .find((button) => button.dataset.focusId === `movie-${id}`)
+        ?.focus();
+    }
+  }, [page, items]);
   useEffect(() => {
     let active = true;
     api
@@ -356,12 +367,23 @@ function TV({ api }: { api: ApiClient }) {
               data-focus-id="more"
               className={moreBusy ? "is-pending" : undefined}
               aria-busy={moreBusy || undefined}
-              onClick={() => {
+              onClick={(event) => {
                 if (moreBusy) return;
+                // Some WebKit configurations leave pointer-activated buttons unfocused.
+                event.currentTarget.focus();
                 setMoreBusy(true);
                 api
                   .listMovies(cursor)
                   .then((data) => {
+                    if (
+                      pageRef.current === "library" &&
+                      (document.activeElement as HTMLElement | null)?.dataset
+                        .focusId === "more"
+                    ) {
+                      nextFilmFocus.current = data.items.find(
+                        (film) => !items.some((item) => item.id === film.id),
+                      )?.id;
+                    }
                     setItems((old) => [
                       ...old,
                       ...data.items.filter(
