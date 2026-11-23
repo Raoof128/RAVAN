@@ -1,5 +1,6 @@
 import type { SessionState } from "../../../../packages/contracts/src/index.js";
 import roomArtwork from "../../../../packages/ui/src/art/cinema-login.webp";
+import { rememberSignInDestination } from "../sign-in-destination.js";
 import { Mfa } from "./Mfa.js";
 
 export function Setup({ session }: { session: SessionState }) {
@@ -28,7 +29,11 @@ export function Setup({ session }: { session: SessionState }) {
               </li>
             </ol>
             {session.configured ? (
-              <a className="button login-google" href="/auth/google/start">
+              <a
+                className="button login-google"
+                href="/auth/google/start"
+                onClick={rememberSignInDestination}
+              >
                 <GoogleIcon />
                 Continue with Google
               </a>

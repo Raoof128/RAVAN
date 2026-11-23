@@ -194,6 +194,21 @@ extension XCTestCase {
     }
 
     #if PAIRED
+    #if RAVAN_UI_TESTING
+    func testWebsitePairingOffersOwnerApproval() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ravan-isolated-test"]
+        app.launch()
+        preparePortrait(app)
+        tap(app.buttons["welcome.connect"], app: app)
+        tap(app.buttons["server.website"], app: app)
+        XCTAssertTrue(app.staticTexts["pairing.code"].waitForExistence(timeout: 12))
+        XCTAssertEqual(app.staticTexts["pairing.code"].label, "A B C D E F G H")
+        XCTAssertTrue(app.buttons["pairing.approve"].exists)
+        tap(app.buttons["Change server"], app: app)
+        XCTAssertTrue(app.buttons["server.website"].waitForExistence(timeout: 12))
+    }
+    #endif
     func testConnectRejectsAnInsecureAddressAndReturnsToWelcome() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--ravan-isolated-test"]

@@ -63,6 +63,44 @@ test("login layout and Google action work at desktop and narrow widths", async (
     }
   }
 });
+test("website pairing returns to the approval screen after Google and MFA", async ({
+  page,
+}) => {
+  let googleComplete = false;
+  await page.route("**/api/session", (r) =>
+    r.fulfill({
+      json: googleComplete
+        ? {
+            authenticated: false,
+            configured: true,
+            mfa: "verify",
+            csrfToken: "fixture",
+            challengeExpiresAt: Date.now() + 600000,
+          }
+        : { authenticated: false, configured: true },
+    }),
+  );
+  await page.route("**/auth/google/start", (r) => {
+    googleComplete = true;
+    return r.fulfill({
+      contentType: "text/html",
+      body: '<meta http-equiv="refresh" content="0;url=/">',
+    });
+  });
+  await page.route("**/auth/mfa/verify", (r) =>
+    r.fulfill({ json: { authenticated: true } }),
+  );
+  await page.goto("/#/settings");
+  await page.getByRole("link", { name: "Continue with Google" }).click();
+  await page.getByLabel("Authenticator code").fill("123456");
+  await page.getByRole("button", { name: "Verify & enter" }).click();
+  await expect(page).toHaveURL(/\/#\/settings$/);
+  expect(
+    await page.evaluate(() =>
+      sessionStorage.getItem("ravan:sign-in-destination"),
+    ),
+  ).toBeNull();
+});
 test("enrollment renders local QR, validates input and holds recovery codes until saved", async ({
   page,
 }) => {

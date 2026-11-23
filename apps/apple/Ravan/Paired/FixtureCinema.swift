@@ -5,6 +5,16 @@ import UIKit
 // Only the isolated UI-test launch branch constructs this client. URLProtocol handles
 // every request in memory, including unexpected ones; the fixture never loads a network URL.
 @MainActor enum FixtureCinema {
+    static func unpaired(session: String) -> PairedCinema {
+        PairedCinema(service: "Ravan.isolated-test." + session, restoreAutomatically: false, client: client)
+    }
+
+    private static func client(_ origin: URL) -> CinemaAPI {
+        let config = cinemaConfiguration()
+        config.protocolClasses = [ScreeningFixtureProtocol.self]
+        return CinemaAPI(origin: origin, configuration: config)
+    }
+
     static func make(session: String) -> PairedCinema {
         let url = URL(string: "https://screening-fixture.invalid")!
         let caps = CinemaDiscovery(protocolMajor: 1, instanceId: "isolated-fixture", profiles: ["apple-sdr-v1"],
@@ -12,11 +22,6 @@ import UIKit
         let readOnly = ProcessInfo.processInfo.arguments.contains("--ravan-paired-readonly")
         ScreeningFixtureProtocol.state.configure(cover: UIImage(named: "TidePoster")?.jpegData(compressionQuality: 0.65),
                                                 readOnly: readOnly, failFirstPage: ProcessInfo.processInfo.arguments.contains("--ravan-fail-first-page"))
-        func client(_ origin: URL) -> CinemaAPI {
-            let config = cinemaConfiguration()
-            config.protocolClasses = [ScreeningFixtureProtocol.self]
-            return CinemaAPI(origin: origin, configuration: config)
-        }
         let result = PairedCinema(service: "Ravan.fixture." + session, restoreAutomatically: false, client: client)
         result.connectFixture(client: client(url), capabilities: caps, readOnly: readOnly)
         return result
@@ -46,7 +51,21 @@ private final class ScreeningFixtureState: @unchecked Sendable {
             func json(_ status: Int, _ object: [String: Any]) throws -> (Int, String, Data) {
                 (status, "application/json", try JSONSerialization.data(withJSONObject: object))
             }
-            guard let url = request.url, url.scheme == "https", url.host == "screening-fixture.invalid" else {
+            guard let url = request.url, url.scheme == "https" else { throw URLError(.unsupportedURL) }
+            if url.host == RavanWebsite.origin.host {
+                switch (request.httpMethod, url.path) {
+                case ("GET", "/api/capabilities"):
+                    return try json(200, ["protocolMajor": 1, "instanceId": "pairing-fixture", "profiles": ["apple-sdr-v1"],
+                        "mediaOrigins": [RavanWebsite.origin.absoluteString], "features": [:] as [String: Bool]])
+                case ("POST", "/api/pairing"):
+                    return try json(201, ["code": "ABCDEFGH", "id": "fixture-request", "pollSecret": "fixture-secret",
+                        "expiresAt": ISO8601DateFormatter().string(from: .now.addingTimeInterval(600)), "pollIntervalMs": 3000])
+                case ("POST", "/api/pairing/poll"):
+                    return try json(200, ["state": "pending"])
+                default: throw URLError(.unsupportedURL)
+                }
+            }
+            guard url.host == "screening-fixture.invalid" else {
                 throw URLError(.unsupportedURL)
             }
             if url.path == "/api/capabilities" {

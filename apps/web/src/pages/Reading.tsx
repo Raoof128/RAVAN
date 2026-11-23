@@ -27,7 +27,10 @@ type Selection = {
  * shows the folders in it and its books. From the top a search looks through
  * every book; in a folder, through that folder and the folders inside it.
  */
-export function Reading({ folder }: { folder?: string } = {}) {
+export function Reading({
+  folder,
+  readerOnly = false,
+}: { folder?: string; readerOnly?: boolean } = {}) {
   const api = useApi();
   const [query, setQuery] = useState("");
   const scope = folder ?? (query ? undefined : "root");
@@ -193,7 +196,7 @@ export function Reading({ folder }: { folder?: string } = {}) {
         item.preparation || BigInt(item.sizeBytes) > BigInt(MAX_READING_BYTES)
           ? api.readingRanges(item, job.signal)
           : await api.readingFile(item, job.signal);
-      if (item.preparation) {
+      if (item.preparation && !readerOnly) {
         // Opening a page does not wait for job admission or for the worker.
         void api
           .readingPreparation(item, true)
@@ -314,9 +317,11 @@ export function Reading({ folder }: { folder?: string } = {}) {
           </p>
         </div>
         <div className="reading-drive">
-          <a className="button primary" href="#/settings">
-            Manage Drive folder
-          </a>
+          {!readerOnly && (
+            <a className="button primary" href="#/settings">
+              Manage Drive folder
+            </a>
+          )}
           <small>PDF up to 512 MB · EPUB & CBZ up to 100 MB</small>
         </div>
       </header>
@@ -394,9 +399,11 @@ export function Reading({ folder }: { folder?: string } = {}) {
             <p>
               {query
                 ? "Try another title or filename."
-                : "Add EPUB, PDF or CBZ files to your connected Drive folder, then sync your library in Your cinema."}
+                : readerOnly
+                  ? "Books appear here when the owner adds them to the connected Drive folder and syncs the website."
+                  : "Add EPUB, PDF or CBZ files to your connected Drive folder, then sync your library in Your cinema."}
             </p>
-            {!query && (
+            {!query && !readerOnly && (
               <a className="button" href="#/settings">
                 Open library settings
               </a>

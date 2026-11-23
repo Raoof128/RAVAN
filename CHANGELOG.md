@@ -1,5 +1,9 @@
 # Changelog
 
+## Paired Reading Room
+
+iPhone and iPad can connect to the website and read Drive-backed EPUB, PDF and CBZ files. The website owner can grant book access when pairing a device. Reading positions stay on the server.
+
 ## 2026-11-23 · Apple cinema client
 
 Added a universal SwiftUI app with a Files library, native playback, a captioned sample film and optional single-owner server pairing. Schema 13 scopes device watchlist grants, edition-specific film progress and native preparation jobs. The worker packages compatible SDR video and timed text for the Apple player. See the [Apple build guide](apps/apple/README.md).

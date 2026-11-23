@@ -261,6 +261,16 @@
         }
       }
     },
+    "Choose Connect to RAVĀN to get a code for the website. Copy the code, open the website and approve the device in Your cinema. Select Reading Room to read books on this device.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose Connect to RAVĀN to get a code for the website. Copy the code, open the website and approve the device in Your cinema. Select Reading Room to read books on this device."
+          }
+        }
+      }
+    },
     "Choose Locate file on its screening card if access changes. Select the original file to keep its saved position and watchlist choice.": {
       "localizations": {
         "en-AU": {
@@ -391,6 +401,26 @@
         }
       }
     },
+    "Connect to RAVĀN": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to RAVĀN"
+          }
+        }
+      }
+    },
+    "Connect your cinema, or sign in to read on its website.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect your cinema, or sign in to read on its website."
+          }
+        }
+      }
+    },
     "Connected": {
       "localizations": {
         "en-AU": {
@@ -451,12 +481,32 @@
         }
       }
     },
+    "Copy code and open website": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy code and open website"
+          }
+        }
+      }
+    },
     "Could not reach the cinema. Check its address and your connection.": {
       "localizations": {
         "en-AU": {
           "stringUnit": {
             "state": "translated",
             "value": "Could not reach the cinema. Check its address and your connection."
+          }
+        }
+      }
+    },
+    "Custom server": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom server"
           }
         }
       }
@@ -741,6 +791,16 @@
         }
       }
     },
+    "Get website pairing code": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get website pairing code"
+          }
+        }
+      }
+    },
     "History and privacy": {
       "localizations": {
         "en-AU": {
@@ -1011,6 +1071,16 @@
         }
       }
     },
+    "Open a film from Files, or connect to RAVĀN for your films and books.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a film from Files, or connect to RAVĀN for your films and books."
+          }
+        }
+      }
+    },
     "Open owner portal": {
       "localizations": {
         "en-AU": {
@@ -1027,6 +1097,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Open the owner portal in Your Cinema to add films."
+          }
+        }
+      }
+    },
+    "Open the website in your browser and choose Your cinema to approve this code.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the website in your browser and choose Your cinema to approve this code."
+          }
+        }
+      }
+    },
+    "Open website reader": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open website reader"
           }
         }
       }
@@ -1051,6 +1141,16 @@
         }
       }
     },
+    "Opening your shelf…": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opening your shelf…"
+          }
+        }
+      }
+    },
     "Original surf soundtrack": {
       "localizations": {
         "en-AU": {
@@ -1067,6 +1167,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pair a device"
+          }
+        }
+      }
+    },
+    "Paste this code under Pair a screen in Your cinema. After you approve the device, return to the app.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste this code under Pair a screen in Your cinema. After you approve the device, return to the app."
           }
         }
       }
@@ -1301,6 +1411,16 @@
         }
       }
     },
+    "RAVĀN website": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RAVĀN website"
+          }
+        }
+      }
+    },
     "RAVĀN will remove its bookmark, watchlist entry and saved position. Your original file stays in Files.": {
       "localizations": {
         "en-AU": {
@@ -1317,6 +1437,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ravān"
+          }
+        }
+      }
+    },
+    "Read EPUB books, PDFs and comics from your Drive. Your place is saved on the website.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read EPUB books, PDFs and comics from your Drive. Your place is saved on the website."
+          }
+        }
+      }
+    },
+    "Reading Room": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reading Room"
           }
         }
       }
@@ -1541,6 +1681,16 @@
         }
       }
     },
+    "Sign in to this cinema’s website to read with your account.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in to this cinema’s website to read with your account."
+          }
+        }
+      }
+    },
     "Source": {
       "localizations": {
         "en-AU": {
@@ -1661,6 +1811,16 @@
         }
       }
     },
+    "The paired reader stores your reading position on the cinema server. Its temporary session is held in memory. The owner can remove this device in Your cinema on the website.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The paired reader stores your reading position on the cinema server. Its temporary session is held in memory. The owner can remove this device in Your cinema on the website."
+          }
+        }
+      }
+    },
     "The pairing code is no longer available. Get a new code.": {
       "localizations": {
         "en-AU": {
@@ -1687,6 +1847,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "The player could not seek to your saved position."
+          }
+        }
+      }
+    },
+    "The reading room could not open. Try again or open the website reader.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The reading room could not open. Try again or open the website reader."
           }
         }
       }
@@ -1901,6 +2071,16 @@
         }
       }
     },
+    "This cinema supports reading through its website.": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This cinema supports reading through its website."
+          }
+        }
+      }
+    },
     "This clears saved positions for films in Files and the sample on this device. Your Watchlist is kept.": {
       "localizations": {
         "en-AU": {
@@ -2017,6 +2197,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tide Almanac · Sample film"
+          }
+        }
+      }
+    },
+    "Try Again": {
+      "localizations": {
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try Again"
           }
         }
       }

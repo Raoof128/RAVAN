@@ -204,6 +204,16 @@ actor CinemaAPI {
 
     func request(_ path: String, method: String = "GET", query: [URLQueryItem] = [],
                  body: Data? = nil, token: String? = nil, accepting: Set<Int> = [200]) async throws -> Data {
+        try await response(path, method: method, query: query, body: body, token: token, accepting: accepting).0
+    }
+
+    func readerSession(token: String) async throws -> CinemaReaderSession {
+        let (_, http) = try await response("/api/reading/session", method: "POST", token: token, accepting: [204])
+        return try CinemaReaderSession(origin: origin, header: http.value(forHTTPHeaderField: "Set-Cookie"))
+    }
+
+    private func response(_ path: String, method: String, query: [URLQueryItem] = [],
+                          body: Data? = nil, token: String?, accepting: Set<Int>) async throws -> (Data, HTTPURLResponse) {
         var parts = URLComponents(url: origin, resolvingAgainstBaseURL: false)!
         parts.path = path
         parts.queryItems = query.isEmpty ? nil : query
@@ -225,7 +235,7 @@ actor CinemaAPI {
             let code = (try? JSONDecoder().decode(ErrorEnvelope.self, from: data))?.error ?? ""
             throw CinemaFailure.http(http.statusCode, code, http.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init))
         }
-        return data
+        return (data, http)
     }
 
     static func validate(_ cap: CinemaDiscovery) throws -> CinemaDiscovery {

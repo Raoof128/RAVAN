@@ -1,3 +1,4 @@
+import { finishSignIn } from "../sign-in-destination.js";
 import { useEffect, useState, type FormEvent } from "react";
 import { ApiError, useApi } from "../../../../packages/client/src/api.js";
 import type { SessionState } from "../../../../packages/contracts/src/index.js";
@@ -93,7 +94,7 @@ export function Mfa({ session }: { session: SessionState }) {
       } else if (result.recoveryCodes) {
         setEnrollment(undefined);
         setCodes(result.recoveryCodes);
-      } else if (result.authenticated) location.replace("/");
+      } else if (result.authenticated) finishSignIn();
       else setError("Verification is unavailable. Please try again.");
     } catch (e) {
       setError(message(e));
@@ -177,7 +178,7 @@ export function Mfa({ session }: { session: SessionState }) {
           disabled={!saved}
           onClick={() => {
             setCodes(undefined);
-            location.replace("/");
+            finishSignIn();
           }}
         >
           Enter your cinema

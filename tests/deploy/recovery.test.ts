@@ -107,7 +107,12 @@ it("never publishes an interrupted snapshot or restores active authorizations", 
     .run();
   f.db
     .prepare(
-      "INSERT INTO devices(id,name,token_hash) VALUES ('active-tv','TV','newhash')",
+      "INSERT INTO devices(id,name,token_hash,reading) VALUES ('active-tv','TV','newhash',1)",
+    )
+    .run();
+  f.db
+    .prepare(
+      "INSERT INTO device_reader_sessions VALUES ('cookie-hash','active-tv','reader-csrf',9999999999999)",
     )
     .run();
   const path = join(f.dir, "active.ravan");
@@ -122,6 +127,9 @@ it("never publishes an interrupted snapshot or restores active authorizations", 
     expect(db.prepare("SELECT count(*) AS n FROM web_sessions").get()).toEqual({
       n: 0,
     });
+    expect(db.prepare("SELECT * FROM device_reader_sessions").all()).toEqual(
+      [],
+    );
     expect(
       db
         .prepare("SELECT count(*) AS n FROM devices WHERE revoked_at IS NULL")

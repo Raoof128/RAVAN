@@ -9,10 +9,11 @@ export function findDevice(db: Database, request: FastifyRequest) {
   if (!match) return;
   return db
     .prepare(
-      "SELECT id,name,watchlist_write FROM devices WHERE token_hash=? AND revoked_at IS NULL",
+      "SELECT id,name,watchlist_write,reading FROM devices WHERE token_hash=? AND revoked_at IS NULL",
     )
     .get(hash(match[1]!)) as
-    { id: string; name: string; watchlist_write: number } | undefined;
+    | { id: string; name: string; watchlist_write: number; reading: number }
+    | undefined;
 }
 export function principal(db: Database, request: FastifyRequest): Principal {
   const device = findDevice(db, request);

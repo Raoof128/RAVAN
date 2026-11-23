@@ -1,4 +1,5 @@
 import { pictureMs, type Probe } from "../../../worker/src/probe.js";
+import { findReaderSession, readerCookie } from "../auth/reader-sessions.js";
 import { textSubtitles } from "../../../worker/src/compatibility.js";
 import { artworkDirectory, readArtwork } from "../../../worker/src/artwork.js";
 import {
@@ -492,25 +493,45 @@ export function registerCatalogue(
     { config: { rateLimit: { max: 600, timeWindow: "1 minute" } } },
     async (request, reply) => {
       const id = request.params.id;
-      const row = /^[a-f0-9]{32}$/.test(id)
-        ? (db
+      const reader = readerCookie(request) !== undefined;
+      const findCover = () =>
+        db
+          .prepare(
+            `SELECT c.path FROM reading_covers c JOIN reading_items r ON r.id=c.item_id AND r.generation=c.generation
+         WHERE c.picture_id=? AND c.path IS NOT NULL AND r.available=1`,
+          )
+          .get(id) as { path: string } | undefined;
+      if (!/^[a-f0-9]{32}$/.test(id))
+        return reply.code(404).send({ error: "artwork_unavailable" });
+      const row = reader
+        ? findCover()
+        : (db
             .prepare(
               "SELECT path FROM artwork WHERE id=? UNION ALL SELECT path FROM reading_covers WHERE picture_id=? AND path IS NOT NULL LIMIT 1",
             )
-            .get(id, id) as { path: string } | undefined)
-        : undefined;
+            .get(id, id) as { path: string } | undefined);
       const bytes = row
         ? await readArtwork(artworkDirectory(dataDir), row.path).catch(
             () => undefined,
           )
         : undefined;
-      if (!row || !bytes)
+      if (
+        !row ||
+        !bytes ||
+        (reader &&
+          (!findReaderSession(db, request) || findCover()?.path !== row.path))
+      )
         return reply.code(404).send({ error: "artwork_unavailable" });
       return (
         reply
           .type(row.path.endsWith(".png") ? "image/png" : "image/jpeg")
           // A picture's id changes whenever the picture does.
-          .header("Cache-Control", "private, max-age=31536000, immutable")
+          .header(
+            "Cache-Control",
+            reader
+              ? "private, no-store"
+              : "private, max-age=31536000, immutable",
+          )
           .send(bytes)
       );
     },

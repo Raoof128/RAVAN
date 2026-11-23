@@ -2,6 +2,23 @@
 import XCTest
 
 @MainActor final class CompactNavigationTests: XCTestCase {
+    #if PAIRED
+    func testFirstLaunchCanReadAndConnectWithoutImportingAFilm() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--ravan-isolated-test"]
+        app.launch()
+        preparePortrait(app)
+        tap(app.buttons["welcome.reading"], app: app)
+        let reader = app.buttons["destination.reading"]
+        XCTAssertTrue(reader.waitForExistence(timeout: 15))
+        XCTAssertTrue(reader.isSelected)
+        XCTAssertTrue(app.buttons["reading.website"].exists)
+        tap(app.buttons["reading.connect"], app: app)
+        XCTAssertTrue(app.buttons["server.website"].waitForExistence(timeout: 10))
+    }
+    #endif
+
     func testTaskBarAndScrollViewOccupySeparateRegions() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

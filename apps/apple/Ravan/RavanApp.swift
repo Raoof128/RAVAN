@@ -49,7 +49,7 @@ struct RavanApp: App {
             if ProcessInfo.processInfo.arguments.contains("--ravan-paired-fixture") {
                 _paired = State(initialValue: FixtureCinema.make(session: session))
             } else {
-                _paired = State(initialValue: PairedCinema(service: "Ravan.isolated-test." + session, restoreAutomatically: false))
+                _paired = State(initialValue: FixtureCinema.unpaired(session: session))
             }
             #else
             _paired = State(initialValue: PairedCinema(service: "Ravan.isolated-test." + session, restoreAutomatically: false))

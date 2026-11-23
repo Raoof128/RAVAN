@@ -424,6 +424,7 @@ export function Settings() {
                           .replace(/\s/g, "")
                           .toUpperCase(),
                         data.has("watchlistWrite"),
+                        data.has("reading"),
                       );
                       form.reset();
                       deviceEdits.current++;
@@ -463,6 +464,10 @@ export function Settings() {
               <label className="checkbox">
                 <input type="checkbox" name="watchlistWrite" /> Allow this
                 device to change the watchlist
+              </label>
+              <label className="checkbox">
+                <input type="checkbox" name="reading" /> Allow this device to
+                open the Reading Room and save reading progress
               </label>
               <ActionButton
                 pending={pairBusy}

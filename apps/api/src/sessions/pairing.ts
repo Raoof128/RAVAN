@@ -95,7 +95,7 @@ export class PairingService {
       pollIntervalMs: 5000,
     };
   }
-  approve(code: string, watchlistWrite = false) {
+  approve(code: string, watchlistWrite = false, reading = false) {
     this.db.transaction(() => {
       const row = this.db
         .prepare("SELECT * FROM pairing_requests WHERE code_hash=?")
@@ -108,9 +108,15 @@ export class PairingService {
         .name;
       this.db
         .prepare(
-          "INSERT INTO devices(id,name,token_hash,watchlist_write) VALUES(?,?,?,?)",
+          "INSERT INTO devices(id,name,token_hash,watchlist_write,reading) VALUES(?,?,?,?,?)",
         )
-        .run(device, name, hash(credential), Number(watchlistWrite));
+        .run(
+          device,
+          name,
+          hash(credential),
+          Number(watchlistWrite),
+          Number(reading),
+        );
       const nonce = randomBytes(12),
         cipher = createCipheriv("aes-256-gcm", this.key, nonce);
       cipher.setAAD(Buffer.from(row.id));

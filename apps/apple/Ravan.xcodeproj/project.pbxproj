@@ -29,8 +29,11 @@
 		65AAF342B186C6CBF03BE507 /* ServerCatalogue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63E0CE3D953B67757C64D3AC /* ServerCatalogue.swift */; };
 		71CA8E82A12919EFE226E152 /* PairedMediaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6DA515A3CCE8C1789355BD4 /* PairedMediaTests.swift */; };
 		734E1C9ACF4CAEB5A49CF866 /* CormorantGaramond-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 9935C26A65FC2D3CE3D133C5 /* CormorantGaramond-Regular.ttf */; };
+		8123CEBFFCBFD9C5927CFE4A /* CinemaReadingRoom.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE3027A8E4877743C7E8560F /* CinemaReadingRoom.swift */; };
 		9831AB958C726E9838706875 /* PairedCinema.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6BA47A502DA5ACB79D9548F /* PairedCinema.swift */; };
+		A100AA9B3C263DABE33C81FC /* RavanWebsite.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EF5271FEAA62CAD849B8BCF /* RavanWebsite.swift */; };
 		AA98D35316C48BDA8A0A02AA /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 7A2616D3A69512663C616DE8 /* Localizable.xcstrings */; };
+		AC0AB588DC5266FFCECB7CE2 /* ReadingRoomTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D07AFA0803B4EBFDD91BB44 /* ReadingRoomTests.swift */; };
 		B3FDC19AC04791A3BE349B5F /* apple-v1 in Resources */ = {isa = PBXBuildFile; fileRef = 1C393FAC3BF03EA559629E6E /* apple-v1 */; };
 		B84904C93B34245A9626B07B /* CompactNavigationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A98066AECB468E195AF848AF /* CompactNavigationTests.swift */; };
 		BB3DA24DA69C0DAFDC172054 /* CinemaMedia.swift in Sources */ = {isa = PBXBuildFile; fileRef = A361A863D0F0E844DCC91518 /* CinemaMedia.swift */; };
@@ -39,6 +42,7 @@
 		D42D79A2929B7430335D5993 /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A43B737AA36EDCB589BCCF /* WelcomeView.swift */; };
 		E209B2C3039D563C3B57A8FE /* LocalCinemaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBAB8429F57399D6F551ADA1 /* LocalCinemaTests.swift */; };
 		EB85415308806DDC30DF0A27 /* CinemaTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8FDA98AC58B75A4777A434A /* CinemaTheme.swift */; };
+		F590B0517DEB79999E409067 /* CinemaReaderSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5FAB1701726052C45329F2D /* CinemaReaderSession.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -66,6 +70,7 @@
 		1C393FAC3BF03EA559629E6E /* apple-v1 */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "apple-v1"; path = "../../packages/contracts/fixtures/apple-v1"; sourceTree = SOURCE_ROOT; };
 		25C0472347FDEA0431E41F69 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		273E7FABC5FB3ED03F9D6173 /* CinemaRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CinemaRootView.swift; sourceTree = "<group>"; };
+		2EF5271FEAA62CAD849B8BCF /* RavanWebsite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RavanWebsite.swift; sourceTree = "<group>"; };
 		55F021E674EBB3F038599923 /* LocalLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalLibrary.swift; sourceTree = "<group>"; };
 		63E0CE3D953B67757C64D3AC /* ServerCatalogue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerCatalogue.swift; sourceTree = "<group>"; };
 		6CA0530ECBDB7F0906DA588E /* Cormorant-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Cormorant-LICENSE.txt"; sourceTree = "<group>"; };
@@ -74,6 +79,7 @@
 		7A2616D3A69512663C616DE8 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		7ED71484D9B3105C51372551 /* CinemaAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CinemaAPI.swift; sourceTree = "<group>"; };
 		89770C0E14443E8E3E7136C8 /* RavanRibbon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = RavanRibbon.icon; sourceTree = "<group>"; };
+		8D07AFA0803B4EBFDD91BB44 /* ReadingRoomTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingRoomTests.swift; sourceTree = "<group>"; };
 		919096304587EAF1EAD5BD8A /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		92F05CF301318E7C108615A3 /* ServerConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConnectionView.swift; sourceTree = "<group>"; };
 		9935C26A65FC2D3CE3D133C5 /* CormorantGaramond-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "CormorantGaramond-Regular.ttf"; sourceTree = "<group>"; };
@@ -89,6 +95,8 @@
 		BEE5D619A9E8AC9EEC632734 /* PairedContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairedContractTests.swift; sourceTree = "<group>"; };
 		CCC8D9DCA0007758C4CF0DDF /* PlaybackCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackCoordinator.swift; sourceTree = "<group>"; };
 		D56F0FB009C6ACA9E9FDE3C5 /* YourCinemaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YourCinemaView.swift; sourceTree = "<group>"; };
+		DE3027A8E4877743C7E8560F /* CinemaReadingRoom.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CinemaReadingRoom.swift; sourceTree = "<group>"; };
+		E5FAB1701726052C45329F2D /* CinemaReaderSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CinemaReaderSession.swift; sourceTree = "<group>"; };
 		E8FDA98AC58B75A4777A434A /* CinemaTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CinemaTheme.swift; sourceTree = "<group>"; };
 		E95FB8939F35D6763E2B873C /* RavanApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RavanApp.swift; sourceTree = "<group>"; };
 		EED93331499A87B7F9E7E865 /* CinemaTaskBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CinemaTaskBar.swift; sourceTree = "<group>"; };
@@ -145,9 +153,12 @@
 			children = (
 				7ED71484D9B3105C51372551 /* CinemaAPI.swift */,
 				A361A863D0F0E844DCC91518 /* CinemaMedia.swift */,
+				E5FAB1701726052C45329F2D /* CinemaReaderSession.swift */,
+				DE3027A8E4877743C7E8560F /* CinemaReadingRoom.swift */,
 				9F0D416A0167B21EAE22864C /* CinemaRemotePlayback.swift */,
 				058AC656E13E283A15FF02B0 /* FixtureCinema.swift */,
 				B6BA47A502DA5ACB79D9548F /* PairedCinema.swift */,
+				2EF5271FEAA62CAD849B8BCF /* RavanWebsite.swift */,
 				63E0CE3D953B67757C64D3AC /* ServerCatalogue.swift */,
 				92F05CF301318E7C108615A3 /* ServerConnectionView.swift */,
 			);
@@ -197,6 +208,7 @@
 				BBAB8429F57399D6F551ADA1 /* LocalCinemaTests.swift */,
 				BEE5D619A9E8AC9EEC632734 /* PairedContractTests.swift */,
 				A6DA515A3CCE8C1789355BD4 /* PairedMediaTests.swift */,
+				8D07AFA0803B4EBFDD91BB44 /* ReadingRoomTests.swift */,
 			);
 			path = RavanTests;
 			sourceTree = "<group>";
@@ -404,6 +416,8 @@
 				4AE549E53C84A6038527B2D2 /* CinemaAPI.swift in Sources */,
 				3BD6F3237FB8A69F2926B8E4 /* CinemaCollectionView.swift in Sources */,
 				BB3DA24DA69C0DAFDC172054 /* CinemaMedia.swift in Sources */,
+				F590B0517DEB79999E409067 /* CinemaReaderSession.swift in Sources */,
+				8123CEBFFCBFD9C5927CFE4A /* CinemaReadingRoom.swift in Sources */,
 				21593D75AE7894A9306D619A /* CinemaRemotePlayback.swift in Sources */,
 				5927E18580079985AAC76C83 /* CinemaRootView.swift in Sources */,
 				46C52E3E5AD41135155142B9 /* CinemaTaskBar.swift in Sources */,
@@ -414,6 +428,7 @@
 				9831AB958C726E9838706875 /* PairedCinema.swift in Sources */,
 				21BA28C404E8A324BD06DF68 /* PlaybackCoordinator.swift in Sources */,
 				576C5D567F3AAE8AA84654CB /* RavanApp.swift in Sources */,
+				A100AA9B3C263DABE33C81FC /* RavanWebsite.swift in Sources */,
 				65AAF342B186C6CBF03BE507 /* ServerCatalogue.swift in Sources */,
 				33EE524F5F82E09D3A6321C3 /* ServerConnectionView.swift in Sources */,
 				D42D79A2929B7430335D5993 /* WelcomeView.swift in Sources */,
@@ -428,6 +443,7 @@
 				E209B2C3039D563C3B57A8FE /* LocalCinemaTests.swift in Sources */,
 				156282BF02267D02AB531D30 /* PairedContractTests.swift in Sources */,
 				71CA8E82A12919EFE226E152 /* PairedMediaTests.swift in Sources */,
+				AC0AB588DC5266FFCECB7CE2 /* ReadingRoomTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -507,7 +523,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -603,7 +619,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -795,7 +811,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;

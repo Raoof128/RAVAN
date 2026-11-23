@@ -2,7 +2,7 @@ import type { FastifyRequest } from "fastify";
 import { equal, type OwnerSession } from "./sessions.js";
 export function validCsrf(
   request: FastifyRequest,
-  session: OwnerSession,
+  session: Pick<OwnerSession, "csrf">,
   origin: string,
 ): boolean {
   const token = request.headers["x-csrf-token"];

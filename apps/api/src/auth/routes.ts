@@ -15,6 +15,13 @@ import { z } from "zod";
 import { MfaService } from "./mfa.js";
 import { registerMfaRoutes } from "./mfa-routes.js";
 import { findDevice } from "../sessions/devices.js";
+import {
+  findReaderSession,
+  issueReaderSession,
+  readerCookie,
+  READER_COOKIE,
+  READER_SESSION_SECONDS,
+} from "./reader-sessions.js";
 
 // Reachable without an owner session: session discovery and the TV's own pairing
 // handshake, which is bound to a poll secret and approved separately by the owner.
@@ -38,6 +45,12 @@ const deviceRoutes = new Set([
   "/api/progress",
   "/api/pairing/ack",
   "/api/pairing/forget",
+]);
+const readerReadRoutes = new Set([
+  "/api/reading",
+  "/api/reading/:id/content",
+  "/api/reading/:id/preparation",
+  "/api/artwork/:id",
 ]);
 
 export function registerAuth(
@@ -224,8 +237,22 @@ export function registerAuth(
         authenticated: true,
         configured,
         deviceId: device.id,
-        permissions: device.watchlist_write ? ["watchlist:write"] : [],
+        permissions: [
+          ...(device.watchlist_write ? ["watchlist:write"] : []),
+          ...(device.reading ? ["reading:read"] : []),
+        ],
       };
+    if (readerCookie(request) !== undefined) {
+      const reader = findReaderSession(db, request);
+      return reader
+        ? {
+            authenticated: true,
+            configured,
+            readerOnly: true,
+            csrfToken: reader.csrf,
+          }
+        : { authenticated: false, configured };
+    }
     const session = findSession(db, request);
     if (session)
       return { authenticated: true, configured, csrfToken: session.csrf };
@@ -247,12 +274,34 @@ export function registerAuth(
   // handler while its raw URL does not start with "/api/".
   app.addHook("preHandler", async (request, reply) => {
     const route = request.routeOptions.url ?? "";
-    if (request.method === "GET" && route === "/api/capabilities") return;
-    if (!route.startsWith("/api/") || publicApiRoutes.has(route)) return;
+    if (!route.startsWith("/api/") || route === "/api/session") return;
     const device = findDevice(db, request);
+    if (!device && readerCookie(request) !== undefined) {
+      const reader = findReaderSession(db, request);
+      if (!reader)
+        return reply.code(401).send({ error: "authentication_required" });
+      if (
+        ["GET", "HEAD"].includes(request.method) &&
+        readerReadRoutes.has(route)
+      )
+        return;
+      if (request.method === "PUT" && route === "/api/reading/:id/progress") {
+        if (validCsrf(request, reader, config.origin)) return;
+        return reply.code(403).send({ error: "csrf_failed" });
+      }
+      return reply.code(403).send({ error: "reader_scope_required" });
+    }
+    if (
+      (request.method === "GET" && route === "/api/capabilities") ||
+      publicApiRoutes.has(route)
+    )
+      return;
     if (device) {
       const allowed =
         (request.method === "GET" && deviceReadRoutes.has(route)) ||
+        (request.method === "POST" &&
+          route === "/api/reading/session" &&
+          device.reading === 1) ||
         (request.method === "DELETE" && route === "/api/devices/self") ||
         (request.method === "PUT" &&
           route === "/api/watchlist/:id" &&
@@ -269,6 +318,25 @@ export function registerAuth(
       !validCsrf(request, session, config.origin)
     )
       return reply.code(403).send({ error: "csrf_failed" });
+  });
+  app.post("/api/reading/session", async (request, reply) => {
+    const device = findDevice(db, request);
+    if (!device?.reading || !secure)
+      return reply.code(403).send({ error: "reading_grant_required" });
+    const token = issueReaderSession(db, device.id);
+    if (!token)
+      return reply.code(403).send({ error: "reading_grant_required" });
+    return reply
+      .setCookie(READER_COOKIE, token, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "strict",
+        path: "/api",
+        maxAge: READER_SESSION_SECONDS,
+      })
+      .header("Cache-Control", "no-store")
+      .code(204)
+      .send();
   });
   app.post("/api/logout", async (request, reply) => {
     const session = findSession(db, request);

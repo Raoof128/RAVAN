@@ -5,13 +5,20 @@ import CryptoKit
 #endif
 
 enum CinemaDestination: String, CaseIterable, Identifiable {
-    case library, watchlist, cinema
+    case library, watchlist
+    #if PAIRED
+    case reading
+    #endif
+    case cinema
     var id: Self { self }
 
     var title: LocalizedStringResource {
         switch self {
         case .library: "Library"
         case .watchlist: "Watchlist"
+        #if PAIRED
+        case .reading: "Reading Room"
+        #endif
         case .cinema: "Your Cinema"
         }
     }
@@ -20,6 +27,9 @@ enum CinemaDestination: String, CaseIterable, Identifiable {
         switch self {
         case .library: "1"
         case .watchlist: "2"
+        #if PAIRED
+        case .reading: "4"
+        #endif
         case .cinema: "3"
         }
     }
@@ -28,6 +38,9 @@ enum CinemaDestination: String, CaseIterable, Identifiable {
         switch self {
         case .library: "books.vertical"
         case .watchlist: "bookmark"
+        #if PAIRED
+        case .reading: "book"
+        #endif
         case .cinema: "person.crop.rectangle"
         }
     }
@@ -81,44 +94,24 @@ struct CinemaRootView: View {
         GeometryReader { proxy in
             if showCinema {
                 let scale = max(1, typeScale)
-                switch CinemaColumnLayout(width: proxy.size.width, regular: horizontalSizeClass == .regular, typeScale: scale) {
-                case .threeColumns:
-                    NavigationSplitView(columnVisibility: $columns) {
+                let layout = CinemaColumnLayout(width: proxy.size.width, regular: horizontalSizeClass == .regular, typeScale: scale)
+                #if PAIRED
+                if destination == .reading && layout != .stacked {
+                    NavigationSplitView {
                         sidebar
                             .navigationSplitViewColumnWidth(min: 175 * scale, ideal: 205 * scale, max: 245 * scale)
-                    } content: {
-                        mainColumn(destination, rows: true)
-                            .navigationSplitViewColumnWidth(min: 260 * scale, ideal: 300 * scale, max: 395 * scale)
                     } detail: {
-                        selectedDetail(destination: destination)
+                        CinemaReadingRoom(connect: connect)
                     }
                     .navigationSplitViewStyle(.balanced)
-                case .twoColumns:
-                    NavigationSplitView {
-                        mainColumn(destination, rows: true)
-                            .toolbar { ToolbarItem(placement: .topBarLeading) { destinationMenu } }
-                            .navigationSplitViewColumnWidth(min: 245 * scale, ideal: 290 * scale, max: 375 * scale)
-                    } detail: {
-                        selectedDetail(destination: destination)
-                    }
-                    .navigationSplitViewStyle(.balanced)
-                case .stacked:
-                    VStack(spacing: 0) {
-                        // Scene storage retains each destination’s path, search text and film scroll anchor.
-                        NavigationStack(path: navigationPath(destination)) {
-                            mainColumn(destination, rows: false)
-                                .navigationDestination(for: String.self) { route in detail(route) }
-                        }
-                        .id(destination)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
-
-                        CinemaTaskBar(selection: destination) { savedDestination = $0.rawValue }
-                            .layoutPriority(1)
-                    }
+                } else {
+                    cinemaLayout(layout, scale: scale)
                 }
+                #else
+                cinemaLayout(layout, scale: scale)
+                #endif
             } else {
-                CinemaWelcomeView(openFile: { chooseFile() }, openConnection: connect, playSample: { play(library.sample) })
+                CinemaWelcomeView(openFile: { chooseFile() }, openConnection: connect, playSample: { play(library.sample) }, openReading: openReading)
             }
         }
         .onChange(of: library.films.map(\.id), initial: true) { _, ids in
@@ -177,6 +170,52 @@ struct CinemaRootView: View {
         #endif
     }
 
+    @ViewBuilder private func cinemaLayout(_ layout: CinemaColumnLayout, scale: CGFloat) -> some View {
+        switch layout {
+        case .threeColumns:
+            NavigationSplitView(columnVisibility: $columns) {
+                sidebar
+                    .navigationSplitViewColumnWidth(min: 175 * scale, ideal: 205 * scale, max: 245 * scale)
+            } content: {
+                mainColumn(destination, rows: true)
+                    .navigationSplitViewColumnWidth(min: 260 * scale, ideal: 300 * scale, max: 395 * scale)
+            } detail: {
+                selectedDetail(destination: destination)
+            }
+            .navigationSplitViewStyle(.balanced)
+        case .twoColumns:
+            NavigationSplitView {
+                mainColumn(destination, rows: true)
+                    .toolbar { ToolbarItem(placement: .topBarLeading) { destinationMenu } }
+                    .navigationSplitViewColumnWidth(min: 245 * scale, ideal: 290 * scale, max: 375 * scale)
+            } detail: {
+                selectedDetail(destination: destination)
+            }
+            .navigationSplitViewStyle(.balanced)
+        case .stacked:
+            VStack(spacing: 0) {
+                // Scene storage retains each destination’s path, search text and film scroll anchor.
+                NavigationStack(path: navigationPath(destination)) {
+                    mainColumn(destination, rows: false)
+                        .navigationDestination(for: String.self) { route in detail(route) }
+                }
+                .id(destination)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+
+                CinemaTaskBar(selection: destination) { savedDestination = $0.rawValue }
+                    .layoutPriority(1)
+            }
+        }
+    }
+
+    private func openReading() {
+        #if PAIRED
+        savedDestination = CinemaDestination.reading.rawValue
+        library.hasEntered = true
+        #endif
+    }
+
     private var sidebar: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 25) {
@@ -229,9 +268,14 @@ struct CinemaRootView: View {
     }
 
     @ViewBuilder private func mainColumn(_ tab: CinemaDestination, rows: Bool) -> some View {
-        if tab == .cinema {
+        switch tab {
+        #if PAIRED
+        case .reading:
+            CinemaReadingRoom(connect: connect)
+        #endif
+        case .cinema:
             YourCinemaView(openFile: { chooseFile() })
-        } else {
+        case .library, .watchlist:
             let selected = selection(tab)
             CinemaCollectionView(
                 savedOnly: tab == .watchlist,
@@ -261,7 +305,7 @@ struct CinemaRootView: View {
 
     private func navigationPath(_ tab: CinemaDestination) -> Binding<[String]> {
         let selected = selection(tab)
-        guard tab != .cinema else { return .constant([]) }
+        guard tab == .library || tab == .watchlist else { return .constant([]) }
         return Binding(get: { selected.wrappedValue.isEmpty ? [] : [selected.wrappedValue] },
                        set: { selected.wrappedValue = $0.last ?? "" })
     }

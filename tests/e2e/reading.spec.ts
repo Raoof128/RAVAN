@@ -14,6 +14,7 @@ async function driveShelf(
     format: ReadingItem["format"];
     buffer: Buffer;
   }>,
+  readerOnly = false,
 ) {
   const items: ReadingItem[] = books.map((book) => ({
     id: book.id,
@@ -30,7 +31,12 @@ async function driveShelf(
     const url = new URL(route.request().url());
     if (url.pathname === "/api/session")
       return route.fulfill({
-        json: { authenticated: true, configured: true, csrfToken: "test" },
+        json: {
+          authenticated: true,
+          configured: true,
+          csrfToken: "test",
+          readerOnly,
+        },
       });
     if (url.pathname === "/api/reading") {
       const query = (url.searchParams.get("q") ?? "").toLowerCase();
@@ -156,6 +162,72 @@ test("opens Drive EPUB, blocks active content, adjusts text and resumes server-s
   ).toEqual([]);
   expect(outside).toEqual([]);
   expect(errors).toEqual([]);
+});
+
+test("paired iPhone reads and resumes with only a reading grant", async ({
+  page,
+}) => {
+  const calls: string[] = [];
+  page.on("request", (request) => {
+    const { pathname } = new URL(request.url());
+    if (pathname.startsWith("/api/"))
+      calls.push(request.method() + " " + pathname);
+  });
+  const saves = await driveShelf(
+    page,
+    [
+      {
+        id: "paired-book",
+        title: "Paired story",
+        format: "epub",
+        buffer: await epubFixture("<p>Device edition</p>"),
+      },
+    ],
+    true,
+  );
+  // A device session must stay in the reading room, even on an owner-only route.
+  await page.goto("/?client=apple-reader#/settings");
+  await expect(
+    page.getByRole("heading", { name: "Reading room." }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Manage Drive folder" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("navigation", { name: "Main navigation" }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: /Paired story/ }).click();
+  await expect(
+    page.getByRole("heading", { name: "The quiet chapter" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await page.getByRole("button", { name: "Back to reading room" }).click();
+  await expect
+    .poll(() => saves.some((position) => position.section === 1))
+    .toBe(true);
+  await page.reload();
+  await page.getByRole("button", { name: /Paired story.*Continue/ }).click();
+  await expect(
+    page.getByRole("heading", { name: "A second morning" }),
+  ).toBeVisible();
+  expect(
+    calls.every((call) =>
+      /^GET \/api\/(session$|reading(?:$|\/))|^PUT \/api\/reading\/paired-book\/progress$/.test(
+        call,
+      ),
+    ),
+  ).toBe(true);
+});
+
+test("an expired embedded reading grant offers recovery", async ({ page }) => {
+  await page.route("**/api/session", (route) =>
+    route.fulfill({ json: { authenticated: false, configured: true } }),
+  );
+  await page.goto("/?client=apple-reader#/reading");
+  await expect(
+    page.getByRole("heading", { name: "Reconnect your reading room" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
 });
 
 test("reads Drive CBZ pages with right-to-left keyboard navigation on mobile", async ({

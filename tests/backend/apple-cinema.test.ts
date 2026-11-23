@@ -215,8 +215,10 @@ it("upgrades a populated version 4 cinema and keeps its identity on a second mig
     migrate(db);
     expect(db.prepare("SELECT id FROM server_identity").get()).toEqual(id);
     expect(
-      db.prepare("SELECT watchlist_write,revoked_at FROM devices").get(),
-    ).toEqual({ watchlist_write: 0, revoked_at: null });
+      db
+        .prepare("SELECT watchlist_write,reading,revoked_at FROM devices")
+        .get(),
+    ).toEqual({ watchlist_write: 0, reading: 0, revoked_at: null });
     expect(db.prepare("SELECT * FROM progress_editions").get()).toEqual({
       movie_id: "m",
       edition_id: "cut",

@@ -70,6 +70,9 @@ export async function buildApp(
     const now = Date.now();
     db.transaction(() => {
       db.prepare("DELETE FROM web_sessions WHERE expires_at<=?").run(now);
+      db.prepare("DELETE FROM device_reader_sessions WHERE expires_at<=?").run(
+        now,
+      );
       db.prepare("DELETE FROM media_ticket_grace WHERE expires_at<=?").run(now);
       db.prepare(
         "DELETE FROM playback_sessions WHERE expires_at<=? AND epoch<(SELECT MAX(epoch) FROM playback_sessions) AND id NOT IN (SELECT session_id FROM media_ticket_grace)",

@@ -287,10 +287,11 @@ export function createApiClient(baseUrl: string) {
     forgetDevice() {
       return request<void>("/api/pairing/forget", "POST", {});
     },
-    approvePairing(code: string, watchlistWrite = false) {
+    approvePairing(code: string, watchlistWrite = false, reading = false) {
       return request<void>("/api/pairing/approve", "POST", {
         code,
         ...(watchlistWrite ? { watchlistWrite } : {}),
+        ...(reading ? { reading } : {}),
       });
     },
   };

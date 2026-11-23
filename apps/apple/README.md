@@ -14,7 +14,9 @@ The identifiers are proposed for development. Signing and App Store Connect requ
 
 ## Connect a personal cinema
 
-Use a compatible staging deployment of the API, edge and worker from this branch. Open Your Cinema, choose **Connect a Server**, enter its HTTPS origin and follow the owner approval flow in the browser. Optional watchlist changes require the owner's explicit grant. Prepared media uses the Apple SDR profile. Remote playback uses Wi-Fi. Server administration stays in the web console.
+Choose **Connect to RAVĀN** on the welcome screen, or open the connection screen from **Your Cinema**. Choose the RAVĀN website or enter the HTTPS address of your own server. Copy the temporary code and open the website. Sign in as the owner, paste the code in **Your cinema → Pair a screen**, select **Reading Room** for books, and approve. Return to the app to finish pairing. Watchlist changes have their own permission.
+
+Open **Reading Room** to browse the same Drive folders as the website. EPUB, PDF and CBZ use the existing website reader and save your place on the server. The paired reader uses a temporary, device-scoped browser session. An existing pairing can also open the website reader and sign in there. Disconnect and pair again to request the new reading permission. Remote film playback uses Wi-Fi and the Apple SDR profile.
 
 ## Implementation
 

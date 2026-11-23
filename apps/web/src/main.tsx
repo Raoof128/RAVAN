@@ -68,7 +68,7 @@ function dismissBoot() {
  * reload that fixes it, instead of an empty page.
  */
 class ScreenBoundary extends Component<
-  { route: string; children: ReactNode },
+  { route: string; children: ReactNode; readerOnly?: boolean },
   { failed: boolean }
 > {
   state = { failed: false };
@@ -91,8 +91,13 @@ class ScreenBoundary extends Component<
           action={
             <div className="button-row">
               <button onClick={() => location.reload()}>Reload</button>
-              <a className="button" href="#/library">
-                Back to your library
+              <a
+                className="button"
+                href={this.props.readerOnly ? "#/reading" : "#/library"}
+              >
+                {this.props.readerOnly
+                  ? "Back to the reading room"
+                  : "Back to your library"}
               </a>
             </div>
           }
@@ -145,6 +150,9 @@ async function start() {
   );
 }
 function App({ api }: { api: ApiClient }) {
+  // The URL chooses presentation only. The server validates the grant on every API request.
+  const embedded =
+    new URLSearchParams(location.search).get("client") === "apple-reader";
   const route = useRoute();
   const movieId = routeParam(route, "/movie/");
   const playerId = routeParam(route, "/player/");
@@ -200,8 +208,9 @@ function App({ api }: { api: ApiClient }) {
     window.addEventListener(signedOut, recheck);
     return () => window.removeEventListener(signedOut, recheck);
   }, [authenticated]);
+  const readerOnly = embedded || session?.readerOnly === true;
   useEffect(() => {
-    if (!authenticated) return;
+    if (!authenticated || readerOnly) return;
     let active = true;
     api
       .preferences()
@@ -220,7 +229,7 @@ function App({ api }: { api: ApiClient }) {
       active = false;
       cancel(handle);
     };
-  }, [api, authenticated]);
+  }, [api, authenticated, readerOnly]);
   // A new screen starts at its top for everyone: sighted users are scrolled
   // there, keyboard and screen-reader users are placed there. The first screen
   // is left alone so the skip link stays the first stop.
@@ -256,71 +265,75 @@ function App({ api }: { api: ApiClient }) {
           )}
         </div>
       )}
-      <header
-        className={`site-header${authenticated ? " site-header-browse" : ""}`}
-        data-player={playerId !== undefined || undefined}
-      >
-        <a href="#/library" className="wordmark" aria-label="RAVĀN home">
-          <img src={ravanMark} width="32" height="32" alt="" />
-          RAVĀN
-        </a>
-        <span className="brand-caption">
-          EVERY STORY
-          <br />
-          FLOWS.
-        </span>
-        {authenticated ? (
-          <>
-            <nav
-              className="taskbar"
-              aria-label="Main navigation"
-              data-destination={activeDestination.slice(1)}
-            >
-              {destinations.map((item) => (
-                <a
-                  key={item.route}
-                  href={`#${item.route}`}
-                  aria-current={
-                    item.route === activeDestination
-                      ? currentLocation
-                      : undefined
+      {!readerOnly && (
+        <header
+          className={`site-header${authenticated ? " site-header-browse" : ""}`}
+          data-player={playerId !== undefined || undefined}
+        >
+          <a href="#/library" className="wordmark" aria-label="RAVĀN home">
+            <img src={ravanMark} width="32" height="32" alt="" />
+            RAVĀN
+          </a>
+          <span className="brand-caption">
+            EVERY STORY
+            <br />
+            FLOWS.
+          </span>
+          {authenticated ? (
+            <>
+              <nav
+                className="taskbar"
+                aria-label="Main navigation"
+                data-destination={activeDestination.slice(1)}
+              >
+                {destinations.map((item) => (
+                  <a
+                    key={item.route}
+                    href={`#${item.route}`}
+                    aria-current={
+                      item.route === activeDestination
+                        ? currentLocation
+                        : undefined
+                    }
+                  >
+                    <Icon name={item.icon} size={18} />
+                    <span>{item.label}</span>
+                  </a>
+                ))}
+              </nav>
+              {!isPreview && (
+                <ActionButton
+                  className="sign-out"
+                  pending={leaving}
+                  pendingLabel="Signing out"
+                  onClick={() =>
+                    void signOut(async () => {
+                      setSignOutFailed(false);
+                      try {
+                        await api.logout();
+                        setSession({ authenticated: false, configured: true });
+                        // The button that had focus is gone; land on the sign-in page.
+                        view.current?.focus({ preventScroll: true });
+                      } catch {
+                        setSignOutFailed(true);
+                      }
+                    })
                   }
                 >
-                  <Icon name={item.icon} size={18} />
-                  <span>{item.label}</span>
-                </a>
-              ))}
-            </nav>
-            {!isPreview && (
-              <ActionButton
-                className="sign-out"
-                pending={leaving}
-                pendingLabel="Signing out"
-                onClick={() =>
-                  void signOut(async () => {
-                    setSignOutFailed(false);
-                    try {
-                      await api.logout();
-                      setSession({ authenticated: false, configured: true });
-                      // The button that had focus is gone; land on the sign-in page.
-                      view.current?.focus({ preventScroll: true });
-                    } catch {
-                      setSignOutFailed(true);
-                    }
-                  })
-                }
-              >
-                Sign out
-              </ActionButton>
-            )}
-          </>
-        ) : (
-          <span className="header-label">A PERSONAL CINEMA</span>
-        )}
-      </header>
+                  Sign out
+                </ActionButton>
+              )}
+            </>
+          ) : (
+            <span className="header-label">A PERSONAL CINEMA</span>
+          )}
+        </header>
+      )}
       <p className="shell-notice" role="status">
         {offline
-          ? "This device is offline. Films and changes will work again when the connection returns."
+          ? readerOnly
+            ? "You’re offline. Reconnect to open books and save your place."
+            : "This device is offline. Films and changes will work again when the connection returns."
           : ""}
       </p>
       {signOutFailed && (
@@ -349,10 +362,26 @@ function App({ api }: { api: ApiClient }) {
         ) : !session ? (
           // The opening screen in index.html covers this until the session is known.
           <main id="main" aria-busy="true" />
+        ) : readerOnly && (!session.authenticated || !session.readerOnly) ? (
+          <main id="main">
+            <StatusPanel
+              title="Reconnect your reading room"
+              level={1}
+              action={
+                <button onClick={() => setRetry((n) => n + 1)}>
+                  Try again
+                </button>
+              }
+            >
+              Return to the Reading Room tab in RAVĀN and reopen it. If access
+              has changed, ask the website owner to approve this device for
+              reading.
+            </StatusPanel>
+          </main>
         ) : !session.authenticated ? (
           <Setup session={session} />
         ) : (
-          <ScreenBoundary route={route}>
+          <ScreenBoundary route={route} readerOnly={readerOnly}>
             <Suspense
               fallback={
                 <main id="main">
@@ -360,7 +389,13 @@ function App({ api }: { api: ApiClient }) {
                 </main>
               }
             >
-              {route === "/settings" ? (
+              {readerOnly ? (
+                <Reading
+                  folder={readingFolder}
+                  key={readingFolder ?? "root"}
+                  readerOnly
+                />
+              ) : route === "/settings" ? (
                 <Settings />
               ) : route === "/watchlist" ? (
                 <Watchlist />

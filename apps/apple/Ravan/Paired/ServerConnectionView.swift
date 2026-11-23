@@ -5,6 +5,7 @@ import Accessibility
 struct ServerConnectionView: View {
     @Environment(PairedCinema.self) private var cinema
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var phase
     @State private var address = ""
     @State private var name = UIDevice.current.userInterfaceIdiom == .pad ? "My iPad" : "My iPhone"
@@ -14,6 +15,7 @@ struct ServerConnectionView: View {
     @State private var issue: String?
     @State private var busy = false
     @State private var operation: Task<Void, Never>?
+    @State private var operationID = 0
     @State private var confirmDisconnect = false
     @FocusState private var nameFocused: Bool
     @State private var addressFocusRequest = 0
@@ -32,39 +34,54 @@ struct ServerConnectionView: View {
                         }
                     } else if let challenge, let client {
                         section("Approve this device") {
-                            Text("Enter this code in Your Cinema on your server.")
+                            Text("Paste this code under Pair a screen in Your cinema. After you approve the device, return to the app.")
                             let grouped = String(challenge.code.prefix(4)) + " " + String(challenge.code.suffix(4))
                             Text(verbatim: grouped).font(.largeTitle.monospaced()).textSelection(.enabled)
                                 .minimumScaleFactor(0.55).lineLimit(1).privacySensitive()
                                 .accessibilityLabel(challenge.code.map(String.init).joined(separator: " "))
                                 .accessibilityIdentifier("pairing.code")
-                            Button("Copy code", systemImage: "doc.on.doc") {
-                                UIPasteboard.general.setItems([["public.utf8-plain-text": challenge.code]],
-                                    options: [.localOnly: true, .expirationDate: challenge.expiry ?? Date()])
-                            }
                             if let expiry = challenge.expiry { Text("Expires at \(expiry.formatted(date: .omitted, time: .shortened))") }
-                            if let approve = URL(string: client.origin.absoluteString + "/#/settings") {
-                                Link("Approve in Browser", destination: approve)
+                            Button {
+                                copy(challenge)
+                                openURL(RavanWebsite.settings(at: client.origin)) { opened in
+                                    if !opened { issue = String(localized: "Open the website in your browser and choose Your cinema to approve this code.") }
+                                }
+                            } label: {
+                                Label("Copy code and open website", systemImage: "safari")
                             }
+                            .buttonStyle(CinemaPrimaryButtonStyle())
+                            .accessibilityIdentifier("pairing.approve")
+                            Button("Copy code", systemImage: "doc.on.doc") { copy(challenge) }
                             Button("Get a new code") {
                                 do { try cinema.clearChallenge(); self.challenge = nil; issue = nil; startPairing() }
                                 catch { issue = cinemaMessage(error) }
                             }.disabled(busy)
                             Button("Change server") {
+                                cancelOperation()
                                 do { try cinema.clearChallenge(); self.challenge = nil; self.client = nil; discovery = nil; issue = nil }
                                 catch { issue = cinemaMessage(error) }
                             }
                         }
                     } else {
-                        section("Server address") {
-                            CinemaTextInput(text: $address, focusRequest: addressFocusRequest,
+                        if client == nil {
+                            section("RAVĀN website") {
+                                Text(verbatim: RavanWebsite.origin.host() ?? RavanWebsite.origin.absoluteString)
+                                    .font(.subheadline).foregroundStyle(CinemaTheme.muted)
+                                Button(action: connectWebsite) {
+                                    Label("Get website pairing code", systemImage: "link")
+                                }
+                                .buttonStyle(CinemaPrimaryButtonStyle()).disabled(busy)
+                                .accessibilityIdentifier("server.website")
+                            }
+                        }
+                        section("Custom server") {
+                            CinemaTextInput(text: Binding(get: { address }, set: editAddress), focusRequest: addressFocusRequest,
                                             label: String(localized: "Server address"), identifier: "server.address",
                                             keyboard: .URL, returnKey: .go, submit: checkServer)
                                 .frame(height: max(48, inputHeight + 12))
                                 .padding(.horizontal, 12)
                                 .background(CinemaTheme.panel, in: RoundedRectangle(cornerRadius: 10))
                                 .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(CinemaTheme.hairline) }
-                                .onChange(of: address) { _, _ in operation?.cancel(); client = nil; discovery = nil; issue = nil }
                             Text("Use the HTTPS address from your cinema’s owner.")
                                 .font(.subheadline).foregroundStyle(CinemaTheme.ink)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -77,7 +94,7 @@ struct ServerConnectionView: View {
                             Button(action: checkServer) {
                                 Text("Check server").font(.headline).fixedSize(horizontal: false, vertical: true)
                             }
-                                .buttonStyle(CinemaPrimaryButtonStyle())
+                                .buttonStyle(CinemaSecondaryButtonStyle())
                                 .disabled(busy)
                                 .accessibilityIdentifier("server.check")
                         } else {
@@ -99,7 +116,7 @@ struct ServerConnectionView: View {
                 .frame(maxWidth: .infinity)
             }
             .background(CinemaTheme.background)
-            .navigationTitle("Connect a Server").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("Connect to RAVĀN").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button {
@@ -117,27 +134,28 @@ struct ServerConnectionView: View {
             Button("Disconnect", role: .destructive) { run { await cinema.disconnect() } }
         }
         .onChange(of: issue) { _, text in if let text { AccessibilityNotification.Announcement(text).post() } }
-        .task {
-            guard !cinema.hasRememberedServer else { return }
+        .onAppear {
+            guard !cinema.hasRememberedServer, challenge == nil, !busy else { return }
             do {
                 guard let pending = try cinema.recoverChallenge() else { return }
                 address = pending.origin
-                let candidate = CinemaAPI(origin: try CinemaURL.origin(pending.origin))
-                let caps = try await candidate.discover()
-                try Task.checkCancellation()
-                guard address == pending.origin, challenge == nil else { return }
-                guard pending.instance == caps.instanceId else {
-                    try cinema.clearChallenge(); throw CinemaFailure.identity
+                run {
+                    let candidate = cinema.newClient(try CinemaURL.origin(pending.origin))
+                    let caps = try await candidate.discover()
+                    try Task.checkCancellation()
+                    guard pending.instance == caps.instanceId else {
+                        try cinema.clearChallenge(); throw CinemaFailure.identity
+                    }
+                    client = candidate; discovery = caps; challenge = pending.challenge
                 }
-                client = candidate; discovery = caps; challenge = pending.challenge
-            } catch { if !Task.isCancelled { issue = cinemaMessage(error) } }
+            } catch { issue = cinemaMessage(error) }
         }
         .task(id: [phase == .active ? "active" : "", challenge?.id ?? ""]) {
             guard phase == .active, let challenge, let client, let discovery else { return }
             await poll(challenge, client, discovery)
         }
         .onChange(of: cinema.isConnected) { _, online in if online { dismiss() } }
-        .onDisappear { operation?.cancel() }
+        .onDisappear { cancelOperation() }
     }
     private func section<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -150,13 +168,43 @@ struct ServerConnectionView: View {
     private var deviceName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var validName: Bool { !deviceName.isEmpty && deviceName.utf16.count <= 80 }
 
+    private func copy(_ challenge: CinemaChallenge) {
+        UIPasteboard.general.setItems([["public.utf8-plain-text": challenge.code]],
+            options: [.localOnly: true, .expirationDate: challenge.expiry ?? .now])
+    }
+
+    private func editAddress(_ value: String) {
+        guard value != address else { return }
+        cancelOperation()
+        address = value
+        client = nil; discovery = nil; issue = nil
+    }
+
+    private func cancelOperation() {
+        operationID += 1
+        operation?.cancel()
+        operation = nil
+        busy = false
+    }
+
     private func run(_ work: @escaping @MainActor () async throws -> Void) {
         guard !busy else { return }
         issue = nil; busy = true
+        operationID += 1
+        let id = operationID
         operation = Task {
-            defer { busy = false }
+            defer { if operationID == id { busy = false; operation = nil } }
             do { try await work() }
             catch { if !Task.isCancelled { issue = cinemaMessage(error) } }
+        }
+    }
+    private func connectWebsite() {
+        let candidate = cinema.newClient(RavanWebsite.origin)
+        let name = UIDevice.current.userInterfaceIdiom == .pad ? "My iPad" : "My iPhone"
+        run {
+            let caps = try await candidate.discover()
+            try Task.checkCancellation()
+            try await requestCode(name: name, using: candidate, discovery: caps)
         }
     }
     private func checkServer() {
@@ -166,7 +214,7 @@ struct ServerConnectionView: View {
             return
         }
         run {
-            let candidate = CinemaAPI(origin: try CinemaURL.origin(address))
+            let candidate = cinema.newClient(try CinemaURL.origin(address))
             let caps = try await candidate.discover()
             try Task.checkCancellation()
             client = candidate; discovery = caps; nameFocused = true
@@ -175,17 +223,22 @@ struct ServerConnectionView: View {
 
     private func startPairing() {
         guard validName, let client, let discovery else { return }
+        let name = deviceName
         run {
-            let bytes = try await client.request("/api/pairing", method: "POST",
-                body: JSONEncoder().encode(["name": deviceName]), accepting: [200, 201])
-            let next = try JSONDecoder().decode(CinemaChallenge.self, from: bytes)
-            guard next.code.range(of: #"^[A-Z2-9]{8}$"#, options: .regularExpression) != nil,
-                  let expiry = next.expiry, expiry > .now, expiry.timeIntervalSinceNow < 3600,
-                  (1...600_000).contains(next.pollIntervalMs) else { throw CinemaFailure.invalidReply }
-            try Task.checkCancellation()
-            try cinema.saveChallenge(next, origin: client.origin, instance: discovery.instanceId)
-            challenge = next
+            try await requestCode(name: name, using: client, discovery: discovery)
         }
+    }
+
+    private func requestCode(name: String, using client: CinemaAPI, discovery: CinemaDiscovery) async throws {
+        let bytes = try await client.request("/api/pairing", method: "POST",
+            body: JSONEncoder().encode(["name": name]), accepting: [200, 201])
+        let next = try JSONDecoder().decode(CinemaChallenge.self, from: bytes)
+        guard next.code.range(of: #"^[A-HJ-NP-Z2-9]{8}$"#, options: .regularExpression) != nil,
+              let expiry = next.expiry, expiry > .now, expiry.timeIntervalSinceNow < 3600,
+              (1...600_000).contains(next.pollIntervalMs) else { throw CinemaFailure.invalidReply }
+        try Task.checkCancellation()
+        try cinema.saveChallenge(next, origin: client.origin, instance: discovery.instanceId)
+        self.client = client; self.discovery = discovery; challenge = next
     }
     private func poll(_ waiting: CinemaChallenge, _ client: CinemaAPI, _ caps: CinemaDiscovery) async {
         let interval = Double(max(waiting.pollIntervalMs, 1000)) / 1000

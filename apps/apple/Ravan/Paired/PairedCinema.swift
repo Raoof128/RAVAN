@@ -75,13 +75,18 @@ private final class CinemaVault {
 @MainActor @Observable
 final class PairedCinema {
     private let vault: CinemaVault
-    private let newClient: (URL) -> CinemaAPI
+    let newClient: (URL) -> CinemaAPI
     private let restoreAutomatically: Bool
 
     init(service: String = (Bundle.main.bundleIdentifier ?? "Ravan") + ".cinema",
          restoreAutomatically: Bool = true,
          client: @escaping (URL) -> CinemaAPI = { CinemaAPI(origin: $0) }) {
         vault = CinemaVault(service: service)
+        #if RAVAN_UI_TESTING
+        if let session = CinemaLaunch.testSession, service == "Ravan.isolated-test." + session {
+            vault.transient = [:]
+        }
+        #endif
         newClient = client
         self.restoreAutomatically = restoreAutomatically
     }
@@ -102,6 +107,7 @@ final class PairedCinema {
     var isConnected: Bool { api != nil && secret != nil }
     var scopeID: String? { isConnected ? account?.key : nil }
     var canSave: Bool { discovery?.features["watchlistWrite"] == true && permissions.contains("watchlist:write") }
+    var canRead: Bool { isConnected && permissions.contains("reading:read") }
     var hasRememberedServer: Bool { account != nil }
     var portal: URL? {
         guard let origin = account?.origin else { return nil }
@@ -206,6 +212,23 @@ final class PairedCinema {
 
     func data(_ path: String, _ method: String = "GET", query: [URLQueryItem] = [], body: Data? = nil,
               accepting: Set<Int> = [200]) async throws -> Data {
+        try await authorized { client, bearer in
+            try await client.request(path, method: method, query: query, body: body, token: bearer, accepting: accepting)
+        }
+    }
+
+    func readerSession() async throws -> CinemaReaderSession {
+        guard canRead else { throw CinemaFailure.http(403, "reading_required", nil) }
+        do {
+            return try await authorized { client, bearer in try await client.readerSession(token: bearer) }
+        } catch CinemaFailure.http(403, _, _) {
+            // An owner can withdraw this permission without removing the cinema pairing.
+            permissions.remove("reading:read")
+            throw CinemaFailure.http(403, "reading_required", nil)
+        }
+    }
+
+    private func authorized<Value: Sendable>(_ operation: (CinemaAPI, String) async throws -> Value) async throws -> Value {
         guard let captured = account else { throw CinemaFailure.identity }
         guard let api, let secret else { throw CinemaFailure.offline }
         do {
@@ -217,14 +240,18 @@ final class PairedCinema {
                     throw CinemaFailure.identity
                 }
             }
-            let data = try await api.request(path, method: method, query: query, body: body,
-                                             token: secret.bearer, accepting: accepting)
+            let value = try await operation(api, secret.bearer)
             try Task.checkCancellation()
-            guard captured == account else { throw CancellationError() }
-            return data
-        } catch CinemaFailure.http(401, _, _) {
-            if captured == account { try forget(); notice = CinemaFailure.identity.localizedDescription }
-            throw CinemaFailure.identity
+            guard captured == account, self.api === api else { throw CancellationError() }
+            return value
+        } catch {
+            guard captured == account, self.api === api else { throw CancellationError() }
+            if case CinemaFailure.http(401, _, _) = error {
+                try forget()
+                notice = CinemaFailure.identity.localizedDescription
+                throw CinemaFailure.identity
+            }
+            throw error
         }
     }
 

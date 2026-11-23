@@ -326,7 +326,7 @@ test("a field explains what it needs in words, and removing a TV looks like what
   ).toBeFocused();
 });
 
-test("the owner explicitly grants watchlist access to each paired screen", async ({
+test("the owner explicitly grants watchlist and Reading Room access to each paired screen", async ({
   page,
   browserName,
 }) => {
@@ -341,14 +341,18 @@ test("the owner explicitly grants watchlist access to each paired screen", async
   const permission = page.getByRole("checkbox", {
     name: "Allow this device to change the watchlist",
   });
+  const reading = page.getByRole("checkbox", { name: /open the Reading Room/ });
   const approve = page.getByRole("button", { name: "Approve this device" });
 
   await expect(permission).not.toBeChecked();
+  await expect(reading).not.toBeChecked();
   await code.focus();
   await code.pressSequentially("abcd efgh");
   const tab = browserName === "webkit" ? "Alt+Tab" : "Tab";
   await page.keyboard.press(tab);
   await expect(permission).toBeFocused();
+  await page.keyboard.press(tab);
+  await expect(reading).toBeFocused();
   await page.keyboard.press(tab);
   await expect(approve).toBeFocused();
   await page.keyboard.press("Enter");
@@ -362,4 +366,10 @@ test("the owner explicitly grants watchlist access to each paired screen", async
   await expect.poll(() => approvals.length).toBe(2);
   expect(approvals[1]).toEqual({ code: "JKMNPQRS", watchlistWrite: true });
   await expect(permission).not.toBeChecked();
+  await code.fill("QRST UVWX");
+  await reading.check();
+  await approve.click();
+  await expect.poll(() => approvals.length).toBe(3);
+  expect(approvals[2]).toEqual({ code: "QRSTUVWX", reading: true });
+  await expect(reading).not.toBeChecked();
 });

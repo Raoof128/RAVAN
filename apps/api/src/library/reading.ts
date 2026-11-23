@@ -16,6 +16,7 @@ import {
   type ReadingList,
 } from "../../../../packages/contracts/src/reading.js";
 import { driveId } from "../drive/client.js";
+import { findReaderSession, readerCookie } from "../auth/reader-sessions.js";
 import { type LibrarySync, sourceGone } from "../drive/sync.js";
 import type { BlockCache } from "../media/cache.js";
 import { parseReadingSlices, readSlices } from "./reading-slices.js";
@@ -213,6 +214,16 @@ export function registerReading(
       : undefined;
     if (folder === null)
       return reply.code(404).send({ error: "folder_not_found" });
+    if (
+      folder?.parent_id &&
+      readerCookie(request) !== undefined &&
+      !db
+        .prepare(
+          `${subtree} SELECT 1 FROM reading_items r WHERE r.available=1 AND ${parentOf} IN (SELECT id FROM tree) LIMIT 1`,
+        )
+        .get(folder.id)
+    )
+      return reply.code(404).send({ error: "folder_not_found" });
     const match = "instr(lower(r.name),lower(?))>0";
     const order = "ORDER BY r.name COLLATE NOCASE,r.id LIMIT 61 OFFSET ?";
     const rows = (
@@ -337,16 +348,31 @@ export function registerReading(
         BigInt(ref.sizeBytes) > BigInt(readingLimit(format))
       )
         return reply.code(413).send({ error: "book_too_large" });
-      void warmer.start(ref);
       // Recheck Drive throughout a long stream, including when every block is warm.
       let checkedAt = Date.now();
       const authorize = async () => {
-        if (Date.now() - checkedAt < 5000) return;
-        const current = await library.verifyReading(ref.fileId);
-        if (current.generation !== ref.generation)
-          throw new Error("Source changed");
-        checkedAt = Date.now();
+        if (Date.now() - checkedAt >= 5000) {
+          const current = await library.verifyReading(ref.fileId);
+          if (current.generation !== ref.generation)
+            throw new Error("Source changed");
+          checkedAt = Date.now();
+        }
+        // The device or book may have been withdrawn during the Drive check.
+        if (readerCookie(request) !== undefined) {
+          if (!findReaderSession(db, request))
+            throw new Error("Reader session ended");
+          if (
+            !db
+              .prepare(
+                "SELECT 1 FROM reading_items WHERE id=? AND generation=? AND available=1",
+              )
+              .get(ref.fileId, ref.generation)
+          )
+            throw new Error("Source changed");
+        }
       };
+      await authorize();
+      void warmer.start(ref);
       reply
         .header("Content-Disposition", 'attachment; filename="reading.bin"')
         .header("Cache-Control", "private, no-store");

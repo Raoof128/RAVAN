@@ -14,6 +14,7 @@ const files = [
   "011_reading_covers.sql",
   "012_title_follows_drive.sql",
   "013_apple.sql",
+  "014_reader_sessions.sql",
 ];
 function current(db: Database): number {
   return (

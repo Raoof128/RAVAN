@@ -76,9 +76,10 @@ export async function sendRaw(
       if (!first.done) yield first.value;
       while (true) {
         controller.signal.throwIfAborted();
-        await authorize();
         const next = await iterator.next();
         if (next.done) break;
+        // Recheck after a potentially slow read, immediately before disclosure.
+        await authorize();
         yield next.value;
       }
       complete = true;

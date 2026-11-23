@@ -155,7 +155,7 @@ export async function restoreEncryptedBackup(
             "UPDATE owner_mfa SET last_counter=max(last_counter,?)",
           ).run(Math.floor(Date.now() / 30000));
           db.exec(
-            "DELETE FROM native_preparations; DELETE FROM web_sessions; DELETE FROM mfa_challenges; DELETE FROM pairing_requests; DELETE FROM prepared_assets; DELETE FROM jobs WHERE kind IN ('browser-prepare','artwork','book-cover'); DELETE FROM artwork;",
+            "DELETE FROM native_preparations; DELETE FROM device_reader_sessions; DELETE FROM web_sessions; DELETE FROM mfa_challenges; DELETE FROM pairing_requests; DELETE FROM prepared_assets; DELETE FROM jobs WHERE kind IN ('browser-prepare','artwork','book-cover'); DELETE FROM artwork;",
           );
           db.prepare("UPDATE server_identity SET id=? WHERE singleton=1").run(
             randomUUID(),

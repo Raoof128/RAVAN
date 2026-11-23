@@ -174,13 +174,14 @@ private struct CinemaGuidePage: View {
                     section("Your controls", "Clear viewing history in Your Cinema to reset local viewing positions. Choose Forget this film on its screening card to remove the file reference and its activity.")
                     #if PAIRED
                     section("Connected cinemas", "A connected server receives the device name you enter, catalogue and playback requests, and viewing progress. Saving a server film updates that server’s watchlist. Its operator controls retention and access. RAVĀN keeps its device credential in the system Keychain. Disconnect in Your Cinema to remove this device’s saved access.")
+                    section("Reading Room", "The paired reader stores your reading position on the cinema server. Its temporary session is held in memory. The owner can remove this device in Your cinema on the website.")
                     #endif
                 } else {
                     section("Open a film", "Choose Open a Film in Files, then select a video. An H.264 MP4 with AAC audio is a good choice. To watch offline, download the film to your device in Files first.")
                     section("Find a film again", "Choose Locate file on its screening card if access changes. Select the original file to keep its saved position and watchlist choice.")
                     section("Audio and captions", "During playback, tap the picture to show controls. Open the system language menu to choose among the tracks included with the film.")
                     #if PAIRED
-                    section("Pair a device", "Choose Connect a Server and enter the address supplied by your cinema’s owner. The owner approves the code in the browser. Contact the owner for help with a missing title, a preparation failure or an expired connection.")
+                    section("Pair a device", "Choose Connect to RAVĀN to get a code for the website. Copy the code, open the website and approve the device in Your cinema. Select Reading Room to read books on this device.")
                     #endif
                 }
             }

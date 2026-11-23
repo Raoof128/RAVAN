@@ -133,6 +133,7 @@ export interface PlayerAdapter {
 export type SessionState = {
   authenticated: boolean;
   configured: boolean;
+  readerOnly?: boolean;
   csrfToken?: string;
   mfa?: "enroll" | "verify";
   challengeExpiresAt?: number;

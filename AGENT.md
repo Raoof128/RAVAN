@@ -501,4 +501,4 @@ Raouf: 2026-11-22 (Australia/Sydney), forty-third entry
 
 Build the SwiftUI project with the iPhoneOS SDK and use a connected physical device for hardware testing. See [the build guide](apps/apple/README.md) for the three configurations and isolated fixtures.
 
-The paired build stores device credentials in a device-only Keychain item. The Files build excludes pairing at compile time. An authenticated preparation-status request reads progress without creating a playback lease. Deploy schema 13 with its matching API and worker.
+The paired build stores device credentials in a device-only Keychain item. The Files build excludes pairing at compile time. An authenticated preparation-status request reads progress without creating a playback lease. Deploy schema 14 with its matching API and worker. The paired Reading Room uses a short-lived cookie limited to books and reading progress.

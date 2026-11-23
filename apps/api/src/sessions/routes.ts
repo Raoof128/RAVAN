@@ -49,6 +49,7 @@ export function registerSessions(
         editionSelection: true,
         preparationStatus: true,
         selfRevocation: true,
+        readingRoom: true,
       },
     };
   });
@@ -307,12 +308,17 @@ export function registerSessions(
         .strictObject({
           code: z.string().regex(/^[A-HJ-NP-Z2-9]{8}$/),
           watchlistWrite: z.boolean().default(false),
+          reading: z.boolean().default(false),
         })
         .safeParse(request.body);
       if (!body.success || !pairing)
         return reply.code(400).send({ error: "pairing_unavailable" });
       try {
-        pairing.approve(body.data.code, body.data.watchlistWrite);
+        pairing.approve(
+          body.data.code,
+          body.data.watchlistWrite,
+          body.data.reading,
+        );
         return reply.code(204).send();
       } catch {
         return reply.code(400).send({ error: "pairing_unavailable" });
