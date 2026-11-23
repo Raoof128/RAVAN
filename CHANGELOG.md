@@ -1,8 +1,12 @@
 # Changelog
 
-## Paired Reading Room
+## 2026-11-23 · Paired Reading Room
 
-iPhone and iPad can connect to the website and read Drive-backed EPUB, PDF and CBZ files. The website owner can grant book access when pairing a device. Reading positions stay on the server.
+The paired iPhone and iPad app opens EPUB books, PDF documents and CBZ comics from the website’s Google Drive library. The owner grants reading access when approving the device. A bookmark saved on either screen is available on the other. [Connect an Apple device](apps/apple/README.md#connect-a-personal-cinema)
+
+Build 1.0 (2) passed seven checks on a physical iPhone Air. The hosted reader opened a two-chapter test EPUB and resumed at chapter two in a fresh session using an isolated bookmark fixture.
+
+The release verification included 415 passing unit and integration tests with one conditional HDR skip, 244 passing browser tests with two expected skips, and 12 passing release checks.
 
 ## 2026-11-23 · Apple cinema client
 
