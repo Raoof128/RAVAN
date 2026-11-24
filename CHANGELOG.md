@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-24 · Device pairing recovery
+
+An approved device can return to the app and finish connecting with the same code. The website shows whether the device still needs to confirm. An interrupted acknowledgement can be retried, and reading and playback access begin after the device confirms.
+
 ## 2026-11-23 · Paired Reading Room
 
 The paired iPhone and iPad app opens EPUB books, PDF documents and CBZ comics from the website’s Google Drive library. The owner grants reading access when approving the device. A bookmark saved on either screen is available on the other. [Connect an Apple device](apps/apple/README.md#connect-a-personal-cinema)

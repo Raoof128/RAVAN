@@ -2,16 +2,23 @@ import type { Database } from "../../../../packages/db/src/open.js";
 import type { FastifyRequest } from "fastify";
 import { hash, findSession } from "../auth/sessions.js";
 export type Principal = { webHash?: string; deviceId?: string };
-export function findDevice(db: Database, request: FastifyRequest) {
-  const match = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(
+export function deviceCredential(request: FastifyRequest) {
+  return /^Bearer ([A-Za-z0-9_-]{43})$/.exec(
     request.headers.authorization ?? "",
-  );
-  if (!match) return;
+  )?.[1];
+}
+export function findDevice(
+  db: Database,
+  request: FastifyRequest,
+  forAcknowledgement = false,
+) {
+  const credential = deviceCredential(request);
+  if (!credential) return;
   return db
     .prepare(
-      "SELECT id,name,watchlist_write,reading FROM devices WHERE token_hash=? AND revoked_at IS NULL",
+      "SELECT id,name,watchlist_write,reading FROM devices WHERE token_hash=? AND revoked_at IS NULL AND (awaiting_ack=0 OR ?=1)",
     )
-    .get(hash(match[1]!)) as
+    .get(hash(credential), Number(forAcknowledgement)) as
     | { id: string; name: string; watchlist_write: number; reading: number }
     | undefined;
 }

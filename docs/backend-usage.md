@@ -17,7 +17,7 @@ npm run dev:web
 
 The player reports what the browser can decode, and the server does the least work that will play: the original directly, a repackaged copy with the picture untouched, or a full H.264 conversion. Choosing an explicit size in the player always converts to that size. A browser that reports nothing gets the universal conversion.
 
-Only one playback session is active by default. Replacing it requires an explicit button press. Progress is saved periodically and on pause/end. The TV receives its own revocable credential; Google tokens remain on the server. A credential the owner approved but the screen did not collect within a minute is revoked, since nobody holds it.
+Only one playback session is active by default. Replacing it requires an explicit button press. Progress is saved periodically and on pause/end. The TV receives its own revocable credential; Google tokens remain on the server. The device can collect approval until the displayed code expires. After collection it has one minute to acknowledge its credential before that credential expires. Only a confirmed device can use its grants. A device can safely retry an acknowledgement if it loses the response.
 
 The worker's private routes are `/_worker/*`. They require a separate key and must also be excluded by the public proxy. Source bytes are served only against a per-file grant the worker obtains with that key, so the key itself never appears on an FFmpeg command line. Media operations use fixed executable argument arrays, bounded output and timeouts. Source downloads use immutable generation-keyed blocks; the input file is never changed.
 

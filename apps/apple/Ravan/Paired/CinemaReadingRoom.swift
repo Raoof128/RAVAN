@@ -199,7 +199,14 @@ struct ReaderWebView: UIViewRepresentable {
             view.configuration.websiteDataStore.httpCookieStore.setCookie(session.cookie) { [weak self, weak view] in
                 guard let self, let view, self.currentCookie?.value == session.cookie.value, !self.started else { return }
                 self.started = true
-                view.load(URLRequest(url: session.page, cachePolicy: .reloadIgnoringLocalCacheData))
+                let request = URLRequest(url: session.page, cachePolicy: .reloadIgnoringLocalCacheData)
+                #if RAVAN_UI_TESTING
+                if CinemaLaunch.testSession != nil && ProcessInfo.processInfo.arguments.contains("--ravan-approve-fixture-in-background") {
+                    FixtureCinema.loadReader(request, cookie: session.cookie, in: view)
+                    return
+                }
+                #endif
+                view.load(request)
             }
         }
 

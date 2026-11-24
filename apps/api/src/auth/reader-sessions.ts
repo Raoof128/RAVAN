@@ -16,7 +16,7 @@ export function findReaderSession(db: Database, request: FastifyRequest) {
   return db
     .prepare(
       `SELECT s.token_hash,s.csrf FROM device_reader_sessions s JOIN devices d ON d.id=s.device_id
-     WHERE s.token_hash=? AND s.expires_at>? AND d.revoked_at IS NULL AND d.reading=1`,
+     WHERE s.token_hash=? AND s.expires_at>? AND d.revoked_at IS NULL AND d.awaiting_ack=0 AND d.reading=1`,
     )
     .get(hash(token), Date.now()) as ReaderSession | undefined;
 }
@@ -26,8 +26,7 @@ export function issueReaderSession(db: Database, deviceId: string) {
     .transaction(() => {
       const approved = db
         .prepare(
-          `SELECT id FROM devices WHERE id=? AND revoked_at IS NULL AND reading=1
-       AND NOT EXISTS (SELECT 1 FROM pairing_requests WHERE device_id=devices.id AND state='approved')`,
+          "SELECT id FROM devices WHERE id=? AND revoked_at IS NULL AND reading=1 AND awaiting_ack=0",
         )
         .get(deviceId);
       if (!approved) return;

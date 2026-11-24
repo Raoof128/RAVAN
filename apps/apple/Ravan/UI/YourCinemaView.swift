@@ -2,6 +2,7 @@ import SwiftUI
 
 struct YourCinemaView: View {
     let openFile: () -> Void
+    let connect: () -> Void
     @Environment(LocalLibrary.self) private var library
     @Environment(\.horizontalSizeClass) private var horizontalSize
     @State private var confirmHistory = false
@@ -23,7 +24,7 @@ struct YourCinemaView: View {
                 }
 
                 #if PAIRED
-                ServerSettingsView()
+                ServerSettingsView(connect: connect)
                 #endif
 
                 VStack(alignment: .leading, spacing: 12) {

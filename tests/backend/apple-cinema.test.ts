@@ -82,6 +82,7 @@ it("retains the old device's grants and only revokes the requesting device", asy
     expect(result.statusCode).toBe(204);
     const approved = pair.poll(challenge.id, challenge.pollSecret);
     if (approved.state !== "approved") throw Error("fixture pairing failed");
+    pair.ack(challenge.id, approved.credential);
     return { authorization: "Bearer " + approved.credential };
   };
   const old = await grant();

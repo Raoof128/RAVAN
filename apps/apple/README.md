@@ -17,7 +17,7 @@ The identifiers are proposed for development. Signing and App Store Connect requ
 1. On the welcome screen, tap **Connect to RAVĀN**. You can also open the connection screen from **Your Cinema**.
 2. Tap **Get website pairing code**, or enter the HTTPS address of your own server. When the temporary code appears, tap **Copy code and open website**.
 3. Sign in as the owner. In **Your cinema → Pair a screen**, paste the code, select **Allow this device to open the Reading Room and save reading progress**, then approve the device. Watchlist access has its own checkbox.
-4. Return to the app and open **Reading Room**. Browse your Drive folders, choose an EPUB, PDF or CBZ title, and pick up at the position saved on the website.
+4. Return to the app to finish pairing. The app resumes the same code when you return. The website shows **Waiting for device** until the app confirms, then **Paired**. If the code has expired, get a new code in the app and approve it on the website. Open **Reading Room**. Browse your Drive folders, choose an EPUB, PDF or CBZ title, and pick up at the position saved on the website.
 
 For a self-hosted build, set the default website in [RavanWebsite.swift](Ravan/Paired/RavanWebsite.swift). If a device was paired before reading access was available, choose **Open website reader** and sign in, or disconnect and pair again to grant reading access.
 

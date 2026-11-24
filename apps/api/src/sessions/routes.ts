@@ -11,8 +11,8 @@ import {
   idSchema,
 } from "../../../../packages/contracts/src/schemas.js";
 import { PlaybackService } from "./playback.js";
-import { PairingService } from "./pairing.js";
-import { principal, revokeDevice } from "./devices.js";
+import { PairingService, listedDevices } from "./pairing.js";
+import { deviceCredential, principal, revokeDevice } from "./devices.js";
 import { MediaPlanner } from "../media/planner.js";
 import { localReader, ASSET_ID } from "../../../worker/src/prepared-store.js";
 import { lstat, readFile } from "node:fs/promises";
@@ -253,13 +253,7 @@ export function registerSessions(
       }
     },
   );
-  app.get("/api/devices", async () =>
-    db
-      .prepare(
-        "SELECT id,name FROM devices WHERE revoked_at IS NULL ORDER BY name",
-      )
-      .all(),
-  );
+  app.get("/api/devices", async () => listedDevices(db));
   app.delete<{ Params: { id: string } }>(
     "/api/devices/:id",
     async (request, reply) => {
@@ -351,10 +345,11 @@ export function registerSessions(
   );
   app.post("/api/pairing/ack", async (request, reply) => {
     const body = z.strictObject({ id: idSchema }).safeParse(request.body);
-    if (!body.success || !pairing)
+    const credential = deviceCredential(request);
+    if (!body.success || !pairing || !credential)
       return reply.code(400).send({ error: "pairing_unavailable" });
     try {
-      pairing.ack(body.data.id, (request.headers.authorization ?? "").slice(7));
+      pairing.ack(body.data.id, credential);
       return reply.code(204).send();
     } catch {
       return reply.code(400).send({ error: "pairing_unavailable" });

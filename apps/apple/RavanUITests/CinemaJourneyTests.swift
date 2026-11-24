@@ -208,6 +208,33 @@ extension XCTestCase {
         tap(app.buttons["Change server"], app: app)
         XCTAssertTrue(app.buttons["server.website"].waitForExistence(timeout: 12))
     }
+
+    func testApprovedWebsitePairingConnectsAfterReturningToApp() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ravan-isolated-test", "--ravan-approve-fixture-in-background"]
+        app.launch()
+        preparePortrait(app)
+        tap(app.buttons["welcome.connect"], app: app)
+        tap(app.buttons["server.website"], app: app)
+        XCTAssertTrue(app.staticTexts["pairing.code"].waitForExistence(timeout: 12))
+        XCTAssertTrue(app.buttons["pairing.approve"].exists)
+
+        // Closing the code sheet must keep the same request available after owner approval.
+        tap(app.buttons["server.close"], app: app)
+        XCTAssertTrue(app.buttons["welcome.connect"].waitForExistence(timeout: 10))
+        // The fixture approves only after iOS has actually backgrounded the app.
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        XCTAssertTrue(app.buttons["destination.library"].waitForExistence(timeout: 25))
+        let film = app.buttons["server.film.paired-film"].firstMatch
+        for _ in 0..<5 where !film.exists { app.swipeUp() }
+        XCTAssertTrue(film.waitForExistence(timeout: 10))
+        XCTAssertTrue(film.label.contains("The Lantern Keeper"))
+        tap(app.buttons["destination.reading"], app: app)
+        let shelf = app.webViews.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", "The Lantern Shelf")).firstMatch
+        XCTAssertTrue(shelf.waitForExistence(timeout: 20))
+    }
     #endif
     func testConnectRejectsAnInsecureAddressAndReturnsToWelcome() throws {
         let app = XCUIApplication()

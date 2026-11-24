@@ -66,6 +66,7 @@ struct CinemaRootView: View {
     @Namespace private var sidebarSelection
     #if PAIRED
     @Environment(PairedCinema.self) private var paired
+    @Environment(\.scenePhase) private var phase
     @State private var connectionPresented = false
     #endif
 
@@ -131,6 +132,11 @@ struct CinemaRootView: View {
         }
         #if PAIRED
         .sheet(isPresented: $connectionPresented) { ServerConnectionView() }
+        .task(id: phase == .active) {
+            // The approval can outlive the sheet or the app process while Safari is open.
+            guard phase == .active, !connectionPresented, !paired.hasRememberedServer else { return }
+            if (try? paired.recoverChallenge()) != nil { connectionPresented = true }
+        }
         .onChange(of: paired.isConnected) { _, connected in
             if connected { library.hasEntered = true }
             else {
@@ -274,7 +280,7 @@ struct CinemaRootView: View {
             CinemaReadingRoom(connect: connect)
         #endif
         case .cinema:
-            YourCinemaView(openFile: { chooseFile() })
+            YourCinemaView(openFile: { chooseFile() }, connect: connect)
         case .library, .watchlist:
             let selected = selection(tab)
             CinemaCollectionView(

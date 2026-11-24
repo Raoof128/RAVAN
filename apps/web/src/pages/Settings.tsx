@@ -427,13 +427,15 @@ export function Settings() {
                         data.has("reading"),
                       );
                       form.reset();
-                      deviceEdits.current++;
+                      const edits = ++deviceEdits.current;
                       void api
                         .devices()
-                        .then(setDevices)
+                        .then((d) => {
+                          if (deviceEdits.current === edits) setDevices(d);
+                        })
                         .catch(() => {});
                     },
-                    "Device approved. Continue on your screen.",
+                    "Code approved. Return to RAVĀN on your device to finish connecting.",
                     "That code wasn’t accepted. Codes expire quickly: check the one on your device and enter it again.",
                   ),
                 );
@@ -478,7 +480,7 @@ export function Settings() {
               <Outcome note={notes.pairing} />
             </form>
             <h3 className="panel-subtitle" ref={screens} tabIndex={-1}>
-              Paired screens
+              Your screens
             </h3>
             {devices.length === 0 ? (
               <p className="fine-print">No paired screens yet.</p>
@@ -486,7 +488,16 @@ export function Settings() {
               <ul className="device-list">
                 {devices.map((d) => (
                   <li className="edition" key={d.id}>
-                    <span>{d.name}</span>
+                    <span>
+                      {d.name}
+                      {d.pairingState && (
+                        <small className="fine-print device-state">
+                          {d.pairingState === "awaitingDevice"
+                            ? "Waiting for device"
+                            : "Paired"}
+                        </small>
+                      )}
+                    </span>
                     {removing === d.id ? (
                       <span className="device-confirm">
                         <ActionButton

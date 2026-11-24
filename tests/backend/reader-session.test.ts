@@ -93,7 +93,10 @@ it("exchanges only an acknowledged, reader-approved device and limits its browse
     (await h.app.inject("/api/capabilities")).json().features.readingRoom,
   ).toBe(true);
   expect((await h.app.inject(exchange)).statusCode).toBe(401);
-  for (const headers of [legacy.headers, iphone.headers, h.ownerHeaders])
+  expect(
+    (await h.app.inject({ ...exchange, headers: iphone.headers })).statusCode,
+  ).toBe(401);
+  for (const headers of [legacy.headers, h.ownerHeaders])
     expect((await h.app.inject({ ...exchange, headers })).statusCode).toBe(403);
   iphone.ack();
   expect(

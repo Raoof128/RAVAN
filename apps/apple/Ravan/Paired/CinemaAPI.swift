@@ -187,7 +187,7 @@ enum CinemaURL {
     }
 
     static func id(_ id: String) throws -> String {
-        guard id.range(of: #"^[A-Za-z0-9_-]{1,160}$"#, options: .regularExpression) != nil
+        guard id.range(of: #"\A[A-Za-z0-9_-]{1,160}\z"#, options: .regularExpression) != nil
         else { throw CinemaFailure.invalidReply }
         return id
     }

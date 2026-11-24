@@ -73,7 +73,9 @@ export class PlaybackService {
     if (
       row.device_id &&
       !this.db
-        .prepare("SELECT 1 FROM devices WHERE id=? AND revoked_at IS NULL")
+        .prepare(
+          "SELECT 1 FROM devices WHERE id=? AND revoked_at IS NULL AND awaiting_ack=0",
+        )
         .get(row.device_id)
     )
       return false;
@@ -201,7 +203,9 @@ export class PlaybackService {
           .get(source.fileId, movieId, source.generation) ||
         (who.deviceId &&
           !this.db
-            .prepare("SELECT 1 FROM devices WHERE id=? AND revoked_at IS NULL")
+            .prepare(
+              "SELECT 1 FROM devices WHERE id=? AND revoked_at IS NULL AND awaiting_ack=0",
+            )
             .get(who.deviceId))
       )
         return {

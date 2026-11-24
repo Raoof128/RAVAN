@@ -229,4 +229,8 @@ export type PlaybackResult =
     }
   | { kind: "conflict"; sessionId: string }
   | { kind: "unsupported"; reason: string };
-export type Device = { id: string; name: string };
+export type Device = {
+  id: string;
+  name: string;
+  pairingState?: "awaitingDevice" | "paired";
+};

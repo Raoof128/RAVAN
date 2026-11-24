@@ -12,6 +12,8 @@ struct ServerConnectionView: View {
     @State private var client: CinemaAPI?
     @State private var discovery: CinemaDiscovery?
     @State private var challenge: CinemaChallenge?
+    @State private var challengeInstance: String?
+    @State private var nextPoll = Date.distantPast
     @State private var issue: String?
     @State private var busy = false
     @State private var operation: Task<Void, Never>?
@@ -53,9 +55,12 @@ struct ServerConnectionView: View {
                             .accessibilityIdentifier("pairing.approve")
                             Button("Copy code", systemImage: "doc.on.doc") { copy(challenge) }
                             Button("Get a new code") {
-                                do { try cinema.clearChallenge(); self.challenge = nil; issue = nil; startPairing() }
-                                catch { issue = cinemaMessage(error) }
-                            }.disabled(busy)
+                                run {
+                                    let caps = try await client.discover()
+                                    try Task.checkCancellation()
+                                    try await requestCode(name: deviceName, using: client, discovery: caps)
+                                }
+                            }.disabled(busy || cinema.restoring)
                             Button("Change server") {
                                 cancelOperation()
                                 do { try cinema.clearChallenge(); self.challenge = nil; self.client = nil; discovery = nil; issue = nil }
@@ -65,8 +70,11 @@ struct ServerConnectionView: View {
                     } else {
                         if client == nil {
                             section("RAVĀN website") {
-                                Text(verbatim: RavanWebsite.origin.host() ?? RavanWebsite.origin.absoluteString)
+                                let host = RavanWebsite.origin.host() ?? RavanWebsite.origin.absoluteString
+                                let spokenHost = host.components(separatedBy: ".").joined(separator: " " + String(localized: "dot") + " ")
+                                Text(verbatim: host)
                                     .font(.subheadline).foregroundStyle(CinemaTheme.muted)
+                                    .accessibilityLabel(Text("Website address, \(spokenHost)"))
                                 Button(action: connectWebsite) {
                                     Label("Get website pairing code", systemImage: "link")
                                 }
@@ -120,7 +128,6 @@ struct ServerConnectionView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button {
-                        try? cinema.clearChallenge()
                         dismiss()
                     } label: {
                         Image(systemName: "xmark").frame(minWidth: 44, minHeight: 44)
@@ -139,20 +146,14 @@ struct ServerConnectionView: View {
             do {
                 guard let pending = try cinema.recoverChallenge() else { return }
                 address = pending.origin
-                run {
-                    let candidate = cinema.newClient(try CinemaURL.origin(pending.origin))
-                    let caps = try await candidate.discover()
-                    try Task.checkCancellation()
-                    guard pending.instance == caps.instanceId else {
-                        try cinema.clearChallenge(); throw CinemaFailure.identity
-                    }
-                    client = candidate; discovery = caps; challenge = pending.challenge
-                }
+                client = cinema.newClient(try CinemaURL.origin(pending.origin))
+                challengeInstance = pending.instance
+                challenge = pending.challenge
             } catch { issue = cinemaMessage(error) }
         }
         .task(id: [phase == .active ? "active" : "", challenge?.id ?? ""]) {
-            guard phase == .active, let challenge, let client, let discovery else { return }
-            await poll(challenge, client, discovery)
+            guard phase == .active, let challenge, let client, !cinema.hasRememberedServer else { return }
+            await poll(challenge, client)
         }
         .onChange(of: cinema.isConnected) { _, online in if online { dismiss() } }
         .onDisappear { cancelOperation() }
@@ -238,9 +239,12 @@ struct ServerConnectionView: View {
               (1...600_000).contains(next.pollIntervalMs) else { throw CinemaFailure.invalidReply }
         try Task.checkCancellation()
         try cinema.saveChallenge(next, origin: client.origin, instance: discovery.instanceId)
-        self.client = client; self.discovery = discovery; challenge = next
+        self.client = client; self.discovery = discovery
+        challengeInstance = discovery.instanceId
+        nextPoll = .distantPast
+        challenge = next
     }
-    private func poll(_ waiting: CinemaChallenge, _ client: CinemaAPI, _ caps: CinemaDiscovery) async {
+    private func poll(_ waiting: CinemaChallenge, _ client: CinemaAPI) async {
         let interval = Double(max(waiting.pollIntervalMs, 1000)) / 1000
         var delay = interval
         while !Task.isCancelled && waiting.id == challenge?.id {
@@ -248,34 +252,62 @@ struct ServerConnectionView: View {
                 guard let expiry = waiting.expiry, expiry > .now else {
                     issue = String(localized: "This code has expired. Get a new code."); return
                 }
-                try await Task.sleep(for: .seconds(min(delay, max(0, expiry.timeIntervalSinceNow))))
+                let remaining = min(nextPoll, expiry).timeIntervalSinceNow
+                if remaining > 0 { try await Task.sleep(for: .seconds(remaining)) }
                 guard expiry > .now else { issue = String(localized: "This code has expired. Get a new code."); return }
+                let caps: CinemaDiscovery
+                if let discovery { caps = discovery }
+                else {
+                    caps = try await client.discover()
+                    try Task.checkCancellation()
+                    guard caps.instanceId == challengeInstance else {
+                        try cinema.clearChallenge()
+                        challenge = nil; self.client = nil
+                        throw CinemaFailure.identity
+                    }
+                    discovery = caps
+                }
+                // Keep the server's polling interval when the user switches back from Safari.
+                nextPoll = Date.now.addingTimeInterval(interval)
                 let bytes = try await client.request("/api/pairing/poll", method: "POST", body:
                     JSONEncoder().encode(["id": waiting.id, "pollSecret": waiting.pollSecret]))
                 let answer = try JSONDecoder().decode(CinemaApproval.self, from: bytes)
                 try Task.checkCancellation()
+                guard waiting.id == challenge?.id else { return }
                 if answer.state == "approved" {
+                    cancelOperation()
                     try await cinema.finishPairing(client: client, caps: caps, challenge: waiting, approval: answer)
                     return
                 }
                 guard answer.state == "pending" else { throw CinemaFailure.invalidReply }
                 delay = interval; issue = nil
             } catch CinemaFailure.http(429, _, let retry) {
+                guard !Task.isCancelled, waiting.id == challenge?.id else { return }
                 delay = min(900, max(interval, retry ?? (delay * 2)))
+                nextPoll = Date.now.addingTimeInterval(delay)
             } catch {
                 if Task.isCancelled { return }
                 issue = cinemaMessage(error)
-                if error is URLError { delay = min(60, max(interval, delay * 2)); continue }
-                return
+                guard !cinema.hasRememberedServer, waiting.id == challenge?.id else { return }
+                switch error {
+                case CinemaFailure.http(400, "pairing_unavailable", _):
+                    do { try cinema.clearChallenge(); challenge = nil }
+                    catch { issue = cinemaMessage(error) }
+                    return
+                case is URLError, CinemaFailure.http(408, _, _), CinemaFailure.http(500...599, _, _):
+                    delay = min(60, max(interval, delay * 2))
+                    nextPoll = Date.now.addingTimeInterval(delay)
+                default: return
+                }
             }
         }
     }
 }
 
 struct ServerSettingsView: View {
+    let connect: () -> Void
     @Environment(PairedCinema.self) private var cinema
     @Environment(\.cinemaWindowID) private var window
-    @State private var connect = false
     @State private var confirm = false
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -298,12 +330,11 @@ struct ServerSettingsView: View {
                 }
             } else {
                 Text("No server paired").foregroundStyle(CinemaTheme.muted)
-                Button("Connect a Server", systemImage: "link") { connect = true }
+                Button("Connect a Server", systemImage: "link", action: connect)
                     .buttonStyle(CinemaSecondaryButtonStyle())
             }
             if let notice = cinema.notice { Text(notice).font(.footnote) }
         }
-        .sheet(isPresented: $connect) { ServerConnectionView() }
         .confirmationDialog("Disconnect this device?", isPresented: $confirm) {
             Button("Disconnect", role: .destructive) { Task { await cinema.disconnect() } }
         } message: { Text("This removes the device credential and the server’s saved preparations from this device.") }

@@ -332,6 +332,20 @@ test("the owner explicitly grants watchlist and Reading Room access to each pair
 }) => {
   await cinema(page);
   const approvals: unknown[] = [];
+  let acknowledged = false;
+  await page.route("**/api/devices", (route) =>
+    route.fulfill({
+      json: approvals.length
+        ? [
+            {
+              id: "phone",
+              name: "Fixture iPhone",
+              pairingState: acknowledged ? "paired" : "awaitingDevice",
+            },
+          ]
+        : [],
+    }),
+  );
   await page.route("**/api/pairing/approve", async (route) => {
     approvals.push(route.request().postDataJSON());
     await route.fulfill({ status: 204 });
@@ -360,6 +374,17 @@ test("the owner explicitly grants watchlist and Reading Room access to each pair
   expect(approvals[0]).toEqual({ code: "ABCDEFGH" });
 
   await expect(code).toHaveValue("");
+  const phone = page
+    .getByRole("listitem")
+    .filter({ hasText: "Fixture iPhone" });
+  await expect(phone.getByText("Waiting for device")).toBeVisible();
+  await expect(phone.getByText("Paired", { exact: true })).toHaveCount(0);
+  await expect(page.getByText(/Return to RAVĀN on your device/)).toBeVisible();
+  acknowledged = true;
+  await expect(phone.getByText("Paired", { exact: true })).toBeVisible({
+    timeout: 10000,
+  });
+  await expect(phone.getByText("Waiting for device")).toHaveCount(0);
   await code.fill("JKMN PQRS");
   await permission.check();
   await approve.click();

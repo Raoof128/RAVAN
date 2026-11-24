@@ -400,7 +400,7 @@ it("revokes a screen's credential that was approved but never collected", async 
   const lost = pairing.create("Switched off");
   pairing.approve(lost.code);
   // While the screen may still collect it, the credential stands.
-  now += 59_000;
+  now += 599_000;
   pairing.expire();
   expect(active().sort()).toEqual(["Living room", "Switched off"]);
   // The delivery window passes. Nobody holds that credential, and nobody can
@@ -412,7 +412,7 @@ it("revokes a screen's credential that was approved but never collected", async 
   // The next pairing request tidies up as well, without being asked.
   const again = pairing.create("Switched off");
   pairing.approve(again.code);
-  now += 61_000;
+  now += 601_000;
   pairing.create("Another screen");
   expect(active()).toEqual(["Living room"]);
 });

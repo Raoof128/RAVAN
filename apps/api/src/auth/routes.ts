@@ -275,7 +275,7 @@ export function registerAuth(
   app.addHook("preHandler", async (request, reply) => {
     const route = request.routeOptions.url ?? "";
     if (!route.startsWith("/api/") || route === "/api/session") return;
-    const device = findDevice(db, request);
+    const device = findDevice(db, request, route === "/api/pairing/ack");
     if (!device && readerCookie(request) !== undefined) {
       const reader = findReaderSession(db, request);
       if (!reader)

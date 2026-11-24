@@ -77,34 +77,18 @@ final class PairedContractTests: XCTestCase {
     }
 
     @MainActor func testRestoresAfterAmbiguousAcknowledgementAndPurgesOnInstanceChange() async throws {
-        let state = PairingScript()
-        let origin = try CinemaURL.origin("https://" + UUID().uuidString.lowercased() + ".example")
-        let host = try XCTUnwrap(origin.host())
-        ScriptedCinemaProtocol.scripts.register(state, host)
-        defer { ScriptedCinemaProtocol.scripts.remove(host) }
-        let service = "Ravan.fixture." + UUID().uuidString
-        func client(_ url: URL) -> CinemaAPI {
-            let config = cinemaConfiguration()
-            config.protocolClasses = [ScriptedCinemaProtocol.self]
-            return CinemaAPI(origin: url, configuration: config)
-        }
-        let api = client(origin)
-        let caps = try await api.discover()
-        let first = PairedCinema(service: service, client: client)
-        let challenge = CinemaChallenge(id: "challenge", code: "ABCDEFGH", pollSecret: "fixture",
-                                       expiresAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(50)),
-                                       pollIntervalMs: 5000)
-        try first.saveChallenge(challenge, origin: origin, instance: caps.instanceId)
-        XCTAssertEqual(try first.recoverChallenge()?.challenge.id, challenge.id)
-        let issued = CinemaApproval(state: "approved", deviceId: "fixture-device", credential: String(repeating: "x", count: 43))
+        let attempt = try PairingAttempt(.lostAcknowledgement)
+        let state = attempt.state
+        let first = attempt.makeCinema()
         do {
-            try await first.finishPairing(client: api, caps: caps, challenge: challenge, approval: issued)
-            XCTFail("An interrupted acknowledgement must be recoverable")
+            try await attempt.approve(first)
+            XCTFail("The acknowledgement reply was interrupted")
         } catch { XCTAssertFalse(first.isConnected) }
-        let restored = PairedCinema(service: service, client: client)
+        let restored = attempt.makeCinema()
         await restored.restore()
         XCTAssertTrue(restored.isConnected)
         XCTAssertTrue(restored.canSave)
+        XCTAssertEqual(state.acknowledgements, 2)
         XCTAssertNil(try restored.recoverChallenge())
         state.setOffline(true)
         await restored.foreground()
@@ -116,18 +100,111 @@ final class PairedContractTests: XCTestCase {
         XCTAssertTrue(restored.isConnected)
         XCTAssertNil(restored.notice)
         state.replaceInstance()
-        let replaced = PairedCinema(service: service, client: client)
+        let replaced = attempt.makeCinema()
         await replaced.restore()
         XCTAssertFalse(replaced.isConnected)
         XCTAssertNil(replaced.account)
         XCTAssertEqual(state.credentialRequestsOnReplacement, 0)
         await replaced.disconnect()
     }
+
+    @MainActor func testMalformedCredentialNeverReachesAcknowledgement() async throws {
+        let attempt = try PairingAttempt(.rejectedAcknowledgement)
+        let cinema = attempt.makeCinema()
+        for credential in [String(repeating: "a", count: 42), String(repeating: "a", count: 44),
+                           String(repeating: "a", count: 42) + "\n"] {
+            do {
+                try await attempt.approve(cinema, credential: credential)
+                XCTFail("Unexpected credential format")
+            } catch CinemaFailure.invalidReply {
+                XCTAssertNil(cinema.account)
+            }
+        }
+        XCTAssertEqual(attempt.state.acknowledgements, 0)
+        try cinema.clearChallenge()
+    }
+
+    @MainActor func testRestoreResumesAtIdentityAfterSuccessfulAcknowledgement() async throws {
+        let attempt = try PairingAttempt(.lostIdentity)
+        let first = attempt.makeCinema()
+        do {
+            try await attempt.approve(first)
+            XCTFail("The identity reply was interrupted")
+        } catch { XCTAssertFalse(first.isConnected) }
+
+        let restored = attempt.makeCinema()
+        await restored.restore()
+        XCTAssertTrue(restored.isConnected)
+        XCTAssertEqual(attempt.state.acknowledgements, 1)
+        await restored.disconnect()
+    }
+
+    @MainActor func testRejectedAcknowledgementRequiresNewCode() async throws {
+        let attempt = try PairingAttempt(.rejectedAcknowledgement)
+        let first = attempt.makeCinema()
+        do {
+            try await attempt.approve(first)
+            XCTFail("The server rejected this delivery")
+        } catch CinemaFailure.http(400, "pairing_unavailable", _) {
+            XCTAssertFalse(first.isConnected)
+            XCTAssertNil(first.account)
+        }
+        let restored = attempt.makeCinema()
+        await restored.restore()
+        XCTAssertNil(restored.account)
+        XCTAssertEqual(attempt.state.acknowledgements, 1)
+        XCTAssertEqual(attempt.state.identityRequests, 0)
+    }
+}
+
+private final class PairingAttempt {
+    let state: PairingScript
+    private let origin: URL
+    private let host: String
+    private let service = "Ravan.fixture." + UUID().uuidString
+
+    init(_ scenario: PairingScript.Scenario) throws {
+        state = PairingScript(scenario)
+        origin = try CinemaURL.origin("https://" + UUID().uuidString.lowercased() + ".example")
+        host = try XCTUnwrap(origin.host())
+        ScriptedCinemaProtocol.scripts.register(state, host)
+    }
+
+    deinit { ScriptedCinemaProtocol.scripts.remove(host) }
+
+    private static func client(_ url: URL) -> CinemaAPI {
+        let config = cinemaConfiguration()
+        config.protocolClasses = [ScriptedCinemaProtocol.self]
+        return CinemaAPI(origin: url, configuration: config)
+    }
+
+    @MainActor func makeCinema() -> PairedCinema {
+        PairedCinema(service: service, client: Self.client)
+    }
+
+    @MainActor func approve(_ cinema: PairedCinema, credential: String = PairingScript.bearer) async throws {
+        let api = Self.client(origin)
+        let caps = try await api.discover()
+        let challenge = CinemaChallenge(id: "challenge", code: "ABCDEFGH", pollSecret: String(repeating: "p", count: 43),
+                                        expiresAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(50)),
+                                        pollIntervalMs: 5000)
+        try cinema.saveChallenge(challenge, origin: origin, instance: caps.instanceId)
+        XCTAssertEqual(try cinema.recoverChallenge()?.challenge.id, challenge.id)
+        let issued = CinemaApproval(state: "approved", deviceId: "fixture-device", credential: credential)
+        try await cinema.finishPairing(client: api, caps: caps, challenge: challenge, approval: issued)
+    }
 }
 
 private final class PairingScript: @unchecked Sendable {
+    enum Scenario { case lostAcknowledgement, lostIdentity, rejectedAcknowledgement }
+    static let bearer = String(repeating: "x", count: 43)
+    private let scenario: Scenario
     private let lock = NSLock()
-    private var firstAcknowledgement = true
+    private var ackCount = 0
+    private var identityCount = 0
+    var acknowledgements: Int { lock.withLock { ackCount } }
+    var identityRequests: Int { lock.withLock { identityCount } }
+    init(_ scenario: Scenario) { self.scenario = scenario }
     private var replaced = false
     private var offline = false
     func setOffline(_ value: Bool) { lock.withLock { offline = value } }
@@ -143,12 +220,18 @@ private final class PairingScript: @unchecked Sendable {
                 return (200, ["protocolMajor": 1, "instanceId": replaced ? "second" : "first",
                               "profiles": ["apple-sdr-v1"], "mediaOrigins": ["https://media.example"], "features": ["watchlistWrite": true]])
             case "/api/pairing/ack":
-                if firstAcknowledgement {
-                    firstAcknowledgement = false
-                    throw URLError(.networkConnectionLost)
-                }
-                return (400, ["error": "pairing_unavailable"])
+                guard request.httpMethod == "POST",
+                      request.value(forHTTPHeaderField: "Authorization") == "Bearer " + Self.bearer
+                else { return (401, ["error": "authentication_required"]) }
+                ackCount += 1
+                if scenario == .lostAcknowledgement && ackCount == 1 { throw URLError(.networkConnectionLost) }
+                if scenario == .rejectedAcknowledgement { return (400, ["error": "pairing_unavailable"]) }
+                return (204, [:])
             case "/api/session":
+                identityCount += 1
+                guard request.value(forHTTPHeaderField: "Authorization") == "Bearer " + Self.bearer
+                else { return (200, ["authenticated": false]) }
+                if scenario == .lostIdentity && identityCount == 1 { throw URLError(.networkConnectionLost) }
                 return (200, ["authenticated": true, "deviceId": "fixture-device", "permissions": ["watchlist:write"]])
             default: return (404, [:])
             }
@@ -174,7 +257,7 @@ private final class ScriptedCinemaProtocol: URLProtocol, @unchecked Sendable {
             let (status, json) = try script.reply(request)
             let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-            client?.urlProtocol(self, didLoad: try JSONSerialization.data(withJSONObject: json))
+            if status != 204 { client?.urlProtocol(self, didLoad: try JSONSerialization.data(withJSONObject: json)) }
             client?.urlProtocolDidFinishLoading(self)
         } catch { client?.urlProtocol(self, didFailWithError: error) }
     }

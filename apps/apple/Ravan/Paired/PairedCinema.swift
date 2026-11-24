@@ -126,6 +126,9 @@ final class PairedCinema {
     #endif
 
     func saveChallenge(_ challenge: CinemaChallenge, origin: URL, instance: String) throws {
+        _ = try CinemaURL.id(challenge.id)
+        guard challenge.pollSecret.utf8.count == 43 else { throw CinemaFailure.invalidReply }
+        _ = try CinemaURL.id(challenge.pollSecret)
         try vault.put(RememberedChallenge(origin: origin.absoluteString, instance: instance, challenge: challenge), "pending")
     }
 
@@ -157,7 +160,8 @@ final class PairedCinema {
         } catch {
             guard started == revision, !Task.isCancelled else { return }
             switch error {
-            case CinemaFailure.identity, CinemaFailure.http(401, _, _): try? forget()
+            case CinemaFailure.identity, CinemaFailure.http(401, _, _),
+                 CinemaFailure.http(400, "pairing_unavailable", _): try? forget()
             default: break
             }
             notice = cinemaMessage(error)
@@ -166,43 +170,56 @@ final class PairedCinema {
 
     func finishPairing(client: CinemaAPI, caps: CinemaDiscovery, challenge: CinemaChallenge,
                        approval: CinemaApproval) async throws {
-        guard !isConnected, account == nil, let device = approval.deviceId,
-              (try? CinemaURL.id(device)) != nil, let bearer = approval.credential,
-              bearer.range(of: #"^[A-Za-z0-9_-]{43}$"#, options: .regularExpression) != nil
+        guard !isConnected, !restoring, account == nil, approval.state == "approved",
+              let device = approval.deviceId, let bearer = approval.credential, bearer.utf8.count == 43
         else { throw CinemaFailure.invalidReply }
+        _ = try CinemaURL.id(device)
+        _ = try CinemaURL.id(bearer)
         let saved = CinemaAccount(origin: client.origin.absoluteString, instance: caps.instanceId, device: device)
         let credential = CinemaSecret(bearer: bearer, pendingAck: challenge.id)
         revision += 1
+        let started = revision
+        restoring = true
+        defer { restoring = false }
         // An interrupted ACK can be retried after relaunch, with the same device.
         try vault.put(credential, saved.key)
         do { try vault.put(saved, "selected") }
         catch { try? vault.remove(saved.key); throw error }
         account = saved
         try clearChallenge()
-        do { try await activate(saved, credential, client, caps, revision: revision) }
-        catch CinemaFailure.identity { try forget(); throw CinemaFailure.identity }
-        catch CinemaFailure.http(401, _, _) { try forget(); throw CinemaFailure.identity }
+        do {
+            try await activate(saved, credential, client, caps, revision: started)
+        } catch {
+            guard started == revision else { throw CancellationError() }
+            switch error {
+            case CinemaFailure.identity, CinemaFailure.http(401, _, _):
+                try forget()
+                throw CinemaFailure.identity
+            case CinemaFailure.http(400, "pairing_unavailable", _):
+                try forget()
+                throw error
+            default:
+                throw error
+            }
+        }
     }
 
     private func activate(_ saved: CinemaAccount, _ original: CinemaSecret, _ client: CinemaAPI,
                           _ caps: CinemaDiscovery, revision started: Int) async throws {
         var credential = original
         if let pending = credential.pendingAck {
-            do {
-                _ = try await client.request("/api/pairing/ack", method: "POST",
-                        body: try JSONEncoder().encode(["id": pending]), token: credential.bearer, accepting: [204])
-                credential.pendingAck = nil
-            } catch CinemaFailure.http(400, _, _) {
-                // An ACK may have committed before its reply was lost.
-                credential.pendingAck = nil
-            }
+            _ = try await client.request("/api/pairing/ack", method: "POST",
+                    body: try JSONEncoder().encode(["id": pending]), token: credential.bearer, accepting: [204])
+            guard revision == started else { throw CancellationError() }
+            // Keep the confirmed delivery even if the subsequent identity request is interrupted.
+            credential.pendingAck = nil
+            try vault.put(credential, saved.key)
         }
         let data = try await client.request("/api/session", token: credential.bearer)
         let identity = try JSONDecoder().decode(CinemaIdentity.self, from: data)
         try Task.checkCancellation()
         guard revision == started else { throw CancellationError() }
         guard identity.authenticated, identity.deviceId == saved.device else { throw CinemaFailure.identity }
-        try vault.put(credential, saved.key)
         let recovered = try vault.read(saved.key + "|jobs", [CinemaJob].self) ?? []
         permissions = Set(identity.permissions ?? [])
         jobs = recovered; account = saved; discovery = caps; api = client; secret = credential

@@ -15,6 +15,7 @@ const files = [
   "012_title_follows_drive.sql",
   "013_apple.sql",
   "014_reader_sessions.sql",
+  "015_device_pairing_confirmation.sql",
 ];
 function current(db: Database): number {
   return (

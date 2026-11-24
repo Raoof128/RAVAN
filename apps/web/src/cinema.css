@@ -1290,6 +1290,9 @@ body {
   flex-wrap: wrap;
   font-size: 0.9333rem;
 }
+.device-state {
+  display: block;
+}
 .device-confirm {
   display: flex;
   flex-wrap: wrap;
