@@ -74,11 +74,12 @@ struct ServerConnectionView: View {
                                 let spokenHost = host.components(separatedBy: ".").joined(separator: " " + String(localized: "dot") + " ")
                                 Text(verbatim: host)
                                     .font(.subheadline).foregroundStyle(CinemaTheme.muted)
-                                    .accessibilityLabel(Text("Website address, \(spokenHost)"))
+                                    .accessibilityHidden(true)
                                 Button(action: connectWebsite) {
                                     Label("Get website pairing code", systemImage: "link")
                                 }
                                 .buttonStyle(CinemaPrimaryButtonStyle()).disabled(busy)
+                                .accessibilityValue(Text("Website address, \(spokenHost)"))
                                 .accessibilityIdentifier("server.website")
                             }
                         }
